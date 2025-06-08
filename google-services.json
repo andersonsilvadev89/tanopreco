@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "161717540109",
+    "firebase_url": "https://stoantoniobarbalhacliente-default-rtdb.firebaseio.com",
+    "project_id": "stoantoniobarbalhacliente",
+    "storage_bucket": "stoantoniobarbalhacliente.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:161717540109:android:a5e5d4b112cb7d10704c44",
+        "android_client_info": {
+          "package_name": "com.ae.stoantoniobarbalhacliente"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBaMZ5Oylb-T9A7o2BgJ0ba50NvdOH1aKo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

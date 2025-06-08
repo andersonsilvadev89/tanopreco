@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "petrolina",
+    "slug": "petrolina",
+    "platforms": [
+      "android",
+      "ios"
+    ],
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "bundleIdentifier": "com.petrolina.assistentedeeventos",
+      "infoPlist": {
+        "NSPhotoLibraryUsageDescription": "Precisamos de acesso à sua galeria de fotos."
+      },
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.petrolina.assistentedeeventos",
+      "googleServicesFile": "./google-services.json"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "googleClientId": "60386522895-u9q752serjr2nce5rmiqg4s65t6ov94d.apps.googleusercontent.com",
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "81b50aac-2706-47bb-aee1-709a2d18fb6b"
+      }
+    },
+    "owner": "professor.anderson.a.silva"
+  }
+}
