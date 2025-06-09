@@ -43,6 +43,7 @@
           "backgroundColor": "#ffffff"
         }
       ],
+      "@react-native-firebase/app",
       "expo-secure-store"
     ],
     "experiments": {
@@ -54,7 +55,7 @@
         "origin": false
       },
       "eas": {
-        "projectId": "81b50aac-2706-47bb-aee1-709a2d18fb6b"
+        "projectId": "c152364f-e543-4f21-9ed3-cfc5163afa10"
       }
     },
     "owner": "professor.anderson.a.silva"
