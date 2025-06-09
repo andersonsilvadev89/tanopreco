@@ -13,7 +13,7 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "bundleIdentifier": "com.petrolina.assistentedeeventos",
+      "bundleIdentifier": "com.ae.stoantoniobarbalhacliente",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Precisamos de acesso à sua galeria de fotos."
       },
@@ -24,7 +24,7 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.petrolina.assistentedeeventos",
+      "package": "com.ae.stoantoniobarbalhacliente",
       "googleServicesFile": "./google-services.json"
     },
     "web": {
