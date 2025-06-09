@@ -114,8 +114,8 @@ export default function CadastroScreen({ navigation }: any) {
   }, [fadeAnim]); // fadeAnim adicionado como dependência, pois é usado no efeito
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
-
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    
     if (allBanners.length > 1) {
       intervalId = setInterval(() => {
         Animated.timing(fadeAnim, { // 1. Fade-out do banner atual

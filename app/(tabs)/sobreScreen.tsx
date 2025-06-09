@@ -155,7 +155,8 @@ export default function Sobre() {
   }, [fadeAnim]);
 
   useEffect(() => {
-    let intervalId: NodeJS.Timeout | null = null;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    
     if (allBanners.length > 1) {
       intervalId = setInterval(() => {
         Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
