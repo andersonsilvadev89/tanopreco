@@ -1,13 +1,53 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ImageBackground, FlatList, TouchableOpacity, Dimensions, Linking, Platform, Image, Alert, TextInput, SafeAreaView, InteractionManager, Animated, } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
-import { ref, onValue, get } from 'firebase/database';
+import { ref, onValue, get, update } from 'firebase/database'; // <<< ALTERAÇÃO: Adicionado 'update'
 import { auth, database, administrativoDatabase } from '../../firebaseConfig';
 import * as Location from 'expo-location';
 import { LocationSubscription, PermissionStatus } from 'expo-location';
+import * as TaskManager from 'expo-task-manager'; // <<< ALTERAÇÃO: Importado TaskManager
 import { useFocusEffect } from '@react-navigation/native';
 import moment from 'moment';
 import 'moment/locale/pt-br';
+
+
+// <<< ALTERAÇÃO: DEFINIÇÃO DA TAREFA DE BACKGROUND (FORA DO COMPONENTE) >>>
+const BACKGROUND_LOCATION_TASK = 'background-location-task';
+
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
+  if (error) {
+    console.error('TaskManager Error:', error.message);
+    return;
+  }
+  if (data) {
+    const { locations } = data as { locations: Location.LocationObject[] };
+    const location = locations[0];
+    const userId = auth.currentUser?.uid;
+
+    if (location && userId) {
+      console.log('[Background] Localização recebida:', location.coords);
+      const userLocationRef = ref(database, `localizacoes/${userId}`);
+      
+      // Prepara os dados para atualização no Firebase
+      // Esta tarefa é "burra", ela apenas envia a localização.
+      // A lógica de 'compartilhando' e 'nome' deve ser mantida no DB.
+      const locationData = {
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        timestamp: location.timestamp,
+      };
+      
+      try {
+        await update(userLocationRef, locationData);
+        console.log('[Background] Localização atualizada no Firebase.');
+      } catch (dbError) {
+        console.error('[Background] Erro ao atualizar Firebase:', dbError);
+      }
+    }
+  }
+});
+// <<< FIM DA ALTERAÇÃO >>>
+
 
 // --- Interfaces --- (sem alterações)
 interface Localizacao {
@@ -16,19 +56,15 @@ interface Localizacao {
   nome: string;
   id: string;
 }
-
 interface Amigo {
   id: string;
   nome: string;
   telefone?: string;
   imagem?: string;
 }
-
 interface EventoFirebase { id: string; nomeBanda: string; horaInicio: string; local: string; imagemUrl?: string; dataMomento: string; duracao: string; }
 interface LocalInfoFirebase { id: string; descricao: string; latitude: number; longitude: number; }
 interface EventoProcessado extends EventoFirebase { coordenadas: { latitude: number; longitude: number }; startTime: moment.Moment; endTime: moment.Moment; janelaStartTime: moment.Moment; janelaEndTime: moment.Moment; }
-
-// Interface para tipar os objetos de banner conforme a estrutura fornecida
 interface BannerItem {
   descricao: string;
   id: string;
@@ -37,7 +73,6 @@ interface BannerItem {
 }
 
 const { height: screenHeight } = Dimensions.get('window');
-// const listaAmigosHeight = screenHeight * 0.18; // REMOVIDA - não será mais usada para altura fixa da lista
 
 const AmigoItem = React.memo(({ item, isSelected, amigoLocal, handleAmigoPress }: {
   item: Amigo;
@@ -49,7 +84,7 @@ const AmigoItem = React.memo(({ item, isSelected, amigoLocal, handleAmigoPress }
     <TouchableOpacity
       style={[styles.amigoItem, isSelected && styles.amigoItemSelected]}
       onPress={() => handleAmigoPress(item.id, amigoLocal)}
-      disabled={!amigoLocal && !isSelected} // Lógica de desabilitar mantida
+      disabled={!amigoLocal && !isSelected}
     >
       {item.imagem ? (
         <Image source={{ uri: item.imagem }} style={styles.amigoFoto} />
@@ -107,25 +142,19 @@ const MapaAmigosScreen = () => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); return R * c;
   }, []);
 
+  // --- Lógica de Banners (sem alterações) ---
   const [allBanners, setAllBanners] = useState<string[]>([]);
     const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
     const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-  
-    // Valor animado para a opacidade do banner
-    const fadeAnim = useRef(new Animated.Value(0)).current; // Começa invisível (opacidade 0)
-  
+    const fadeAnim = useRef(new Animated.Value(0)).current;
     useEffect(() => {
       const fetchBanners = async () => {
         try {
-          // Usando administrativoDatabase conforme seu código anterior
           const sponsorsRef = ref(administrativoDatabase, 'patrocinadores');
-          
           const snapshot = await get(sponsorsRef);
-  
           if (snapshot.exists()) {
             const sponsorsData = snapshot.val();
             const bannersList: string[] = [];
-  
             for (const sponsorId in sponsorsData) {
               const sponsor = sponsorsData[sponsorId];
               if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
@@ -137,25 +166,20 @@ const MapaAmigosScreen = () => {
                 });
               }
             }
-  
             if (bannersList.length > 0) {
               setAllBanners(bannersList);
               setCurrentBannerUrl(bannersList[0]);
               setCurrentBannerIndex(0);
-              // Animação de Fade-in para o primeiro banner
               Animated.timing(fadeAnim, {
                 toValue: 1,
-                duration: 200, // Duração do fade-in
-                useNativeDriver: true, // Importante para performance
+                duration: 200,
+                useNativeDriver: true,
               }).start();
             } else {
-              console.log('Nenhum banner de patrocinador encontrado com a estrutura esperada.');
               setCurrentBannerUrl(null);
-              fadeAnim.setValue(0); // Garante que a opacidade seja 0 se não houver banners
+              fadeAnim.setValue(0);
             }
           } else {
-            // Ajuste na mensagem de log para refletir o caminho usado
-            console.log('Nó "patrocinadores" não encontrado em administrativoDatabase.');
             setCurrentBannerUrl(null);
             fadeAnim.setValue(0);
           }
@@ -166,85 +190,94 @@ const MapaAmigosScreen = () => {
           fadeAnim.setValue(0);
         }
       };
-  
       fetchBanners();
-    }, [fadeAnim]); // fadeAnim adicionado como dependência, pois é usado no efeito
-  
+    }, [fadeAnim]);
     useEffect(() => {
       let intervalId: ReturnType<typeof setInterval> | null = null;
-      
       if (allBanners.length > 1) {
         intervalId = setInterval(() => {
-          Animated.timing(fadeAnim, { // 1. Fade-out do banner atual
+          Animated.timing(fadeAnim, {
             toValue: 0,
-            duration: 200, // Duração do fade-out
+            duration: 200,
             useNativeDriver: true,
           }).start(() => {
-            // 2. Atualiza o banner APÓS o fade-out
             setCurrentBannerIndex(prevIndex => {
               const nextIndex = (prevIndex + 1) % allBanners.length;
-              setCurrentBannerUrl(allBanners[nextIndex]); // Define a URL para o próximo banner
-              
-              // 3. Fade-in do novo banner
+              setCurrentBannerUrl(allBanners[nextIndex]);
               Animated.timing(fadeAnim, {
                 toValue: 1,
-                duration: 200, // Duração do fade-in
+                duration: 200,
                 useNativeDriver: true,
               }).start();
-              
-              return nextIndex; // Retorna o novo índice
+              return nextIndex;
             });
           });
-        }, 6000); // Tempo entre o início de cada transição
+        }, 6000);
       }
-  
-      return () => { // Limpa o intervalo quando o componente é desmontado ou allBanners muda
+      return () => {
         if (intervalId) {
           clearInterval(intervalId);
         }
       };
     }, [allBanners, fadeAnim]);
 
+
   useEffect(() => {
     const intervalId = setInterval(() => { setCurrentTimeTick(prev => prev + 1); }, 60000);
     return () => clearInterval(intervalId);
   }, []);
-
+  
+  // <<< ALTERAÇÃO: LÓGICA DE SOLICITAÇÃO DE PERMISSÃO ATUALIZADA >>>
   useEffect(() => {
     if (!usuarioLogadoId) {
-      setLoadingStatus(false); setCompartilhando(false); setLocationPermissionStatus(null);
+      setLoadingStatus(false);
+      setCompartilhando(false);
+      setLocationPermissionStatus(null);
       return;
     }
+  
     let isMounted = true;
     setLoadingStatus(true);
-    let tempCompartilhando: boolean | null = null;
-    let tempPermStatus: PermissionStatus | null = null;
-    const tryFinishLoadingStatus = () => {
-      if (isMounted && tempCompartilhando !== null && tempPermStatus !== null) {
-        setLoadingStatus(false);
-      }
-    };
+  
     const statusRef = ref(database, `usuarios/${usuarioLogadoId}/compartilhando`);
     const unsubscribeStatus = onValue(statusRef, (snapshot) => {
       if (isMounted) {
-        tempCompartilhando = snapshot.val() === true;
-        setCompartilhando(tempCompartilhando);
-        tryFinishLoadingStatus();
+        const isSharing = snapshot.val() === true;
+        setCompartilhando(isSharing);
       }
-    }, (error) => {
-      console.error("Erro ao ler status de compartilhamento:", error);
-      if(isMounted){ tempCompartilhando = false; setCompartilhando(false); tryFinishLoadingStatus(); }
     });
-    Location.requestForegroundPermissionsAsync()
-      .then(({ status }) => {
-        if (isMounted) { tempPermStatus = status; setLocationPermissionStatus(status); tryFinishLoadingStatus(); }
-      })
-      .catch((error) => {
-        console.error("Erro ao solicitar permissão de localização:", error);
-        if (isMounted) { tempPermStatus = PermissionStatus.DENIED; setLocationPermissionStatus(PermissionStatus.DENIED); tryFinishLoadingStatus(); }
-      });
-    return () => { isMounted = false; unsubscribeStatus(); };
+  
+    const requestPermissions = async () => {
+      // 1. Pede permissão de primeiro plano (Foreground)
+      const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+      
+      if (isMounted) {
+        setLocationPermissionStatus(foregroundStatus);
+  
+        // 2. Se concedida, pede a de segundo plano (Background)
+        if (foregroundStatus === 'granted') {
+          const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+          if (backgroundStatus !== 'granted') {
+            // Opcional: Avisar o usuário sobre a importância da permissão de background
+            Alert.alert(
+              "Permissão Adicional Necessária",
+              "Para uma melhor experiência e para que seus amigos o encontrem mesmo com o app fechado, por favor, escolha a opção 'Permitir o tempo todo' para a localização.",
+              [{ text: "Entendi" }]
+            );
+          }
+        }
+        setLoadingStatus(false); // Finaliza o loading após as permissões
+      }
+    };
+  
+    requestPermissions();
+  
+    return () => {
+      isMounted = false;
+      unsubscribeStatus();
+    };
   }, [usuarioLogadoId]);
+
 
   useEffect(() => {
     if (!usuarioLogadoId) { setAmigosLista([]); return; }
@@ -410,61 +443,103 @@ const MapaAmigosScreen = () => {
     return () => { unsubscribePrincipal(); activeLocationListeners.forEach(unsub => unsub()); };
   }, [usuarioLogadoId, podeRastrearAmigos]);
 
+
+  // <<< ALTERAÇÃO: NOVO useEffect PARA GERENCIAR A TAREFA DE BACKGROUND >>>
   useEffect(() => {
-    const manageLocationTracking = async () => {
+    const manageBackgroundTask = async () => {
+        if (!usuarioLogadoId || compartilhando === null) return;
+
+        const isTaskRunning = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
+
+        try {
+            if (compartilhando && !isTaskRunning) {
+                // Inicia a tarefa de background
+                await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+                    accuracy: Location.Accuracy.High,
+                    timeInterval: 60000, // 1 minuto
+                    distanceInterval: 50, // 50 metros
+                    showsBackgroundLocationIndicator: true,
+                    foregroundService: {
+                        notificationTitle: 'Compartilhamento Ativo',
+                        notificationBody: 'Sua localização está sendo compartilhada com seus amigos.',
+                        notificationColor: '#007BFF',
+                    },
+                });
+                console.log('Tarefa de localização em background iniciada.');
+            } else if (!compartilhando && isTaskRunning) {
+                // Para a tarefa de background
+                await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+                console.log('Tarefa de localização em background parada.');
+            }
+        } catch (error) {
+            console.error("Erro ao gerenciar a tarefa de background:", error);
+        }
+    };
+
+    manageBackgroundTask();
+  }, [compartilhando, usuarioLogadoId]);
+
+
+  // <<< ALTERAÇÃO: useEffect de RASTREAMENTO EM PRIMEIRO PLANO (para UI) >>>
+  // Este hook agora serve para atualizar a UI (marcador 'EU' e centralização do mapa) em tempo real quando o app está aberto.
+  useEffect(() => {
+    const manageForegroundTracking = async () => {
+      // Remove a inscrição anterior para evitar duplicatas
       if (locationSubscriptionRef.current) {
         locationSubscriptionRef.current.remove();
         locationSubscriptionRef.current = null;
       }
-      if (!usuarioLogadoId) {
-        setLocationPermissionStatus(null);
+  
+      // Se não estiver compartilhando ou não tiver permissão, para tudo.
+      if (compartilhando !== true || locationPermissionStatus !== PermissionStatus.GRANTED) {
         setMinhaLocalizacao(null);
         return;
       }
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      setLocationPermissionStatus(status);
-      if (status === PermissionStatus.GRANTED && compartilhando === true) {
-        try {
-          locationSubscriptionRef.current = await Location.watchPositionAsync(
-            { accuracy: Location.Accuracy.High, timeInterval: 10000, distanceInterval: 20 },
-            (location) => {
-              if (!usuarioLogadoId) return;
-              const newMinhaLocalizacao: Localizacao = {
-                id: usuarioLogadoId, nome: 'Você',
-                latitude: location.coords.latitude, longitude: location.coords.longitude,
-              };
-              setMinhaLocalizacao(newMinhaLocalizacao);
-              if (!selectedAmigoId) {
-                const isInitialRegion = !mapRegion.latitude || mapRegion.latitude === -7.2291;
-                setMapRegion(prevRegion => ({
-                  latitude: newMinhaLocalizacao.latitude, longitude: newMinhaLocalizacao.longitude,
-                  latitudeDelta: isInitialRegion ? 0.02 : (prevRegion?.latitudeDelta || 0.02),
-                  longitudeDelta: isInitialRegion ? 0.02 : (prevRegion?.longitudeDelta || 0.02),
-                }));
-              }
+  
+      // Inicia o watchPositionAsync para atualizações em tempo real na UI
+      try {
+        locationSubscriptionRef.current = await Location.watchPositionAsync(
+          { accuracy: Location.Accuracy.High, timeInterval: 10000, distanceInterval: 20 },
+          (location) => {
+            if (!usuarioLogadoId) return;
+  
+            const newMinhaLocalizacao: Localizacao = {
+              id: usuarioLogadoId,
+              nome: 'Você',
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            };
+            setMinhaLocalizacao(newMinhaLocalizacao);
+  
+            // Centraliza o mapa no usuário apenas se nenhum amigo estiver selecionado
+            if (!selectedAmigoId) {
+              const isInitialRegion = mapRegion.latitude === -7.2291;
+              setMapRegion(prevRegion => ({
+                latitude: newMinhaLocalizacao.latitude,
+                longitude: newMinhaLocalizacao.longitude,
+                latitudeDelta: isInitialRegion ? 0.02 : (prevRegion?.latitudeDelta || 0.02),
+                longitudeDelta: isInitialRegion ? 0.02 : (prevRegion?.longitudeDelta || 0.02),
+              }));
             }
-          );
-        } catch (error) {
-          console.error("Erro ao iniciar watchPositionAsync:", error);
-          setLocationPermissionStatus(PermissionStatus.DENIED);
-          setMinhaLocalizacao(null);
-        }
-      } else {
+          }
+        );
+      } catch (error) {
+        console.error("Erro ao iniciar watchPositionAsync (foreground):", error);
+        Alert.alert("Erro de Localização", "Não foi possível obter sua localização em tempo real.");
         setMinhaLocalizacao(null);
-        if (locationSubscriptionRef.current) {
-          locationSubscriptionRef.current = null;
-        }
       }
     };
-    manageLocationTracking();
+  
+    manageForegroundTracking();
+  
+    // Função de limpeza para parar o rastreamento quando o componente/efeito for desmontado
     return () => {
       if (locationSubscriptionRef.current) {
         locationSubscriptionRef.current.remove();
         locationSubscriptionRef.current = null;
       }
     };
-  }, [compartilhando, usuarioLogadoId, selectedAmigoId]);
-
+  }, [compartilhando, usuarioLogadoId, locationPermissionStatus, selectedAmigoId]); // Adicionado locationPermissionStatus como dependência
 
   const handleBuscaAmigos = (texto: string) => { setTermoBusca(texto); };
 
@@ -496,6 +571,8 @@ const MapaAmigosScreen = () => {
   };
 
   const isLoadingGeral = loadingStatus || loadingEventos;
+
+  // --- Renderização (sem alterações significativas, apenas condicionais atualizadas) ---
 
   if (isLoadingGeral && usuarioLogadoId) {
     return (
@@ -544,19 +621,16 @@ const MapaAmigosScreen = () => {
     <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
       <View style={styles.adBanner}>
               {currentBannerUrl ? (
-                <Animated.Image // Usando Animated.Image
+                <Animated.Image 
                   source={{ uri: currentBannerUrl }}
                   style={[
                     styles.bannerImage,
-                    { opacity: fadeAnim } // Aplicando a opacidade animada
+                    { opacity: fadeAnim } 
                   ]}
                   resizeMode="contain"
                   onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
                 />
               ) : (
-                // O texto de fallback não precisa ser animado da mesma forma,
-                // mas podemos envolvê-lo se quisermos um fade para ele também.
-                // Por ora, ele aparece quando não há currentBannerUrl e fadeAnim está em 0.
                 <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
               )}
             </View>
@@ -574,7 +648,7 @@ const MapaAmigosScreen = () => {
               data={amigosListaFiltrada}
               keyExtractor={(item) => item.id}
               renderItem={renderAmigoItem}
-              contentContainerStyle={styles.amigosListContent} // ALTERADO
+              contentContainerStyle={styles.amigosListContent}
             />
           </View>
         ) : (
@@ -612,7 +686,7 @@ const MapaAmigosScreen = () => {
   );
 };
 
-// Estilos
+// Estilos (sem alterações)
 const styles = StyleSheet.create({
   background: { flex: 1, resizeMode: 'cover' },
   adBanner: {
@@ -645,81 +719,76 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     fontSize: 16,
     marginHorizontal: 10,
-    marginTop: Platform.OS === 'ios' ? 10 : 10, // Mantido como estava
-    marginBottom: 10, // Espaçamento antes da lista/mapa
+    marginTop: Platform.OS === 'ios' ? 10 : 10,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#E0E0E0'
   },
-  amigosListContainer: { // MODIFICADO para lista vertical
-    maxHeight: screenHeight * 0.35, // Limita a altura da lista
-    marginHorizontal: 10,         // Para alinhar com searchInput e mapContainer
-    marginBottom: 10,             // Espaço antes do mapa
+  amigosListContainer: {
+    maxHeight: screenHeight * 0.35,
+    marginHorizontal: 10,
+    marginBottom: 10,
   },
-  amigosListContent: { // NOVO/RENOMEADO - Estilo para o conteúdo DENTRO da FlatList
-    paddingVertical: 5, // Espaçamento vertical interno para os itens
+  amigosListContent: {
+    paddingVertical: 5,
   },
-  amigoItem: { // MODIFICADO para layout de item vertical (foto à esquerda, info à direita)
+  amigoItem: {
     flexDirection: 'row',
     backgroundColor: 'rgba(255, 255, 255, 0.98)',
     padding: 10,
     borderRadius: 10,
-    alignItems: 'center', // Alinha foto e texto verticalmente ao centro
-    marginBottom: 10,     // Espaçamento entre os itens da lista
+    alignItems: 'center',
+    marginBottom: 10,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 1.5,
-    // width e height removidos para serem automáticos/flexíveis
-    // marginRight removido (era para lista horizontal)
   },
-  amigoItemSelected: { // Mantido, mas agora se aplica ao item de lista vertical
+  amigoItemSelected: {
     backgroundColor: '#E3F2FD',
     borderColor: '#007BFF',
     borderWidth: 2,
   },
-  amigoFoto: { // MODIFICADO - adicionado marginRight
+  amigoFoto: {
     width: 50,
     height: 50,
     borderRadius: 25,
-    marginRight: 12, // Espaço entre a foto e as informações
+    marginRight: 12,
   },
-  amigoFotoPlaceholder: { // MODIFICADO - adicionado marginRight
+  amigoFotoPlaceholder: {
     width: 50,
     height: 50,
     borderRadius: 25,
     backgroundColor: '#BDBDBD',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12, // Espaço entre o placeholder da foto e as informações
+    marginRight: 12,
   },
   amigoFotoPlaceholderText: { fontSize: 22, color: '#FFFFFF', fontWeight: 'bold' },
-  amigoInfo: { // MODIFICADO para layout com foto à esquerda
-    flex: 1, // Para ocupar o espaço restante ao lado da foto
-    alignItems: 'flex-start', // Alinha o texto à esquerda
-    // marginTop removido
-    // width: '100%' removido
+  amigoInfo: {
+    flex: 1,
+    alignItems: 'flex-start',
   },
-  amigoNome: { // MODIFICADO - textAlign
+  amigoNome: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
-    textAlign: 'left', // Alinha nome à esquerda
+    textAlign: 'left',
   },
-  amigoTelefone: { // Estilo não estava sendo usado no AmigoItem, mas se fosse, textAlign left
+  amigoTelefone: {
     fontSize: 12, color: '#666', marginBottom: 2, textAlign: 'left'
   },
-  amigoOffline: { // MODIFICADO - textAlign e fontSize
+  amigoOffline: {
     fontSize: 12,
     color: '#D32F2F',
     fontStyle: 'italic',
-    textAlign: 'left', // Alinha status offline à esquerda
+    textAlign: 'left',
     marginTop: 3,
   },
-  mapContainer: { // MODIFICADO - marginTop removido (espaçamento gerenciado por elementos acima)
+  mapContainer: {
     flex: 1,
     marginHorizontal: 10,
-    // marginTop: 0, // Removido
     marginBottom: 10,
     borderRadius: 12,
     overflow: 'hidden',
@@ -727,17 +796,17 @@ const styles = StyleSheet.create({
     borderColor: '#BDBDBD'
   },
   map: { flex: 1 },
-  semAmigosContainer: { // Estilos base para a mensagem "Sem amigos"
+  semAmigosContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 10,
     borderRadius: 10,
   },
-  semAmigosVertical: { // Estilos adicionais/específicos para a versão vertical da mensagem
-    minHeight: 100, // Altura mínima para a mensagem
-    backgroundColor: 'rgba(255,255,255,0.15)', // Fundo sutil
+  semAmigosVertical: {
+    minHeight: 100,
+    backgroundColor: 'rgba(255,255,255,0.15)',
     padding: 20,
-    marginBottom: 10, // Espaço antes do mapa
+    marginBottom: 10,
   },
   semAmigosText: { fontSize: 16, color: 'white', textAlign: 'center', marginBottom: 8 },
   semAmigosSubText: { fontSize: 14, color: '#f0f0f0', textAlign: 'center' },

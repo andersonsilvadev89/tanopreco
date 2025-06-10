@@ -15,8 +15,12 @@
     "ios": {
       "bundleIdentifier": "com.ae.stoantoniobarbalhacliente",
       "infoPlist": {
-        "NSPhotoLibraryUsageDescription": "Precisamos de acesso à sua galeria de fotos."
+        "NSPhotoLibraryUsageDescription": "Precisamos de acesso à sua galeria de fotos.",
+        "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para mostrar seus amigos no mapa.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Precisamos da sua localização em segundo plano para que seus amigos possam te encontrar mesmo com o app fechado.",
+        "NSLocationAlwaysUsageDescription": "Precisamos da sua localização em segundo plano para que seus amigos possam te encontrar mesmo com o app fechado."
       },
+
       "supportsTablet": true
     },
     "android": {
@@ -24,6 +28,11 @@
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ],
       "package": "com.ae.stoantoniobarbalhacliente",
       "googleServicesFile": "./google-services.json"
     },
@@ -41,6 +50,12 @@
           "imageWidth": 200,
           "resizeMode": "contain",
           "backgroundColor": "#ffffff"
+        },
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permitir que $(PRODUCT_NAME) use sua localização.",
+          "isAndroidBackgroundLocationEnabled": true, // <-- Habilita o serviço em background
+          "isAndroidForegroundServiceEnabled": true // <-- Necessário para Android 10+
         }
       ],
       "@react-native-firebase/app",
