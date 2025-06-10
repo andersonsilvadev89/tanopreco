@@ -53,10 +53,9 @@
         },
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Permitir que $(PRODUCT_NAME) use sua localização.",
-          "isAndroidBackgroundLocationEnabled": true, // <-- Habilita o serviço em background
-          "isAndroidForegroundServiceEnabled": true // <-- Necessário para Android 10+
-        }
+          "locationAlwaysAndWhenInUsePermission": "Permitir que $(PRODUCT_NAME) use sua localização para te mostrar no mapa.",
+          "isAndroidBackgroundLocationEnabled": true
+        } 
       ],
       "@react-native-firebase/app",
       "expo-secure-store"
