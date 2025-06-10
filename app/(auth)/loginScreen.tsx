@@ -49,8 +49,7 @@ const LoginScreen = ({ navigation }: any) => {
   androidClientId: '161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com', 
 
   // Mantenha a antiga para web/desenvolvimento
-  webClientId: '60386522895-u9q752serjr2nce5rmiqg4s65t6ov94d.apps.googleusercontent.com',
-  redirectUri: AuthSession.makeRedirectUri(), 
+  webClientId: '60386522895-u9q752serjr2nce5rmiqg4s65t6ov94d.apps.googleusercontent.com', 
 });
   const toggleMostrarSenha = () => {
     setMostrarSenha(!mostrarSenha);
