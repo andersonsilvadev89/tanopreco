@@ -25,6 +25,7 @@ import * as Google from 'expo-auth-session/providers/google';
 import { router } from 'expo-router';
 import { ref, get } from 'firebase/database';
 import { Eye, EyeOff } from 'lucide-react-native';
+import * as AuthSession from 'expo-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -48,7 +49,8 @@ const LoginScreen = ({ navigation }: any) => {
   androidClientId: '161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com', 
 
   // Mantenha a antiga para web/desenvolvimento
-  webClientId: '60386522895-u9q752serjr2nce5rmiqg4s65t6ov94d.apps.googleusercontent.com', 
+  webClientId: '60386522895-u9q752serjr2nce5rmiqg4s65t6ov94d.apps.googleusercontent.com',
+  redirectUri: AuthSession.makeRedirectUri(), 
 });
   const toggleMostrarSenha = () => {
     setMostrarSenha(!mostrarSenha);
