@@ -44,10 +44,12 @@ const LoginScreen = ({ navigation }: any) => {
   const screenWidth = Dimensions.get('window').width;
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: '60386522895-u9q752serjr2nce5rmiqg4s65t6ov94d.apps.googleusercontent.com',
-    redirectUri: 'https://auth.expo.io/@professor.anderson.a.silva/expocrato',
-  });
+  // Use a nova credencial para Android
+  androidClientId: '161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com', 
 
+  // Mantenha a antiga para web/desenvolvimento
+  webClientId: '60386522895-u9q752serjr2nce5rmiqg4s65t6ov94d.apps.googleusercontent.com', 
+});
   const toggleMostrarSenha = () => {
     setMostrarSenha(!mostrarSenha);
   };
