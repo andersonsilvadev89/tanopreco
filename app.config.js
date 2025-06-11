@@ -9,6 +9,11 @@ export default {
         "version": "1.0.0",
         "orientation": "portrait",
         "icon": "./assets/images/icon.png",
+        "splash": {
+            "image": "./assets/images/splash-icon.png", // Use a imagem que você quer
+            "resizeMode": "contain",
+            "backgroundColor": "#ffffff"
+        },
         "scheme": "myapp",
         "userInterfaceStyle": "automatic",
         "newArchEnabled": false,
@@ -53,14 +58,7 @@ export default {
         },
         "plugins": [
             "expo-router",
-            ["expo-splash-screen",
-                {
-                    "image": "./assets/images/splash-icon.png",
-                    "imageWidth": 200,
-                    "resizeMode": "contain",
-                    "backgroundColor": "#ffffff"
-                }
-            ],
+            "expo-splash-screen",
             ["expo-location",
                 {
                     "locationAlwaysAndWhenInUsePermission": "Permitir que $(PRODUCT_NAME) use sua localização para te mostrar no mapa.",
