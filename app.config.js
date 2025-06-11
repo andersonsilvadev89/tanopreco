@@ -65,7 +65,6 @@ export default {
                     "isAndroidBackgroundLocationEnabled": true
                 }
             ],
-            "@react-native-firebase/app",
             "expo-secure-store"  
         ],
         "experiments": {
