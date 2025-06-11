@@ -13,7 +13,9 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
+      "buildNumber": "1",
       "bundleIdentifier": "com.ae.stoantoniobarbalhacliente",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "NSPhotoLibraryUsageDescription": "Precisamos de acesso à sua galeria de fotos.",
         "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para mostrar seus amigos no mapa.",
@@ -24,6 +26,7 @@
       "supportsTablet": true
     },
     "android": {
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"

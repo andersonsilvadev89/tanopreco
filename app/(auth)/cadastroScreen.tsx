@@ -20,7 +20,7 @@ import { auth, database, administrativoDatabase } from '../../firebaseConfig';
 import { ref, set, get } from 'firebase/database';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Eye, EyeOff } from 'lucide-react-native';
-import { TextInputMask } from 'react-native-masked-text';
+import { MaskedTextInput } from 'react-native-mask-text';
 import { router } from 'expo-router';
 
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
@@ -305,7 +305,7 @@ export default function CadastroScreen({ navigation }: any) {
             style={styles.input}
           />
 
-          <TextInputMask
+          <MaskedTextInput
             type={'cel-phone'}
             options={{
               maskType: 'BRL',

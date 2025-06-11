@@ -1,14 +1,28 @@
 {
+  "cli": {
+    "version": ">= 7.0.0"
+  },
   "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal"
+    },
     "preview": {
+        
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "Maps_API_KEY": "@Maps_API_KEY"
       }
     },
     "production": {
-      "android": {
-        "buildType": "apk"
+      "env": {
+        "Maps_API_KEY": "@Maps_API_KEY"
       }
     }
+  },
+  "submit": {
+    "production": {}
   }
 }
