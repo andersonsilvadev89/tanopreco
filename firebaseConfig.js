@@ -1,6 +1,6 @@
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase } from 'firebase/database';
-import { getAuth, getReactNativePersistence, GoogleAuthProvider } from 'firebase/auth';import { getStorage } from 'firebase/storage';
+import { getReactNativePersistence, GoogleAuthProvider, initializeAuth } from 'firebase/auth';import { getStorage } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Suas configurações do Firebase
@@ -60,11 +60,11 @@ const empresaDatabase = getDatabase(empresaApp);
 const administrativoDatabase = getDatabase(administrativoApp);
 const adminDatabase = getDatabase(adminApp);
 
-// Auth para o aplicativo padrão (cliente)
-const auth = getAuth(clienteApp);
-const authPersistence = { persistence: getReactNativePersistence(AsyncStorage) };
-// Remova a linha abaixo:
-// initializeAuth(adminApp, authPersistence);
+// Auth para o aplicativo padrão (cliente) com PERSISTÊNCIA garantida
+const auth = initializeAuth(clienteApp, {
+  persistence: getReactNativePersistence(AsyncStorage)
+});
+
 const googleProvider = new GoogleAuthProvider();
 
 // Storage para o aplicativo padrão (admin)
