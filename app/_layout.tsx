@@ -1,30 +1,32 @@
-// app/_layout.tsx
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react'; // Removido useState 'ready'
 import { Stack } from 'expo-router';
-import { View } from 'react-native';
+import { AuthProvider } from '../context/AuthContext'; // 1. IMPORTAR
 
 SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [fontsLoaded, fontError] = useFonts({
     SpaceMono: require('../assets/fonts/SpaceMono-Regular.ttf'),
   });
 
-  const [ready, setReady] = useState(false);
-
   useEffect(() => {
-    if (fontsLoaded) {
-      SplashScreen.hideAsync().then(() => setReady(true));
+    // Esconder o splash screen apenas quando as fontes estiverem carregadas OU der erro
+    if (fontsLoaded || fontError) {
+      SplashScreen.hideAsync();
     }
-  }, [fontsLoaded]);
+  }, [fontsLoaded, fontError]);
 
-  if (!ready) {
-    return <View style={{ flex: 1, backgroundColor: 'black' }} />;
+  // Se as fontes não carregaram ainda, não renderiza nada. O splash screen nativo fica visível.
+  if (!fontsLoaded && !fontError) {
+    return null;
   }
 
+  // 2. ENVOLVER O STACK COM O AUTHPROVIDER
   return (
-    <Stack screenOptions={{ headerShown: false }} />
+    <AuthProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </AuthProvider>
   );
 }
