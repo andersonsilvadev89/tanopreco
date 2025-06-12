@@ -1,9 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, ReactNode } from 'react';
-import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
-
-// Importe sua configuração do firebase!
-// Certifique-se que o caminho está correto.
-import '../firebaseConfig'; // <-- ATENÇÃO AQUI
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth } from '../firebaseConfig';
 
 // Tipagem para o valor do nosso contexto
 interface AuthContextType {
@@ -23,7 +20,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, (authenticatedUser) => {
       setUser(authenticatedUser);
       setLoading(false);
