@@ -441,8 +441,7 @@ const displayImageUri = novaImagemUri || imagem;
         </View>
       </ImageBackground>
     );
-  }
-
+  }else{
 return (
   <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
     <View style={styles.adBanner}>
@@ -462,8 +461,7 @@ return (
         extraScrollHeight={Platform.OS === 'ios' ? 20 : 0}
         enableOnAndroid={true} 
         keyboardShouldPersistTaps="handled"><SafeAreaView style={styles.innerContainer}>
-          <View style={styles.card}>
-            {!editandoPerfil ? (
+          <View style={styles.card}>{!editandoPerfil ? (
               <View style={styles.profileDisplayContainer}>
                 <TouchableOpacity onPress={handleEditarPerfil} style={styles.profileImageTouchable}>
                   {displayImageUri ? (
@@ -543,7 +541,10 @@ return (
     </SafeAreaView>
     </KeyboardAwareScrollView>
 </ImageBackground>
-);};
+);
+}
+
+};
 
 const styles = StyleSheet.create({
   background: {
