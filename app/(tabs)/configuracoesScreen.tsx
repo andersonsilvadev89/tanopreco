@@ -444,14 +444,11 @@ const displayImageUri = novaImagemUri || imagem;
   }else{
 return (
   <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
-    <View style={styles.adBanner}>
-              {currentBannerUrl ? (
-                <Animated.Image
+    <View style={styles.adBanner}>{currentBannerUrl ? (<Animated.Image
                   source={{ uri: currentBannerUrl }}
                   style={[ styles.bannerImage, { opacity: fadeAnim } ]}
                   resizeMode="contain"
-                  onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
-                />
+                  onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}/>
               ) : (
                 <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
               )}
