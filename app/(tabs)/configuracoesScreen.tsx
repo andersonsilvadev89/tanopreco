@@ -1,20 +1,20 @@
 import React, { useEffect, useState, useRef } from 'react';
 import {
-View,
-Text,
-StyleSheet,
-Switch,
-Alert,
-TouchableOpacity,
-TextInput,
-Image,
-ImageBackground,
-Dimensions,
-Animated,
-Platform,
-Linking,
-ActivityIndicator,
-SafeAreaView 
+    View,
+  Text,
+  StyleSheet,
+  Switch,
+  Alert,
+  TouchableOpacity,
+  TextInput,
+  Image,
+  ImageBackground,
+  Dimensions,
+  Animated,
+  Platform,
+  Linking,
+  ActivityIndicator,
+  SafeAreaView 
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -431,6 +431,17 @@ const ConfiguracoesScreen = () => {
   };
 
 const displayImageUri = novaImagemUri || imagem;
+
+  if (carregando) {
+    return (
+      <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#fff"/>
+          <Text style={styles.loadingText}>Carregando...</Text>
+        </View>
+      </ImageBackground>
+    );
+  }
 
 return (
   <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
