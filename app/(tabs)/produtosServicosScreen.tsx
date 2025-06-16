@@ -16,6 +16,7 @@ import {
 import { Feather } from '@expo/vector-icons'; // Importar Feather icons
 import { empresaDatabase, administrativoDatabase } from '../../firebaseConfig';
 import { ref, onValue, get } from 'firebase/database';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
 import MapView, { Marker, Callout } from 'react-native-maps'; // Callout adicionado para o futuro
 
@@ -253,17 +254,20 @@ export default function VisualizarProdutosServicos() {
     }
   };
 
-  const handleOpenInstagram = (url: string) => {
-    const linkInstagramPattern = /^(https?:\/\/)?(www\.)?instagram\.com\/[a-zA-Z0-9(\.\_\?)%&=\-\/]+$/;
-    if (linkInstagramPattern.test(url)) {
-      Linking.openURL(url).catch(err => {
-        console.error("Erro ao abrir link do Instagram:", err);
-        Alert.alert("Erro", "Não foi possível abrir o link do Instagram.");
-      });
-    } else {
-      Alert.alert("Link Inválido", "O link do Instagram fornecido não parece ser válido.");
-    }
-  };
+  const handleInstagramPress = async (instagramUsername: string | undefined) => {
+        if (!instagramUsername) return;
+        const url = `https://www.instagram.com/${instagramUsername.replace('@', '')}`;
+        try {
+          const supported = await Linking.canOpenURL(url);
+          if (supported) {
+            await Linking.openURL(url);
+          } else {
+            Alert.alert("Erro", `Não foi possível abrir o perfil do Instagram.`);
+          }
+        } catch (error) {
+          Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
+        }
+    };
 
   if (loadingInicial && produtosComEmpresa.length === 0) {
     return (
@@ -302,12 +306,16 @@ export default function VisualizarProdutosServicos() {
                         </TouchableOpacity>
                       )}
                       {item.linkInstagram && (
-                        <TouchableOpacity
-                          style={[styles.itemActionButton, styles.instagramItemButton]}
-                          onPress={() => handleOpenInstagram(item.linkInstagram!)}
-                        >
-                          <Text style={styles.itemActionButtonText}>Instagram</Text>
-                        </TouchableOpacity>
+                        <TouchableOpacity onPress={() => handleInstagramPress(item.linkInstagram)}>
+                                      <LinearGradient
+                                        colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
+                                        start={{ x: 0.0, y: 1.0 }}
+                                        end={{ x: 1.0, y: 0.0 }}
+                                        style={styles.instagramButton}
+                                      >
+                                        <Text style={styles.instagramButtonText}>Instagram</Text>
+                                      </LinearGradient>
+                                    </TouchableOpacity>
                       )}
                     </View>
                   </View>
@@ -401,7 +409,6 @@ export default function VisualizarProdutosServicos() {
 }
 
 const styles = StyleSheet.create({
-  // ... (estilos anteriores permanecem, exceto os de modal e mapa na lista)
   background: { flex: 1, resizeMode: 'cover' },
   adBanner: { height: 60, backgroundColor: 'rgba(220,220,220,0.7)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
   bannerImage: { width: '100%', height: '100%' },
@@ -419,10 +426,9 @@ const styles = StyleSheet.create({
   botaoEspacado: { marginRight: 8 },
   precoContainer: { flex: 1, alignItems: 'flex-end', justifyContent: 'center' },
   preco: { fontSize: 30, color: 'green', fontWeight: '600', textAlign: 'right' },
-  itemActionButton: { paddingVertical: 1, paddingHorizontal: 10, borderRadius: 18, alignItems: 'center', justifyContent: 'center', minHeight: 20, minWidth: 90 },
+  itemActionButton: { paddingVertical: 1, paddingHorizontal: 10, borderRadius: 20, alignItems: 'center', justifyContent: 'center', minHeight: 20, minWidth: 90 },
   itemActionButtonText: { color: 'white', fontSize: 10, fontWeight: 'bold', textAlign: 'center' },
   mapItemButton: { backgroundColor: '#007BFF' },
-  instagramItemButton: { backgroundColor: '#E1306C' },
   botaoMostrarMais: { backgroundColor: '#007bff', padding: 12, borderRadius: 8, alignItems: 'center', marginVertical: 10 },
   textoBotaoMostrarMais: { color: 'white', fontWeight: 'bold', fontSize: 15 },
   mensagemNenhumResultado: { textAlign: 'center', marginTop: 20, fontStyle: 'italic', color: 'gray', fontSize: 15 },
@@ -488,5 +494,19 @@ const styles = StyleSheet.create({
   calloutDescription: {
     fontSize: 12,
     color: '#555',
+  },
+  instagramButton: {
+    paddingVertical: 1,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 90,
+    minHeight: 20,
+  },
+  instagramButtonText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });

@@ -38,6 +38,7 @@ export default function CadastroScreen({ navigation }: any) {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [telefone, setTelefone] = useState('');
+  const [instagram, setInstagram] = useState(''); // NOVO ESTADO
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [imagem, setImagem] = useState<string | null>(null);
@@ -241,10 +242,12 @@ export default function CadastroScreen({ navigation }: any) {
       const userId = userCredential.user.uid;
       const imageUrl = await uploadImagem();
 
+      // ADICIONADO "instagram" AO OBJETO DO USUÁRIO
       await set(ref(database, 'usuarios/' + userId), {
         nome,
         email,
         telefone,
+        instagram,
         imagem: imageUrl,
       });
 
@@ -252,6 +255,7 @@ export default function CadastroScreen({ navigation }: any) {
       setNome('');
       setEmail('');
       setTelefone('');
+      setInstagram(''); // LIMPA O CAMPO DE INSTAGRAM
       setSenha('');
       setConfirmarSenha('');
       setImagem(null);
@@ -266,23 +270,20 @@ export default function CadastroScreen({ navigation }: any) {
   return (
     <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
       <View style={styles.adBanner}>
-              {currentBannerUrl ? (
-                <Animated.Image // Usando Animated.Image
-                  source={{ uri: currentBannerUrl }}
-                  style={[
-                    styles.bannerImage,
-                    { opacity: fadeAnim } // Aplicando a opacidade animada
-                  ]}
-                  resizeMode="contain"
-                  onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
-                />
-              ) : (
-                // O texto de fallback não precisa ser animado da mesma forma,
-                // mas podemos envolvê-lo se quisermos um fade para ele também.
-                // Por ora, ele aparece quando não há currentBannerUrl e fadeAnim está em 0.
-                <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
-              )}
-            </View>
+          {currentBannerUrl ? (
+            <Animated.Image // Usando Animated.Image
+              source={{ uri: currentBannerUrl }}
+              style={[
+                styles.bannerImage,
+                { opacity: fadeAnim } // Aplicando a opacidade animada
+              ]}
+              resizeMode="contain"
+              onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
+            />
+          ) : (
+            <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
+          )}
+        </View>
       
       <KeyboardAwareScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.container}>
@@ -302,20 +303,27 @@ export default function CadastroScreen({ navigation }: any) {
             value={email}
             onChangeText={setEmail}
             keyboardType="email-address"
+            autoCapitalize="none"
             style={styles.input}
           />
 
           <MaskedTextInput
-            type={'cel-phone'}
-            options={{
-              maskType: 'BRL',
-              withDDD: true,
-              dddMask: '(99) ',
-            }}
+            mask="(99) 99999-9999"
             value={telefone}
-            onChangeText={setTelefone}
+            onChangeText={(text, rawText) => {
+              setTelefone(text);
+            }}
             placeholder="Telefone*"
             keyboardType="phone-pad"
+            style={styles.input}
+          />
+
+          {/* NOVO CAMPO DE INSTAGRAM */}
+          <TextInput
+            placeholder="Instagram (opcional)"
+            value={instagram}
+            onChangeText={setInstagram}
+            autoCapitalize="none"
             style={styles.input}
           />
 
@@ -345,7 +353,6 @@ export default function CadastroScreen({ navigation }: any) {
             </TouchableOpacity>
           </View>
 
-          {/* Termo de autorização */}
           <View style={styles.termoContainer}>
             <TouchableOpacity
               onPress={() => setTermoAceito(!termoAceito)}
@@ -366,7 +373,7 @@ export default function CadastroScreen({ navigation }: any) {
           {loading ? (
             <ActivityIndicator size="large" color="#007BFF" />
           ) : (
-            <Button title="Cadastrar" onPress={cadastrarUsuario} />
+            <Button title="Cadastrar" onPress={cadastrarUsuario} disabled={!camposPreenchidos() || !termoAceito}/>
           )}
 
           <TouchableOpacity onPress={() => router.push('/(auth)/loginScreen')} style={styles.loginLink}>
@@ -374,7 +381,6 @@ export default function CadastroScreen({ navigation }: any) {
           </TouchableOpacity>
         </View>
 
-        {/* Modal para os Termos de uso e política de privacidade */}
         <Modal
           visible={modalVisible}
           transparent={true}
@@ -382,62 +388,60 @@ export default function CadastroScreen({ navigation }: any) {
           onRequestClose={() => setModalVisible(false)}
         >
           <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
-              <ScrollView style={styles.modalContainer}>
-                        <Text style={styles.modalTitle}>TERMO DE USO E CONSENTIMENTO PARA COMPARTILHAMENTO DE DADOS</Text>
-                        <Text style={styles.modalText}>
-                          Este Termo de Uso estabelece as condições para o uso do aplicativo Assistente de Eventos, desenvolvido por
-                          Anderson Antonio da Silva, inscrito no CNPJ nº 57.741.870/0001-39, com sede em Avenida José Bernardino
-                          Carvalho Leite, 295 casa E.
-                        </Text>
-                        <Text style={styles.modalSectionTitle}>1. Aceitação dos Termos</Text>
-                        <Text style={styles.modalText}>
-                          Ao utilizar o aplicativo Assistente de Eventos, o usuário concorda integralmente com este Termo de Uso e
-                          autoriza o tratamento e o compartilhamento de seus dados pessoais, conforme descrito abaixo.
-                        </Text>
-                        <Text style={styles.modalSectionTitle}>2. Dados Pessoais Coletados</Text>
-                        <Text style={styles.modalText}>Para oferecer os serviços do aplicativo, coletamos e armazenamos os seguintes dados pessoais do usuário:</Text>
-                        <Text style={styles.modalText}>- Nome completo</Text>
-                        <Text style={styles.modalText}>- Telefone</Text>
-                        <Text style={styles.modalText}>- E-mail</Text>
-                        <Text style={styles.modalSectionTitle}>3. Finalidade do Compartilhamento</Text>
-                        <Text style={styles.modalText}>
-                          Os dados pessoais coletados poderão ser compartilhados com parceiros e prestadores de serviço, sempre com a finalidade de viabilizar e melhorar o funcionamento do aplicativo, aprimorar a experiência do usuário e permitir o oferecimento de novos serviços e funcionalidades dentro e fora do aplicativo.
-                        </Text>
-                        <Text style={styles.modalSectionTitle}>4. Bases Legais e Consentimento</Text>
-                        <Text style={styles.modalText}>
-                          A coleta, o tratamento e o compartilhamento dos dados pessoais são realizados com base no consentimento do usuário, conforme previsto na Lei nº 13.709/2018 (Lei Geral de Proteção de Dados - LGPD). O usuário manifesta seu consentimento de forma livre, informada e inequívoca ao aceitar este Termo de Uso.
-                        </Text>
-                        <Text style={styles.modalSectionTitle}>5. Direitos do Usuário</Text>
-                        <Text style={styles.modalText}>
-                          O usuário poderá, a qualquer momento, solicitar:
-                          {'\n'}• Confirmação da existência de tratamento dos seus dados;
-                          {'\n'}• Acesso aos seus dados;
-                          {'\n'}• Correção de dados incompletos, inexatos ou desatualizados;
-                          {'\n'}• Revogação do consentimento e eliminação dos dados tratados com base no consentimento, salvo hipóteses legais de retenção.
-                        </Text>
-                        <Text style={styles.modalText}>
-                          Para exercer esses direitos, o usuário poderá entrar em contato pelo e-mail: professor.anderson.a.silva@gmail.com.
-                        </Text>
-                        <Text style={styles.modalSectionTitle}>6. Medidas de Segurança</Text>
-                        <Text style={styles.modalText}>
-                          Adotamos medidas técnicas e organizacionais para proteger os dados pessoais do usuário contra acessos não autorizados ou alteração.
-                        </Text>
-                        <Text style={styles.modalSectionTitle}>7. Alterações</Text>
-                        <Text style={styles.modalText}>
-                          Este Termo de Uso poderá ser alterado a qualquer momento, sendo as alterações comunicadas ao usuário por meio do aplicativo ou por e-mail.
-                        </Text>
-                        <Text style={styles.modalSectionTitle}>8. Contato</Text>
-                        <Text style={styles.modalText}>
-                          Em caso de dúvidas ou solicitações relacionadas a este Termo de Uso e ao tratamento de dados pessoais, o usuário poderá entrar em contato através do e-mail: professor.anderson.a.silva@gmail.com.
-                        </Text>
-                        <Text style={styles.modalText}>Barbalha-CE, 04/06/2025{'\n'}Anderson Antonio da Silva</Text>
-              
-                        </ScrollView>
-                        {/* Botão de Fechar fora do ScrollView */}
-                        <View style={{ marginTop: 10 }}>
-                          <Button title="Fechar" onPress={() => setModalVisible(false)} />
-                        </View>
+            <View style={styles.modalContentWrapper}>
+                <ScrollView style={styles.modalContainer}>
+                    <Text style={styles.modalTitle}>TERMO DE USO E CONSENTIMENTO PARA COMPARTILHAMENTO DE DADOS</Text>
+                    <Text style={styles.modalText}>
+                      Este Termo de Uso estabelece as condições para o uso do aplicativo Assistente de Eventos, desenvolvido por
+                      Anderson Antonio da Silva, inscrito no CNPJ nº 57.741.870/0001-39, com sede em Avenida José Bernardino
+                      Carvalho Leite, 295 casa E.
+                    </Text>
+                    <Text style={styles.modalSectionTitle}>1. Aceitação dos Termos</Text>
+                    <Text style={styles.modalText}>
+                      Ao utilizar o aplicativo Assistente de Eventos, o usuário concorda integralmente com este Termo de Uso e
+                      autoriza o tratamento e o compartilhamento de seus dados pessoais, conforme descrito abaixo.
+                    </Text>
+                    <Text style={styles.modalSectionTitle}>2. Dados Pessoais Coletados</Text>
+                    <Text style={styles.modalText}>Para oferecer os serviços do aplicativo, coletamos e armazenamos os seguintes dados pessoais do usuário:</Text>
+                    <Text style={styles.modalListItem}>- Nome completo</Text>
+                    <Text style={styles.modalListItem}>- Telefone</Text>
+                    <Text style={styles.modalListItem}>- E-mail</Text>
+                    <Text style={styles.modalSectionTitle}>3. Finalidade do Compartilhamento</Text>
+                    <Text style={styles.modalText}>
+                      Os dados pessoais coletados poderão ser compartilhados com parceiros e prestadores de serviço, sempre com a finalidade de viabilizar e melhorar o funcionamento do aplicativo, aprimorar a experiência do usuário e permitir o oferecimento de novos serviços e funcionalidades dentro e fora do aplicativo.
+                    </Text>
+                    <Text style={styles.modalSectionTitle}>4. Bases Legais e Consentimento</Text>
+                    <Text style={styles.modalText}>
+                      A coleta, o tratamento e o compartilhamento dos dados pessoais são realizados com base no consentimento do usuário, conforme previsto na Lei nº 13.709/2018 (Lei Geral de Proteção de Dados - LGPD). O usuário manifesta seu consentimento de forma livre, informada e inequívoca ao aceitar este Termo de Uso.
+                    </Text>
+                    <Text style={styles.modalSectionTitle}>5. Direitos do Usuário</Text>
+                    <Text style={styles.modalText}>
+                      O usuário poderá, a qualquer momento, solicitar:
+                      {'\n'}• Confirmação da existência de tratamento dos seus dados;
+                      {'\n'}• Acesso aos seus dados;
+                      {'\n'}• Correção de dados incompletos, inexatos ou desatualizados;
+                      {'\n'}• Revogação do consentimento e eliminação dos dados tratados com base no consentimento, salvo hipóteses legais de retenção.
+                    </Text>
+                    <Text style={styles.modalText}>
+                      Para exercer esses direitos, o usuário poderá entrar em contato pelo e-mail: professor.anderson.a.silva@gmail.com.
+                    </Text>
+                    <Text style={styles.modalSectionTitle}>6. Medidas de Segurança</Text>
+                    <Text style={styles.modalText}>
+                      Adotamos medidas técnicas e organizacionais para proteger os dados pessoais do usuário contra acessos não autorizados ou alteração.
+                    </Text>
+                    <Text style={styles.modalSectionTitle}>7. Alterações</Text>
+                    <Text style={styles.modalText}>
+                      Este Termo de Uso poderá ser alterado a qualquer momento, sendo as alterações comunicadas ao usuário por meio do aplicativo ou por e-mail.
+                    </Text>
+                    <Text style={styles.modalSectionTitle}>8. Contato</Text>
+                    <Text style={styles.modalText}>
+                      Em caso de dúvidas ou solicitações relacionadas a este Termo de Uso e ao tratamento de dados pessoais, o usuário poderá entrar em contato através do e-mail: professor.anderson.a.silva@gmail.com.
+                    </Text>
+                    <Text style={styles.modalText}>Barbalha-CE, 04/06/2025{'\n'}Anderson Antonio da Silva</Text>
+                </ScrollView>
+                <View style={styles.modalButtonContainer}>
+                  <Button title="Fechar" onPress={() => setModalVisible(false)} />
+                </View>
             </View>
           </View>
         </Modal>
@@ -502,9 +506,10 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderWidth: 1,
     marginBottom: 12,
-    paddingHorizontal: 10,
+    paddingHorizontal: 15,
     borderRadius: 8,
     backgroundColor: '#fff',
+    fontSize: 16,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -512,7 +517,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 8,
-    paddingHorizontal: 10,
     marginBottom: 12,
     backgroundColor: '#fff',
   },
@@ -520,6 +524,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 50,
     fontSize: 16,
+    paddingHorizontal: 15,
   },
   eyeIcon: {
     padding: 10,
@@ -532,7 +537,7 @@ const styles = StyleSheet.create({
   termoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 20,
     flexWrap: 'wrap',
   },
   checkbox: {
@@ -540,7 +545,8 @@ const styles = StyleSheet.create({
     height: 24,
     borderWidth: 2,
     borderColor: '#007BFF',
-    marginRight: 8,
+    borderRadius: 4,
+    marginRight: 10,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -549,6 +555,8 @@ const styles = StyleSheet.create({
   },
   checkboxMarcado: {
     color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   termoTexto: {
     flex: 1,
@@ -560,7 +568,7 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
   loginLink: {
-    marginTop: 12,
+    marginTop: 15,
     alignItems: 'center',
   },
   loginText: {
@@ -571,25 +579,46 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
+    alignItems: 'center',
     padding: 20,
   },
-  modalContainer: {
+  modalContentWrapper: {
+    width: '100%',
+    maxHeight: '85%',
     backgroundColor: '#fff',
     borderRadius: 8,
-    padding: 10,
-    maxHeight: '100%',
+    overflow: 'hidden',
+  },
+  modalContainer: {
+    padding: 20,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 15,
     textAlign: 'center',
   },
-  modalContent: {
+  modalSectionTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+    marginTop: 15,
+    marginBottom: 5,
+  },
+  modalText: {
     fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'justify',
     marginBottom: 10,
   },
-  modalSectionTitle: { fontWeight: 'bold', marginTop: 10 },
-  modalText: { marginBottom: 10, textAlign: 'justify' },
+  modalListItem: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'justify',
+    marginLeft: 10,
+  },
+  modalButtonContainer: {
+    padding: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
 });
-

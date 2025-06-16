@@ -13,8 +13,10 @@ import {
     InteractionManager, 
     Dimensions, 
     Animated, 
-    ActivityIndicator 
+    ActivityIndicator,
+    Linking
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { ref, get, set, remove, onValue } from 'firebase/database';
 import { auth, database, administrativoDatabase } from '../../firebaseConfig';
 import { useFocusEffect } from '@react-navigation/native';
@@ -22,10 +24,11 @@ import { useFocusEffect } from '@react-navigation/native';
 // --- INTERFACES ---
 interface Usuario {
   nome: string;
-  telefone: string;
-  email: string;
+  telefone: string; 
+  email: string; 
   id: string;
   imagem?: string;
+  instagram?: string; 
 }
 
 interface BannerItem {
@@ -187,9 +190,7 @@ const LocalizacaoScreen = () => {
     if (texto.trim().length >= 3) {
       const textoLower = texto.toLowerCase();
       const filtrados = usuariosOriginais.filter((u) =>
-        u.nome.toLowerCase().includes(textoLower) ||
-        (u.telefone && u.telefone.includes(textoLower)) ||
-        u.email.toLowerCase().includes(textoLower)
+        u.nome.toLowerCase().includes(textoLower)
       );
       setUsuariosFiltrados(filtrados);
     } else {
@@ -219,6 +220,21 @@ const LocalizacaoScreen = () => {
       console.error("Erro ao marcar amigo:", error);
       Alert.alert("Erro", "Não foi possível enviar a solicitação.");
     }
+  };
+  
+  const handleInstagramPress = async (instagramUsername: string | undefined) => {
+      if (!instagramUsername) return;
+      const url = `https://www.instagram.com/${instagramUsername.replace('@', '')}`;
+      try {
+        const supported = await Linking.canOpenURL(url);
+        if (supported) {
+          await Linking.openURL(url);
+        } else {
+          Alert.alert("Erro", `Não foi possível abrir o perfil do Instagram.`);
+        }
+      } catch (error) {
+        Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
+      }
   };
 
   const desfazerAmizade = async (usuario: Usuario) => {
@@ -326,22 +342,31 @@ const LocalizacaoScreen = () => {
         </View>
         <View style={styles.infoContainer}>
           <Text style={styles.usuarioNome}>{item.nome}</Text>
-          <View style={styles.telefoneButtonContainer}>
-            <Text style={styles.telefoneText}>{item.telefone}</Text>
-            <View style={styles.buttonContainer}>
-              <TouchableOpacity
-                style={[styles.button, buttonStyle]}
-                onPress={() => {
-                  if (status === 'aceito') desfazerAmizade(item);
-                  else if (status === 'pendente') cancelarSolicitacao(item);
-                  else marcarAmigo(item);
-                }}
-              >
-                <Text style={styles.buttonTextSmall}>{buttonText}</Text>
+          <View style={styles.actionsContainer}>
+            {item.instagram && (
+              <TouchableOpacity onPress={() => handleInstagramPress(item.instagram)}>
+                <LinearGradient
+                  colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
+                  start={{ x: 0.0, y: 1.0 }}
+                  end={{ x: 1.0, y: 0.0 }}
+                  style={styles.instagramButton}
+                >
+                  <Text style={styles.instagramButtonText}>Instagram</Text>
+                </LinearGradient>
               </TouchableOpacity>
-            </View>
+            )}
+            <View style={{flex: 1}} />
+            <TouchableOpacity
+              style={[styles.button, buttonStyle]}
+              onPress={() => {
+                if (status === 'aceito') desfazerAmizade(item);
+                else if (status === 'pendente') cancelarSolicitacao(item);
+                else marcarAmigo(item);
+              }}
+            >
+              <Text style={styles.buttonTextSmall}>{buttonText}</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.email}>{item.email}</Text>
         </View>
       </View>
     );
@@ -355,7 +380,20 @@ const LocalizacaoScreen = () => {
       <View style={styles.infoContainerSolicitacao}>
         <Text style={styles.usuarioNome}>{item.nome}</Text>
         <View style={styles.botoesSolicitacao}>
-          <Text style={styles.telefoneTextSolicitacao}>{item.telefone}</Text>
+          {/* --- CÓDIGO DO BOTÃO DO INSTAGRAM ADICIONADO ABAIXO --- */}
+          {item.instagram && (
+            <TouchableOpacity onPress={() => handleInstagramPress(item.instagram)}>
+              <LinearGradient
+                colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
+                start={{ x: 0.0, y: 1.0 }}
+                end={{ x: 1.0, y: 0.0 }}
+                style={styles.instagramButton}
+              >
+                <Text style={styles.instagramButtonText}>Instagram</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+          {/* --- FIM DO CÓDIGO ADICIONADO --- */}
           <TouchableOpacity style={[styles.button, styles.buttonSolicitar]} onPress={() => aceitarSolicitacao(item)}>
             <Text style={styles.buttonTextSmall}>Aceitar</Text>
           </TouchableOpacity>
@@ -363,7 +401,6 @@ const LocalizacaoScreen = () => {
             <Text style={styles.buttonTextSmall}>Recusar</Text>
           </TouchableOpacity>
         </View>
-        <Text style={styles.emailSolicitacao}>{item.email}</Text>
       </View>
     </View>
   );
@@ -385,7 +422,7 @@ const LocalizacaoScreen = () => {
       <SafeAreaView style={styles.container}>
         <TextInput
           style={styles.input}
-          placeholder="Buscar por nome, e-mail ou telefone (mín. 3 letras)"
+          placeholder="Buscar por nome (mín. 3 letras)"
           value={busca}
           onChangeText={handleBusca}
           placeholderTextColor="#888"
@@ -436,25 +473,33 @@ const styles = StyleSheet.create({
   profileImage: { width: 60, height: 60, borderRadius: 30 },
   profileImagePlaceholder: { width: 60, height: 60, borderRadius: 30, backgroundColor: '#e0e0e0' },
   infoContainer: { flex: 1 },
-  usuarioNome: { fontSize: 17, fontWeight: '600', color: '#222', marginBottom: 2 },
-  telefoneButtonContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  telefoneText: { flex: 1, fontSize: 14, color: '#555' },
-  buttonContainer: {},
-  email: { color: '#666', fontSize: 13 },
-  button: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 20, alignItems: 'center', justifyContent: 'center', minWidth: 90, marginLeft: 8 },
+  usuarioNome: { fontSize: 17, fontWeight: '600', color: '#222', marginBottom: 4 },
+  actionsContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
+  button: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 20, alignItems: 'center', justifyContent: 'center', minWidth: 90 },
   buttonSolicitar: { backgroundColor: '#4CAF50' },
   buttonPendente: { backgroundColor: '#FF9800' },
   buttonAceito: { backgroundColor: '#007BFF' },
   buttonRecusar: { backgroundColor: '#D32F2F' },
   buttonTextSmall: { color: 'white', fontSize: 11, fontWeight: 'bold', textAlign: 'center' },
+  instagramButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 90,
+  },
+  instagramButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
   solicitacoesContainer: { marginTop: 10, backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 10, padding: 10, borderWidth: 1, borderColor: '#ddd', maxHeight: screenHeight * 0.35 },
   solicitacoesTitulo: { fontSize: 18, fontWeight: 'bold', marginBottom: 5, color: '#333', textAlign: 'center' },
   usuarioContainerSolicitacao: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 10, padding: 5, marginBottom: 5, alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 2 },
   profileContainerSolicitacao: { marginRight: 12 },
   infoContainerSolicitacao: { flex: 1 },
-  telefoneTextSolicitacao: { marginTop: 2, color: '#555', fontSize: 14 },
-  botoesSolicitacao: { flexDirection: 'row', marginTop: 2, justifyContent: 'space-between' },
-  emailSolicitacao: { marginTop: 2, color: '#666', fontSize: 13 },
+  botoesSolicitacao: { flexDirection: 'row', marginTop: 4, justifyContent: 'space-around', alignItems: 'center' },
   emptyListText: { textAlign: 'center', marginTop: 20, fontSize: 16, color: '#666' },
 });
 
