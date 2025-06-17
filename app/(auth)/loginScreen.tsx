@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   Alert,
   TextInput,
@@ -11,6 +11,7 @@ import {
   Image,
   ScrollView,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { auth, database, administrativoDatabase } from '../../firebaseConfig';
 import {
@@ -24,19 +25,17 @@ import * as Google from 'expo-auth-session/providers/google';
 import { router } from 'expo-router';
 import { ref, get } from 'firebase/database';
 import { Eye, EyeOff } from 'lucide-react-native';
-// A importação do AuthSession pode não ser mais necessária se não for usada diretamente
-// import * as AuthSession from 'expo-auth-session';
+import * as AuthSession from 'expo-auth-session';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const LoginScreen = () => { // A prop 'navigation' pode ser removida se não for usada
+const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
-  // REMOVIDO: O estado de autenticação agora é gerenciado globalmente no _layout.tsx
-  // const [user, setUser] = useState<any>(null);
-  // const [authLoading, setAuthLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [mostrarSenha, setMostrarSenha] = useState(false);
 
   const [sponsors, setSponsors] = useState<any[]>([]);
@@ -46,18 +45,16 @@ const LoginScreen = () => { // A prop 'navigation' pode ser removida se não for
   const screenWidth = Dimensions.get('window').width;
 
   const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: '161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com',
-    iosClientId: '161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com',
-    webClientId: '161717540109-t6honnbr9s3m55qcngk6222ph3oa9g9k.apps.googleusercontent.com',
-  });
-
+  // Use a nova credencial para Android
+  androidClientId: '161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com',
+  iosClientId: '161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com',
+  // Mantenha a antiga para web/desenvolvimento
+  webClientId: '161717540109-t6honnbr9s3m55qcngk6222ph3oa9g9k.apps.googleusercontent.com', 
+});
   const toggleMostrarSenha = () => {
     setMostrarSenha(!mostrarSenha);
   };
 
-  // REMOVIDO: O listener onAuthStateChanged foi movido para o hook useAuth e usado no _layout.tsx.
-  // Isso centraliza a lógica de autenticação.
-  /*
   const handleAuthStateChanged = useCallback((authUser: any) => {
     setUser(authUser);
     setAuthLoading(false);
@@ -67,30 +64,26 @@ const LoginScreen = () => { // A prop 'navigation' pode ser removida se não for
     const unsubscribe = auth.onAuthStateChanged(handleAuthStateChanged);
     return () => unsubscribe();
   }, [handleAuthStateChanged]);
-  */
 
-  // MODIFICADO: Este useEffect agora apenas lida com a autenticação no Firebase.
-  // Ele não faz mais o redirecionamento. O _layout.tsx fará isso ao detectar a mudança de estado.
   useEffect(() => {
-    if (loading) return; // Evita múltiplas chamadas enquanto uma operação está em andamento
-
     if (response?.type === 'success' && response.authentication) {
-      setLoading(true); // Inicia o loading para a operação do Firebase
       const { idToken, accessToken } = response.authentication;
       const credential = GoogleAuthProvider.credential(idToken, accessToken);
-      
       signInWithCredential(auth, credential)
+        .then(async (userCredential) => {
+          const loggedUser = userCredential.user;
+          
+          if (loggedUser) {
+            router.replace('/(tabs)/homeScreen');
+          } else {
+            Alert.alert('Usuário não logado', 'Faça o login ou cadastre-se!');
+            await auth.signOut();
+          }
+        })
         .catch((err) => {
           const errorMessage = err.message || 'Erro ao fazer login com o Google.';
           setError(errorMessage);
-          console.error("Erro no signInWithCredential:", err);
-        })
-        .finally(() => {
-            setLoading(false); // Finaliza o loading
         });
-    } else if (response?.type === 'error') {
-        setError('Falha na autenticação com o Google. Tente novamente.');
-        console.error("Google Auth Error:", response.error);
     }
   }, [response]);
 
@@ -121,15 +114,22 @@ const LoginScreen = () => { // A prop 'navigation' pode ser removida se não for
   useEffect(() => {
     fetchSponsors();
   }, []);
-  
-  // MODIFICADO: A função de login agora apenas tenta autenticar.
-  // Ela não verifica dados do usuário nem redireciona. O _layout.tsx cuidará disso.
+
   const handleLogin = async () => {
     setLoading(true);
     setError('');
     try {
-      // Apenas tenta fazer o login. Se for bem-sucedido, o listener onAuthStateChanged no _layout irá disparar.
-      await signInWithEmailAndPassword(auth, email, password);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const loggedUser = userCredential.user;
+      const userRef = ref(database, `usuarios/${loggedUser.uid}`);
+      const snapshot = await get(userRef);
+      const userData = snapshot.val();
+
+      if (userData) {
+        router.replace('/(tabs)/homeScreen');
+      } else {
+        setError('Usuário não encontrado.');
+      }
     } catch (error: any) {
       const errorMessage = error.message || 'Erro ao fazer login.';
       if (error.code === 'auth/missing-password') {
@@ -165,70 +165,82 @@ const LoginScreen = () => { // A prop 'navigation' pode ser removida se não for
       setLoading(false);
     }
   };
-
-  // --- Lógica do Carrossel de Patrocinadores (sem alterações) ---
-  const scrollViewRef = useRef<ScrollView>(null);
-  const scrollOffsetRef = useRef(0);
-  const animationFrameIdRef = useRef<number | null>(null);
-  const [measuredContentWidth, setMeasuredContentWidth] = useState(0);
-  const [isUserInteractingWithSponsors, setIsUserInteractingWithSponsors] = useState(false);
-
-  useEffect(() => {
-    if (animationFrameIdRef.current) {
-      cancelAnimationFrame(animationFrameIdRef.current);
-      animationFrameIdRef.current = null;
-    }
-
-    if (sponsors.length === 0 || !scrollViewRef.current || isUserInteractingWithSponsors || measuredContentWidth <= screenWidth) {
-      if (measuredContentWidth <= screenWidth && scrollOffsetRef.current !== 0 && scrollViewRef.current) {
-        scrollViewRef.current.scrollTo({ x: 0, animated: false });
-        scrollOffsetRef.current = 0;
-      }
-      return;
-    }
-
-    let lastTimestamp = 0;
-    const scrollSpeed = 20;
-
-    const animate = (timestamp: number) => {
-      if (!lastTimestamp) {
-        lastTimestamp = timestamp;
-      }
-      const deltaTimeInSeconds = (timestamp - lastTimestamp) / 1000;
-      lastTimestamp = timestamp;
-      scrollOffsetRef.current += scrollSpeed * deltaTimeInSeconds;
-      if (scrollOffsetRef.current >= measuredContentWidth) {
-        scrollOffsetRef.current = scrollOffsetRef.current % measuredContentWidth;
-      }
-      scrollViewRef.current?.scrollTo({ x: scrollOffsetRef.current, animated: false });
-      animationFrameIdRef.current = requestAnimationFrame(animate);
-    };
-    animationFrameIdRef.current = requestAnimationFrame(animate);
-    return () => {
+    // --- Lógica do Carrossel de Patrocinadores ---
+    const scrollViewRef = useRef<ScrollView>(null);
+    const scrollOffsetRef = useRef(0); // Guarda o offset atual da rolagem
+    const animationFrameIdRef = useRef<number | null>(null); // Guarda o ID do requestAnimationFrame
+    const [measuredContentWidth, setMeasuredContentWidth] = useState(0); // Largura do conteúdo da ScrollView
+    const [isUserInteractingWithSponsors, setIsUserInteractingWithSponsors] = useState(false);
+  
+    useEffect(() => {
+      // Cancela animação anterior se houver
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
         animationFrameIdRef.current = null;
       }
+  
+      // Condições para não animar
+      if (sponsors.length === 0 || !scrollViewRef.current || isUserInteractingWithSponsors || measuredContentWidth <= screenWidth) {
+        // Se o conteúdo couber na tela e não estiver no início, rola para o início.
+        if (measuredContentWidth <= screenWidth && scrollOffsetRef.current !== 0 && scrollViewRef.current) {
+           scrollViewRef.current.scrollTo({ x: 0, animated: false });
+           scrollOffsetRef.current = 0;
+        }
+        return;
+      }
+  
+      let lastTimestamp = 0;
+      const scrollSpeed = 20; // Pixels por segundo
+  
+      const animate = (timestamp: number) => {
+        if (!lastTimestamp) {
+          lastTimestamp = timestamp;
+        }
+        const deltaTimeInSeconds = (timestamp - lastTimestamp) / 1000;
+        lastTimestamp = timestamp;
+  
+        scrollOffsetRef.current += scrollSpeed * deltaTimeInSeconds;
+  
+        if (scrollOffsetRef.current >= measuredContentWidth) {
+          // Quando o scroll ultrapassa a largura total do conteúdo,
+          // significa que todo o conteúdo "original" já passou.
+          // Para um loop suave, idealmente teríamos itens duplicados.
+          // Com reset simples:
+          scrollOffsetRef.current = scrollOffsetRef.current % measuredContentWidth; // Mantém a posição relativa no loop
+          // Para um reset para o início absoluto:
+          // scrollOffsetRef.current = 0;
+        }
+        
+        scrollViewRef.current?.scrollTo({ x: scrollOffsetRef.current, animated: false });
+        animationFrameIdRef.current = requestAnimationFrame(animate);
+      };
+  
+      animationFrameIdRef.current = requestAnimationFrame(animate);
+  
+      return () => {
+        if (animationFrameIdRef.current) {
+          cancelAnimationFrame(animationFrameIdRef.current);
+          animationFrameIdRef.current = null;
+        }
+      };
+    }, [sponsors, screenWidth, measuredContentWidth, isUserInteractingWithSponsors]);
+  
+    const handleSponsorsScrollBeginDrag = () => {
+      setIsUserInteractingWithSponsors(true);
     };
-  }, [sponsors, screenWidth, measuredContentWidth, isUserInteractingWithSponsors]);
-
-  const handleSponsorsScrollBeginDrag = () => {
-    setIsUserInteractingWithSponsors(true);
-  };
-  const handleSponsorsScrollEndDrag = (event: any) => {
-    scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
-    setIsUserInteractingWithSponsors(false);
-  };
-  const handleSponsorsMomentumScrollEnd = (event: any) => {
-    scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
-    setTimeout(() => {
+  
+    const handleSponsorsScrollEndDrag = (event: any) => {
+      scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
       setIsUserInteractingWithSponsors(false);
-    }, 100);
-  };
+    };
+     const handleSponsorsMomentumScrollEnd = (event: any) => {
+      scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
+      // Delay para retomar a animação e evitar conflito com possível onScrollEndDrag
+      setTimeout(() => {
+          setIsUserInteractingWithSponsors(false);
+      }, 100); // Pequeno delay
+    };
 
-  // REMOVIDO: O _layout agora mostra um loading inicial.
-  // A tela de login só será renderizada quando o app já souber que o usuário está deslogado.
-  /*
   if (authLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -236,7 +248,6 @@ const LoginScreen = () => { // A prop 'navigation' pode ser removida se não for
       </View>
     );
   }
-  */
 
   return (
     <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
@@ -282,7 +293,7 @@ const LoginScreen = () => { // A prop 'navigation' pode ser removida se não for
             onPress={handleLogin}
             disabled={loading}
           >
-            {loading ? ( // Simplificado: mostra loading para qualquer operação
+            {loading && !sponsorsLoading ? (
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.entrarText}>Entrar</Text>
@@ -314,12 +325,12 @@ const LoginScreen = () => { // A prop 'navigation' pode ser removida se não for
             <Text style={styles.supporterErrorText}>{sponsorsError}</Text>
           ) : sponsors.length > 0 ? (
             <ScrollView
-              ref={scrollViewRef}
+            ref={scrollViewRef}
               horizontal
               showsHorizontalScrollIndicator={true}
               style={styles.supportersLogos}
               contentContainerStyle={styles.supportersLogosContent}
-              onContentSizeChange={(width) => {
+              onContentSizeChange={(width, height) => {
                 setMeasuredContentWidth(width);
               }}
               onScrollBeginDrag={handleSponsorsScrollBeginDrag}
@@ -332,7 +343,9 @@ const LoginScreen = () => { // A prop 'navigation' pode ser removida se não for
                   <Image
                     key={sponsor.id}
                     source={{ uri: sponsor.logoUrl }}
-                    style={styles.supporterLogo}
+                    style={[
+                      styles.supporterLogo,
+                    ]}
                     onError={(e) => console.warn(`Erro ao carregar logo do patrocinador ${sponsor.id}: ${sponsor.logoUrl}`, e.nativeEvent.error)}
                   />
                 ) : null
@@ -348,7 +361,6 @@ const LoginScreen = () => { // A prop 'navigation' pode ser removida se não for
 };
 
 const styles = StyleSheet.create({
-  // Seus estilos permanecem os mesmos, sem alterações.
   background: {
     flex: 1,
   },
@@ -476,46 +488,49 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   supportersContainer: {
-    flex: 0.7,
-    justifyContent: 'center',
-    alignItems: 'center',
+    flex: 0.7, // Proporção da altura para esta seção
+    justifyContent: 'center', // Centraliza o conteúdo (título + scrollview/texto) verticalmente
+    alignItems: 'center', // Centraliza o conteúdo horizontalmente
+    // paddingHorizontal: 15, // Removido ou ajustado, pois o ScrollView pode precisar de largura total
   },
   supportersTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginTop: 10,
-    marginBottom: 5,
+    marginBottom: 5, // Espaçamento entre o título e a área das logos
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
+  // Estilo para o componente ScrollView
   supportersLogos: {
-    width: '100%',
+    width: '100%', // O ScrollView ocupa a largura total do seu container 
   },
+  // Estilo para o contentContainerStyle do ScrollView (o conteúdo interno)
   supportersLogosContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 5,
+    flexDirection: 'row',   // Organiza as logos horizontalmente, lado a lado
+    alignItems: 'center',   // Alinha as logos verticalmente ao centro dentro da faixa do ScrollView
+    paddingHorizontal: 5,  // Espaçamento nas extremidades da lista de logos (antes da primeira e depois da última)
+    paddingVertical: 5,     // Espaçamento vertical acima e abaixo das logos dentro da área de scroll
   },
   supporterText: {
     color: '#E0E0E0',
     fontSize: 14,
     textAlign: 'center',
-    marginTop: 10,
+    marginTop: 10, // Espaçamento do título se esta mensagem aparecer
   },
   supporterErrorText: {
     color: '#FFD700',
     fontSize: 14,
     textAlign: 'center',
-    marginHorizontal: 15,
-    marginTop: 10,
+    marginHorizontal: 15, // Para não colar nas bordas
+    marginTop: 10, // Espaçamento do título se esta mensagem aparecer
   },
   supporterLogo: {
     width: 120,
-    height: 120,
-    resizeMode: 'contain',
+    height: 120, // Altura fixa para as logos. Ajuste conforme o design desejado.
+    resizeMode: 'contain', // Garante que a logo inteira seja visível e não distorcida
     borderRadius: 10,
     backgroundColor: '#fff',
     marginLeft: 10,
