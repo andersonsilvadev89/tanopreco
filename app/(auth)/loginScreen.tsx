@@ -46,10 +46,10 @@ const LoginScreen = ({ navigation }: any) => {
 
   const [request, response, promptAsync] = Google.useAuthRequest({
   // Use a nova credencial para Android
-  androidClientId: '161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com', 
-
+  androidClientId: '161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com',
+  iosClientId: '161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com',
   // Mantenha a antiga para web/desenvolvimento
-  webClientId: '60386522895-u9q752serjr2nce5rmiqg4s65t6ov94d.apps.googleusercontent.com', 
+  webClientId: '161717540109-t6honnbr9s3m55qcngk6222ph3oa9g9k.apps.googleusercontent.com', 
 });
   const toggleMostrarSenha = () => {
     setMostrarSenha(!mostrarSenha);

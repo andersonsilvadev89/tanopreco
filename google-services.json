@@ -15,11 +15,19 @@
       },
       "oauth_client": [
         {
-          "client_id": "161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com",
+          "client_id": "161717540109-7ifgbevmesdqvg6u973kcafht1d7mgkh.apps.googleusercontent.com",
           "client_type": 1,
           "android_info": {
             "package_name": "com.ae.stoantoniobarbalhacliente",
             "certificate_hash": "c6fe9a073459df3eb0254ac4f2fd5e36e4ec8f47"
+          }
+        },
+        {
+          "client_id": "161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.ae.stoantoniobarbalhacliente",
+            "certificate_hash": "80fc1dd253186a03a2042031f7f327e61a4a13cb"
           }
         },
         {
