@@ -72,14 +72,11 @@ const LoginScreen = ({ navigation }: any) => {
       signInWithCredential(auth, credential)
         .then(async (userCredential) => {
           const loggedUser = userCredential.user;
-          const userRef = ref(database, `usuarioTipoUsuario/${loggedUser.uid}`);
-          const snapshot = await get(userRef);
-          const userData = snapshot.val();
-
-          if (userData && userData.tipoUsuario === 'cliente') {
+          
+          if (loggedUser) {
             router.replace('/(tabs)/homeScreen');
           } else {
-            Alert.alert('Usuário não autorizado', 'Este aplicativo é destinado a clientes.');
+            Alert.alert('Usuário não logado', 'Faça o login ou cadastre-se!');
             await auth.signOut();
           }
         })
