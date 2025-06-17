@@ -23,7 +23,7 @@ export default {
                     "apiKey": "AIzaSyDOY_dZzTNgjeMX2z7ssWi755eznnBO68o"
                 }
             },
-            "versionCode": 4,
+            "versionCode": 5,
             "adaptiveIcon": {
                 "foregroundImage": "./assets/images/adaptive-icon.png",
                 "backgroundColor": "#ffffff"
