@@ -74,7 +74,7 @@ const LoginScreen = ({ navigation }: any) => {
           const loggedUser = userCredential.user;
           
           if (loggedUser) {
-            router.replace('../(tabs)/homeScreen');
+            
           } else {
             Alert.alert('Usuário não logado', 'Faça o login ou cadastre-se!');
             await auth.signOut();
@@ -126,7 +126,7 @@ const LoginScreen = ({ navigation }: any) => {
       const userData = snapshot.val();
 
       if (userData) {
-        router.replace('../(tabs)/homeScreen');
+        
       } else {
         setError('Usuário não encontrado.');
       }
