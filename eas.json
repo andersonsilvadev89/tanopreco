@@ -17,13 +17,11 @@
     },
     "production": {
       "ios": {
-        "distribution": "app-store",
-        "autoIncrement": "buildNumber",
-        "resourceClass": "m1-medium"
+        "distribution": "store",
+        "resourceClass": "medium"
       },
       "android": {
-        "autoIncrement": "versionCode",
-        "resourceClass": "m1-medium"
+        "resourceClass": "medium"
       }
     }
   },
