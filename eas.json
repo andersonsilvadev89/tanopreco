@@ -15,20 +15,9 @@
         "simulator": true
       }
     },
-    "production": {
-      "ios": {
-        "distribution": "app-store",
-        "autoIncrement": "buildNumber",
-        "resourceClass": "m1-medium"
-      },
-      "android": {}
-    }
+    "production": {}
   },
   "submit": {
-    "production": {
-      "ios": {
-        "ascAppId": "0000000000" // substitua pelo App ID real do App Store Connect
-      }
-    }
+    "production": {}
   }
 }
