@@ -43,7 +43,11 @@ const LoginScreen = ({ navigation }: any) => {
   const [sponsorsError, setSponsorsError] = useState<string | null>(null);
 
   const screenWidth = Dimensions.get('window').width;
-
+  
+  const redirectUri = AuthSession.makeRedirectUri({
+    native: "myapp:/expo-auth-session",
+  });
+  
   const [request, response, promptAsync] = Google.useAuthRequest({
   // Use a nova credencial para Android
   androidClientId: '161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com',
