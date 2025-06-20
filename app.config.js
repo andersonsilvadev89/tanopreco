@@ -73,7 +73,13 @@ export default {
       typedRoutes: true
     },
     extra: {
-      googleClientId: "161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com",
+      "firebaseApiKey": "AIzaSyCyKuYJzr_0w-pw5Ehmrf8i7TPRAxtbLbM",
+      "firebaseAuthDomain": "stoantoniobarbalhacliente.firebaseapp.com",
+      "firebaseProjectId": "stoantoniobarbalhacliente",
+      "webClientId": "161717540109-2lu2keq5r4ehkjjghmha0bckgktdflq5.apps.googleusercontent.com", // Adicionar esta linha
+      "iosClientId": "161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com",   // Opcional para Expo Go, mas bom para futuro
+      "androidClientId": "161717540109-7ifgbevmesdqvg6u973kcafht1d7mgkh.apps.googleusercontent.com", // Opcional para Expo Go, mas bom para futuro
+      googleClientId: "161717540109-7ifgbevmesdqvg6u973kcafht1d7mgkh.apps.googleusercontent.com",
       router: {
         origin: false
       },

@@ -4,7 +4,7 @@ import { getReactNativePersistence, GoogleAuthProvider, initializeAuth } from 'f
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Suas configurações do Firebase
-const firebaseConfig = {
+/*const firebaseConfig = {
   apiKey: "AIzaSyBaMZ5Oylb-T9A7o2BgJ0ba50NvdOH1aKo",
   authDomain: "SEU_AUTH_DOMAIN",
   databaseURL:"https://stoantoniobarbalhacliente-default-rtdb.firebaseio.com",
@@ -13,6 +13,16 @@ const firebaseConfig = {
   messagingSenderId: "SEU_MESSAGING_SENDER_ID",
   appId: "1:161717540109:android:a5e5d4b112cb7d10704c44",
   measurementId: "SEU_MEASUREMENT_ID"
+};*/
+const firebaseConfig = {
+  apiKey: "AIzaSyCyKuYJzr_0w-pw5Ehmrf8i7TPRAxtbLbM",
+  authDomain: "stoantoniobarbalhacliente.firebaseapp.com",
+  databaseURL: "https://stoantoniobarbalhacliente-default-rtdb.firebaseio.com",
+  projectId: "stoantoniobarbalhacliente",
+  storageBucket: "stoantoniobarbalhacliente.firebasestorage.app",
+  messagingSenderId: "161717540109",
+  appId: "1:161717540109:web:1e24e04a1ff8cc7a704c44",
+  measurementId: "G-2EQBK3SDK0"
 };
 
 const firebaseConfigAdmin = {

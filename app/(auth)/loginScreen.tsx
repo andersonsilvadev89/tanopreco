@@ -30,6 +30,7 @@ import * as AuthSession from 'expo-auth-session';
 WebBrowser.maybeCompleteAuthSession();
 
 const LoginScreen = ({ navigation }: any) => {
+  const [accessToken, setAccessToken] = useState(); // Estado para armazenar o token de acesso (opcional, para exibir)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>('');
@@ -44,33 +45,15 @@ const LoginScreen = ({ navigation }: any) => {
 
   const screenWidth = Dimensions.get('window').width;
   
-  const redirectUri = AuthSession.makeRedirectUri({
-    native: "myapp:/expo-auth-session",
-  });
-  
   const [request, response, promptAsync] = Google.useAuthRequest({
   // Use a nova credencial para Android
-  androidClientId: '161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com',
+  androidClientId: '161717540109-7ifgbevmesdqvg6u973kcafht1d7mgkh.apps.googleusercontent.com',
   iosClientId: '161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com',
   // Mantenha a antiga para web/desenvolvimento
-  webClientId: '161717540109-t6honnbr9s3m55qcngk6222ph3oa9g9k.apps.googleusercontent.com',
-  redirectUri, 
+  webClientId: '161717540109-2lu2keq5r4ehkjjghmha0bckgktdflq5.apps.googleusercontent.com',
 });
-  const toggleMostrarSenha = () => {
-    setMostrarSenha(!mostrarSenha);
-  };
 
-  const handleAuthStateChanged = useCallback((authUser: any) => {
-    setUser(authUser);
-    setAuthLoading(false);
-  }, []);
-
-  useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged(handleAuthStateChanged);
-    return () => unsubscribe();
-  }, [handleAuthStateChanged]);
-
-  useEffect(() => {
+useEffect(() => {
     if (response?.type === 'success' && response.authentication) {
       const { idToken, accessToken } = response.authentication;
       const credential = GoogleAuthProvider.credential(idToken, accessToken);
@@ -92,6 +75,21 @@ const LoginScreen = ({ navigation }: any) => {
     }
   }, [response]);
 
+  const toggleMostrarSenha = () => {
+    setMostrarSenha(!mostrarSenha);
+  };
+
+  const handleAuthStateChanged = useCallback((authUser: any) => {
+    setUser(authUser);
+    setAuthLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged(handleAuthStateChanged);
+    return () => unsubscribe();
+  }, [handleAuthStateChanged]);
+
+  
   const fetchSponsors = async () => {
     setSponsorsLoading(true);
     setSponsorsError(null);
