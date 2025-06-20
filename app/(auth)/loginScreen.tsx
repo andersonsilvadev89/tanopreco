@@ -26,10 +26,15 @@ import { router } from 'expo-router';
 import { ref, get } from 'firebase/database';
 import { Eye, EyeOff } from 'lucide-react-native';
 import * as AuthSession from 'expo-auth-session';
+import { makeRedirectUri } from 'expo-auth-session'; // <-- Importe makeRedirectUri
+import Constants from 'expo-constants';
 
 WebBrowser.maybeCompleteAuthSession();
 
 const LoginScreen = ({ navigation }: any) => {
+  
+  const redirectUri = `https://auth.expo.io/@professor.anderson.a.silva/petrolina`;
+  
   const [accessToken, setAccessToken] = useState(); // Estado para armazenar o token de acesso (opcional, para exibir)
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -44,6 +49,7 @@ const LoginScreen = ({ navigation }: any) => {
   const [sponsorsError, setSponsorsError] = useState<string | null>(null);
 
   const screenWidth = Dimensions.get('window').width;
+
   
   const [request, response, promptAsync] = Google.useAuthRequest({
   // Use a nova credencial para Android
@@ -51,9 +57,11 @@ const LoginScreen = ({ navigation }: any) => {
   iosClientId: '161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com',
   // Mantenha a antiga para web/desenvolvimento
   webClientId: '161717540109-2lu2keq5r4ehkjjghmha0bckgktdflq5.apps.googleusercontent.com',
-});
+  redirectUri: redirectUri,
+  });
 
 useEffect(() => {
+
     if (response?.type === 'success' && response.authentication) {
       const { idToken, accessToken } = response.authentication;
       const credential = GoogleAuthProvider.credential(idToken, accessToken);
@@ -73,7 +81,7 @@ useEffect(() => {
           setError(errorMessage);
         });
     }
-  }, [response]);
+  }, [request, response]);
 
   const toggleMostrarSenha = () => {
     setMostrarSenha(!mostrarSenha);

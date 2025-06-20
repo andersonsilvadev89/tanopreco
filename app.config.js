@@ -11,7 +11,7 @@ export default {
       resizeMode: "contain",
       backgroundColor: "#ffffff"
     },
-    scheme: "myapp",
+    scheme: "stoantoniobarbalhacliente",
     userInterfaceStyle: "automatic",
     newArchEnabled: false,
     android: {
