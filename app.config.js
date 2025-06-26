@@ -1,6 +1,6 @@
 export default {
   expo: {
-    name: "São João de Petrolina",
+    name: "A. E. - São João de Petrolina",
     slug: "petrolina",
     platforms: ["android", "ios"],
     version: "1.0.0",
