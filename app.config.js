@@ -1,6 +1,6 @@
 export default {
   expo: {
-    name: "petrolina",
+    name: "São João de Petrolina",
     slug: "petrolina",
     platforms: ["android", "ios"],
     version: "1.0.0",
@@ -42,11 +42,12 @@ export default {
       },
       googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
+        UIBackgroundModes: ["location", "audio"],
         NSPhotoLibraryUsageDescription: "Precisamos de acesso à sua galeria de fotos.",
+        NSCameraUsageDescription: "Precisamos de acesso à sua câmera para você tirar uma foto de perfil.",
         NSLocationWhenInUseUsageDescription: "Precisamos da sua localização para mostrar seus amigos no mapa.",
-        NSLocationAlwaysAndWhenInUseUsageDescription: "Precisamos da sua localização em segundo plano para que seus amigos possam te encontrar mesmo com o app fechado.",
-        NSLocationAlwaysUsageDescription: "Precisamos da sua localização em segundo plano para que seus amigos possam te encontrar mesmo com o app fechado.",
-        UIBackgroundModes: ["location"]
+        NSLocationAlwaysAndWhenInUseUsageDescription: "Precisamos da sua localização em segundo plano para que seus amigos possam te encontrar mesmo com o app fechado. É importante salientar que a sua localização só será vista caso você esteja próximo ou no local e na hora do evento",
+        NSLocationAlwaysUsageDescription: "Precisamos da sua localização em segundo plano para que seus amigos possam te encontrar mesmo com o app fechado."
       },
       supportsTablet: true
     },
