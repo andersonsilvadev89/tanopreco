@@ -49,7 +49,8 @@ export default function CadastroScreen({ navigation }: any) {
   const [termoAceito, setTermoAceito] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
 
-  const camposPreenchidos = () => nome && email && telefone && senha && confirmarSenha;
+  // ALTERAÇÃO 1: Telefone não é mais obrigatório em camposPreenchidos
+  const camposPreenchidos = () => nome && email && senha && confirmarSenha;
 
   const [allBanners, setAllBanners] = useState<string[]>([]);
   const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
@@ -212,8 +213,9 @@ export default function CadastroScreen({ navigation }: any) {
   };
 
   const cadastrarUsuario = async () => {
+    // ALTERAÇÃO 2: Verificar apenas os campos obrigatórios (nome, email, senha, confirmarSenha)
     if (!camposPreenchidos()) {
-      setErro('Preencha todos os campos obrigatórios.');
+      setErro('Preencha os campos obrigatórios: Nome, Email, Senha e Confirmar Senha.'); // ALTERAÇÃO 3: Mensagem de erro mais específica
       return;
     }
 
@@ -246,8 +248,8 @@ export default function CadastroScreen({ navigation }: any) {
       await set(ref(database, 'usuarios/' + userId), {
         nome,
         email,
-        telefone,
-        instagram,
+        telefone: telefone || null, // ALTERAÇÃO 4: Salvar telefone como null se estiver vazio
+        instagram: instagram || null, // Salvar instagram como null se estiver vazio
         imagem: imageUrl,
       });
 
@@ -307,13 +309,14 @@ export default function CadastroScreen({ navigation }: any) {
             style={styles.input}
           />
 
+          {/* ALTERAÇÃO 5: Remover o * do placeholder */}
           <MaskedTextInput
             mask="(99) 99999-9999"
             value={telefone}
             onChangeText={(text, rawText) => {
               setTelefone(text);
             }}
-            placeholder="Telefone*"
+            placeholder="Telefone (opcional)" 
             keyboardType="phone-pad"
             style={styles.input}
           />
@@ -373,6 +376,7 @@ export default function CadastroScreen({ navigation }: any) {
           {loading ? (
             <ActivityIndicator size="large" color="#007BFF" />
           ) : (
+            // ALTERAÇÃO 6: O botão "Cadastrar" agora é habilitado se os campos obrigatórios (sem telefone) estiverem preenchidos e o termo aceito
             <Button title="Cadastrar" onPress={cadastrarUsuario} disabled={!camposPreenchidos() || !termoAceito}/>
           )}
 
@@ -507,9 +511,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 12,
     paddingHorizontal: 15,
+    fontSize: 16,
     borderRadius: 8,
     backgroundColor: '#fff',
-    fontSize: 16,
+    color: '#333',
   },
   inputContainer: {
     flexDirection: 'row',

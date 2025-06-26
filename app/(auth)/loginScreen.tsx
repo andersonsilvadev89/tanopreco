@@ -17,25 +17,25 @@ import { auth, database, administrativoDatabase } from '../../firebaseConfig';
 import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
-  GoogleAuthProvider,
-  signInWithCredential,
+  // REMOVIDO: GoogleAuthProvider, // Não é mais necessário
+  // REMOVIDO: signInWithCredential, // Não é mais necessário
 } from 'firebase/auth';
-import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
+// REMOVIDO: import * as WebBrowser from 'expo-web-browser'; // Não é mais necessário
+// REMOVIDO: import * as Google from 'expo-auth-session/providers/google'; // Não é mais necessário
 import { router } from 'expo-router';
 import { ref, get } from 'firebase/database';
 import { Eye, EyeOff } from 'lucide-react-native';
-import * as AuthSession from 'expo-auth-session';
-import { makeRedirectUri } from 'expo-auth-session'; // <-- Importe makeRedirectUri
-import Constants from 'expo-constants';
+// REMOVIDO: import * as AuthSession from 'expo-auth-session'; // Não é mais necessário
+// REMOVIDO: import { makeRedirectUri } from 'expo-auth-session'; // Não é mais necessário
+// REMOVIDO: import Constants from 'expo-constants'; // Não é mais necessário para este fim
 
-WebBrowser.maybeCompleteAuthSession();
+// REMOVIDO: WebBrowser.maybeCompleteAuthSession(); // Não é mais necessário
 
 const LoginScreen = ({ navigation }: any) => {
-  
-  const redirectUri = `https://auth.expo.io/@professor.anderson.a.silva/petrolina`;
-  
-  const [accessToken, setAccessToken] = useState(); // Estado para armazenar o token de acesso (opcional, para exibir)
+
+  // REMOVIDO: const redirectUri = `https://auth.expo.io/@professor.anderson.a.silva/petrolina`; // Não é mais necessário
+
+  // REMOVIDO: const [accessToken, setAccessToken] = useState(); // Não é mais necessário
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>('');
@@ -50,38 +50,35 @@ const LoginScreen = ({ navigation }: any) => {
 
   const screenWidth = Dimensions.get('window').width;
 
-  
-  const [request, response, promptAsync] = Google.useAuthRequest({
-  // Use a nova credencial para Android
-  androidClientId: '161717540109-7ifgbevmesdqvg6u973kcafht1d7mgkh.apps.googleusercontent.com',
-  iosClientId: '161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com',
-  // Mantenha a antiga para web/desenvolvimento
-  webClientId: '161717540109-2lu2keq5r4ehkjjghmha0bckgktdflq5.apps.googleusercontent.com',
-  redirectUri: redirectUri,
-  });
+  // REMOVIDO: Lógica do Google Auth
+  // const [request, response, promptAsync] = Google.useAuthRequest({
+  //   androidClientId: '161717540109-7ifgbevmesdqvg6u973kcafht1d7mgkh.apps.googleusercontent.com',
+  //   iosClientId: '161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com',
+  //   webClientId: '161717540109-2lu2keq5r4ehkjjghmha0bckgktdflq5.apps.googleusercontent.com',
+  //   redirectUri: redirectUri,
+  // });
 
-useEffect(() => {
-
-    if (response?.type === 'success' && response.authentication) {
-      const { idToken, accessToken } = response.authentication;
-      const credential = GoogleAuthProvider.credential(idToken, accessToken);
-      signInWithCredential(auth, credential)
-        .then(async (userCredential) => {
-          const loggedUser = userCredential.user;
-          
-          if (loggedUser) {
-            router.replace('/(tabs)/homeScreen');
-          } else {
-            Alert.alert('Usuário não logado', 'Faça o login ou cadastre-se!');
-            await auth.signOut();
-          }
-        })
-        .catch((err) => {
-          const errorMessage = err.message || 'Erro ao fazer login com o Google.';
-          setError(errorMessage);
-        });
-    }
-  }, [request, response]);
+  // REMOVIDO: useEffect para lidar com a resposta do Google Auth
+  // useEffect(() => {
+  //   if (response?.type === 'success' && response.authentication) {
+  //     const { idToken, accessToken } = response.authentication;
+  //     const credential = GoogleAuthProvider.credential(idToken, accessToken);
+  //     signInWithCredential(auth, credential)
+  //       .then(async (userCredential) => {
+  //         const loggedUser = userCredential.user;
+  //         if (loggedUser) {
+  //           router.replace('/(tabs)/homeScreen');
+  //         } else {
+  //           Alert.alert('Usuário não logado', 'Faça o login ou cadastre-se!');
+  //           await auth.signOut();
+  //         }
+  //       })
+  //       .catch((err) => {
+  //         const errorMessage = err.message || 'Erro ao fazer login com o Google.';
+  //         setError(errorMessage);
+  //       });
+  //   }
+  // }, [request, response]);
 
   const toggleMostrarSenha = () => {
     setMostrarSenha(!mostrarSenha);
@@ -97,7 +94,6 @@ useEffect(() => {
     return () => unsubscribe();
   }, [handleAuthStateChanged]);
 
-  
   const fetchSponsors = async () => {
     setSponsorsLoading(true);
     setSponsorsError(null);
@@ -176,81 +172,81 @@ useEffect(() => {
       setLoading(false);
     }
   };
-    // --- Lógica do Carrossel de Patrocinadores ---
-    const scrollViewRef = useRef<ScrollView>(null);
-    const scrollOffsetRef = useRef(0); // Guarda o offset atual da rolagem
-    const animationFrameIdRef = useRef<number | null>(null); // Guarda o ID do requestAnimationFrame
-    const [measuredContentWidth, setMeasuredContentWidth] = useState(0); // Largura do conteúdo da ScrollView
-    const [isUserInteractingWithSponsors, setIsUserInteractingWithSponsors] = useState(false);
-  
-    useEffect(() => {
-      // Cancela animação anterior se houver
+  // --- Lógica do Carrossel de Patrocinadores ---
+  const scrollViewRef = useRef<ScrollView>(null);
+  const scrollOffsetRef = useRef(0); // Guarda o offset atual da rolagem
+  const animationFrameIdRef = useRef<number | null>(null); // Guarda o ID do requestAnimationFrame
+  const [measuredContentWidth, setMeasuredContentWidth] = useState(0); // Largura do conteúdo da ScrollView
+  const [isUserInteractingWithSponsors, setIsUserInteractingWithSponsors] = useState(false);
+
+  useEffect(() => {
+    // Cancela animação anterior se houver
+    if (animationFrameIdRef.current) {
+      cancelAnimationFrame(animationFrameIdRef.current);
+      animationFrameIdRef.current = null;
+    }
+
+    // Condições para não animar
+    if (sponsors.length === 0 || !scrollViewRef.current || isUserInteractingWithSponsors || measuredContentWidth <= screenWidth) {
+      // Se o conteúdo couber na tela e não estiver no início, rola para o início.
+      if (measuredContentWidth <= screenWidth && scrollOffsetRef.current !== 0 && scrollViewRef.current) {
+        scrollViewRef.current.scrollTo({ x: 0, animated: false });
+        scrollOffsetRef.current = 0;
+      }
+      return;
+    }
+
+    let lastTimestamp = 0;
+    const scrollSpeed = 20; // Pixels por segundo
+
+    const animate = (timestamp: number) => {
+      if (!lastTimestamp) {
+        lastTimestamp = timestamp;
+      }
+      const deltaTimeInSeconds = (timestamp - lastTimestamp) / 1000;
+      lastTimestamp = timestamp;
+
+      scrollOffsetRef.current += scrollSpeed * deltaTimeInSeconds;
+
+      if (scrollOffsetRef.current >= measuredContentWidth) {
+        // Quando o scroll ultrapassa a largura total do conteúdo,
+        // significa que todo o conteúdo "original" já passou.
+        // Para um loop suave, idealmente teríamos itens duplicados.
+        // Com reset simples:
+        scrollOffsetRef.current = scrollOffsetRef.current % measuredContentWidth; // Mantém a posição relativa no loop
+        // Para um reset para o início absoluto:
+        // scrollOffsetRef.current = 0;
+      }
+
+      scrollViewRef.current?.scrollTo({ x: scrollOffsetRef.current, animated: false });
+      animationFrameIdRef.current = requestAnimationFrame(animate);
+    };
+
+    animationFrameIdRef.current = requestAnimationFrame(animate);
+
+    return () => {
       if (animationFrameIdRef.current) {
         cancelAnimationFrame(animationFrameIdRef.current);
         animationFrameIdRef.current = null;
       }
-  
-      // Condições para não animar
-      if (sponsors.length === 0 || !scrollViewRef.current || isUserInteractingWithSponsors || measuredContentWidth <= screenWidth) {
-        // Se o conteúdo couber na tela e não estiver no início, rola para o início.
-        if (measuredContentWidth <= screenWidth && scrollOffsetRef.current !== 0 && scrollViewRef.current) {
-           scrollViewRef.current.scrollTo({ x: 0, animated: false });
-           scrollOffsetRef.current = 0;
-        }
-        return;
-      }
-  
-      let lastTimestamp = 0;
-      const scrollSpeed = 20; // Pixels por segundo
-  
-      const animate = (timestamp: number) => {
-        if (!lastTimestamp) {
-          lastTimestamp = timestamp;
-        }
-        const deltaTimeInSeconds = (timestamp - lastTimestamp) / 1000;
-        lastTimestamp = timestamp;
-  
-        scrollOffsetRef.current += scrollSpeed * deltaTimeInSeconds;
-  
-        if (scrollOffsetRef.current >= measuredContentWidth) {
-          // Quando o scroll ultrapassa a largura total do conteúdo,
-          // significa que todo o conteúdo "original" já passou.
-          // Para um loop suave, idealmente teríamos itens duplicados.
-          // Com reset simples:
-          scrollOffsetRef.current = scrollOffsetRef.current % measuredContentWidth; // Mantém a posição relativa no loop
-          // Para um reset para o início absoluto:
-          // scrollOffsetRef.current = 0;
-        }
-        
-        scrollViewRef.current?.scrollTo({ x: scrollOffsetRef.current, animated: false });
-        animationFrameIdRef.current = requestAnimationFrame(animate);
-      };
-  
-      animationFrameIdRef.current = requestAnimationFrame(animate);
-  
-      return () => {
-        if (animationFrameIdRef.current) {
-          cancelAnimationFrame(animationFrameIdRef.current);
-          animationFrameIdRef.current = null;
-        }
-      };
-    }, [sponsors, screenWidth, measuredContentWidth, isUserInteractingWithSponsors]);
-  
-    const handleSponsorsScrollBeginDrag = () => {
-      setIsUserInteractingWithSponsors(true);
     };
-  
-    const handleSponsorsScrollEndDrag = (event: any) => {
-      scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
+  }, [sponsors, screenWidth, measuredContentWidth, isUserInteractingWithSponsors]);
+
+  const handleSponsorsScrollBeginDrag = () => {
+    setIsUserInteractingWithSponsors(true);
+  };
+
+  const handleSponsorsScrollEndDrag = (event: any) => {
+    scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
+    setIsUserInteractingWithSponsors(false);
+  };
+  const handleSponsorsMomentumScrollEnd = (event: any) => {
+    scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
+    // Delay para retomar a animação e evitar conflito com possível onScrollEndDrag
+    setTimeout(() => {
       setIsUserInteractingWithSponsors(false);
-    };
-     const handleSponsorsMomentumScrollEnd = (event: any) => {
-      scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
-      // Delay para retomar a animação e evitar conflito com possível onScrollEndDrag
-      setTimeout(() => {
-          setIsUserInteractingWithSponsors(false);
-      }, 100); // Pequeno delay
-    };
+    }, 100); // Pequeno delay
+  };
 
   if (authLoading) {
     return (
@@ -311,6 +307,8 @@ useEffect(() => {
             )}
           </TouchableOpacity>
 
+          {/* REMOVIDO: Botão de Login com Google */}
+          {/*
           <TouchableOpacity
             onPress={() => promptAsync()}
             style={[styles.googleButton, loading && styles.buttonDisabled]}
@@ -318,6 +316,7 @@ useEffect(() => {
           >
             <Text style={styles.googleButtonText}>Entrar com Google</Text>
           </TouchableOpacity>
+          */}
 
           <TouchableOpacity onPress={handlePasswordReset} style={[styles.forgotPassword, loading && styles.buttonDisabled]} disabled={loading}>
             <Text style={styles.forgotPasswordText}>Esqueceu a senha?</Text>
@@ -464,7 +463,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  googleButton: {
+  googleButton: { // Este estilo pode ser removido se não for usado em outro lugar
     marginTop: 12,
     paddingVertical: 14,
     backgroundColor: '#DB4437',
@@ -476,7 +475,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 1.5,
   },
-  googleButtonText: {
+  googleButtonText: { // Este estilo pode ser removido se não for usado em outro lugar
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
@@ -522,7 +521,7 @@ const styles = StyleSheet.create({
   supportersLogosContent: {
     flexDirection: 'row',   // Organiza as logos horizontalmente, lado a lado
     alignItems: 'center',   // Alinha as logos verticalmente ao centro dentro da faixa do ScrollView
-    paddingHorizontal: 5,  // Espaçamento nas extremidades da lista de logos (antes da primeira e depois da última)
+    paddingHorizontal: 5,   // Espaçamento nas extremidades da lista de logos (antes da primeira e depois da última)
     paddingVertical: 5,     // Espaçamento vertical acima e abaixo das logos dentro da área de scroll
   },
   supporterText: {

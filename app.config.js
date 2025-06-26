@@ -36,7 +36,7 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.ae.stoantoniobarbalhacliente",
-      buildNumber: "1.0.1",
+      buildNumber: "1.0.2",
       config: {
         googleMapsApiKey: "AIzaSyBY4ZBNVZ1VkyqJqY_M7u3LPdT6Ielcuw0"
       },
@@ -77,10 +77,6 @@ export default {
       "firebaseApiKey": "AIzaSyCyKuYJzr_0w-pw5Ehmrf8i7TPRAxtbLbM",
       "firebaseAuthDomain": "stoantoniobarbalhacliente.firebaseapp.com",
       "firebaseProjectId": "stoantoniobarbalhacliente",
-      "webClientId": "161717540109-2lu2keq5r4ehkjjghmha0bckgktdflq5.apps.googleusercontent.com", // Adicionar esta linha
-      "iosClientId": "161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com",   // Opcional para Expo Go, mas bom para futuro
-      "androidClientId": "161717540109-7ifgbevmesdqvg6u973kcafht1d7mgkh.apps.googleusercontent.com", // Opcional para Expo Go, mas bom para futuro
-      googleClientId: "161717540109-7ifgbevmesdqvg6u973kcafht1d7mgkh.apps.googleusercontent.com",
       router: {
         origin: false
       },
