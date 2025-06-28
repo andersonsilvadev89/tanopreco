@@ -36,7 +36,7 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.ae.stoantoniobarbalhacliente",
-      buildNumber: "1.0.2",
+      buildNumber: "1.0.3",
       config: {
         googleMapsApiKey: "AIzaSyBY4ZBNVZ1VkyqJqY_M7u3LPdT6Ielcuw0"
       },
