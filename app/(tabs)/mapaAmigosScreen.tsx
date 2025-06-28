@@ -1,19 +1,17 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ImageBackground, FlatList, TouchableOpacity, Dimensions, Linking, Platform, Image, Alert, TextInput, SafeAreaView, InteractionManager, Animated, } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
-import { ref, onValue, get, update } from 'firebase/database'; // <<< ALTERAÇÃO: Adicionado 'update'
+import { ref, onValue, get, update, set } from 'firebase/database'; // 'set' adicionado aqui
 import { auth, database, administrativoDatabase } from '../../firebaseConfig';
 import * as Location from 'expo-location';
 import { LocationSubscription, PermissionStatus } from 'expo-location';
-import * as TaskManager from 'expo-task-manager'; // <<< ALTERAÇÃO: Importado TaskManager
+import * as TaskManager from 'expo-task-manager';
 import { useFocusEffect } from '@react-navigation/native';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 import { LinearGradient } from 'expo-linear-gradient';
 
-
-
-// <<< ALTERAÇÃO: DEFINIÇÃO DA TAREFA DE BACKGROUND (FORA DO COMPONENTE) >>>
+// DEFINIÇÃO DA TAREFA DE BACKGROUND (FORA DO COMPONENTE)
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
 
 TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
@@ -29,29 +27,37 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
     if (location && userId) {
       console.log('[Background] Localização recebida:', location.coords);
       const userLocationRef = ref(database, `localizacoes/${userId}`);
-      
-      // Prepara os dados para atualização no Firebase
-      // Esta tarefa é "burra", ela apenas envia a localização.
-      // A lógica de 'compartilhando' e 'nome' deve ser mantida no DB.
-      const locationData = {
+
+      let userName = 'Usuário Desconhecido';
+      try {
+          const userProfileRef = ref(database, `usuarios/${userId}`);
+          const userProfileSnap = await get(userProfileRef);
+          if (userProfileSnap.exists() && userProfileSnap.val().nome) {
+              userName = userProfileSnap.val().nome;
+          }
+      } catch (profileError) {
+          console.error('[Background] Erro ao buscar nome do usuário:', profileError);
+      }
+
+      const locationDataToUpdate = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         timestamp: location.timestamp,
+        compartilhando: true,
+        nome: userName,
       };
-      
+
       try {
-        await update(userLocationRef, locationData);
-        console.log('[Background] Localização atualizada no Firebase.');
+        await update(userLocationRef, locationDataToUpdate);
+        console.log('[Background] Localização e status de compartilhamento atualizados no Firebase.');
       } catch (dbError) {
         console.error('[Background] Erro ao atualizar Firebase:', dbError);
       }
     }
   }
 });
-// <<< FIM DA ALTERAÇÃO >>>
 
-
-// --- Interfaces --- (sem alterações)
+// --- Interfaces ---
 interface Localizacao {
   latitude: number;
   longitude: number;
@@ -76,39 +82,38 @@ interface BannerItem {
 }
 
 const { height: screenHeight } = Dimensions.get('window');
+
 const handleInstagramPress = async (instagramInput: string | undefined) => {
-        if (!instagramInput) return;
+  if (!instagramInput) return;
 
-        let instagramUsername = instagramInput.trim();
-        // Expressão regular para capturar o username de URLs do Instagram
-        // Esta regex é mais robusta e lida com http/https, www, e paths adicionais
-        const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)(?:\/.*)?/;
-        const match = instagramUsername.match(instagramUrlRegex);
+  let instagramUsername = instagramInput.trim();
+  const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)(?:\/.*)?/;
+  const match = instagramUsername.match(instagramUrlRegex);
 
-        if (match && match[1]) {
-            instagramUsername = match[1]; // Extrai apenas o username da URL
-        } else if (instagramUsername.startsWith('@')) {
-            instagramUsername = instagramUsername.substring(1); // Remove o '@' se houver
-        }
+  if (match && match[1]) {
+    instagramUsername = match[1];
+  } else if (instagramUsername.startsWith('@')) {
+    instagramUsername = instagramUsername.substring(1);
+  }
 
-        // Se, após processar, o username ainda estiver vazio, é inválido
-        if (!instagramUsername) { 
-            Alert.alert("Erro", `Formato de usuário do Instagram inválido.`);
-            return;
-        }
+  if (!instagramUsername) {
+    Alert.alert("Erro", `Formato de usuário do Instagram inválido.`);
+    return;
+  }
 
-        const url = `https://www.instagram.com/${instagramUsername}`; // Constrói a URL padrão do perfil
-        try {
-            const supported = await Linking.canOpenURL(url);
-            if (supported) {
-                await Linking.openURL(url);
-            } else {
-                Alert.alert("Erro", `Não foi possível abrir o perfil do Instagram.`);
-            }
-        } catch (error) {
-            Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
-        }
-    };
+  const url = `https://www.instagram.com/${instagramUsername}`;
+  try {
+    const supported = await Linking.canOpenURL(url);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      Alert.alert("Erro", `Não foi possível abrir o perfil do Instagram.`);
+    }
+  } catch (error) {
+    Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
+  }
+};
+
 const AmigoItem = React.memo(({ item, isSelected, amigoLocal, handleAmigoPress }: {
   item: Amigo;
   isSelected: boolean;
@@ -132,19 +137,21 @@ const AmigoItem = React.memo(({ item, isSelected, amigoLocal, handleAmigoPress }
       )}
       <View style={styles.amigoInfo}>
         <Text style={styles.amigoNome} numberOfLines={1}>{item.nome}</Text>
-        {!amigoLocal && <Text style={styles.amigoOffline}>Offline</Text>}
-        {item.instagram && (
-          <TouchableOpacity onPress={() => handleInstagramPress(item.instagram)}>
-            <LinearGradient
-              colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
-              start={{ x: 0.0, y: 1.0 }}
-              end={{ x: 1.0, y: 0.0 }}
-              style={styles.instagramButton}
-            >
-              <Text style={styles.instagramButtonText}>Instagram</Text>
-            </LinearGradient>
-          </TouchableOpacity>
-        )}
+        <View style={styles.statusAndInstagramContainer}>
+          {!amigoLocal && <Text style={styles.amigoOffline}>Offline</Text>}
+          {item.instagram && (
+            <TouchableOpacity onPress={() => handleInstagramPress(item.instagram)} style={styles.instagramButtonWrapper}>
+              <LinearGradient
+                colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
+                start={{ x: 0.0, y: 1.0 }}
+                end={{ x: 1.0, y: 0.0 }}
+                style={styles.instagramButton}
+              >
+                <Text style={styles.instagramButtonText}>Instagram</Text>
+              </LinearGradient>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -188,92 +195,93 @@ const MapaAmigosScreen = () => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); return R * c;
   }, []);
 
-  // --- Lógica de Banners (sem alterações) ---
+  // --- Lógica de Banners ---
   const [allBanners, setAllBanners] = useState<string[]>([]);
-    const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-    const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-    const fadeAnim = useRef(new Animated.Value(0)).current;
-    useEffect(() => {
-      const fetchBanners = async () => {
-        try {
-          const sponsorsRef = ref(administrativoDatabase, 'patrocinadores');
-          const snapshot = await get(sponsorsRef);
-          if (snapshot.exists()) {
-            const sponsorsData = snapshot.val();
-            const bannersList: string[] = [];
-            for (const sponsorId in sponsorsData) {
-              const sponsor = sponsorsData[sponsorId];
-              if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
-                const sponsorBannersArray: BannerItem[] = sponsor.banners;
-                sponsorBannersArray.forEach(bannerObject => {
-                  if (typeof bannerObject === 'object' && bannerObject !== null && typeof bannerObject.imagemUrl === 'string') {
-                    bannersList.push(bannerObject.imagemUrl);
-                  }
-                });
-              }
+  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const fetchBanners = async () => {
+      try {
+        const sponsorsRef = ref(administrativoDatabase, 'patrocinadores');
+        const snapshot = await get(sponsorsRef);
+        if (snapshot.exists()) {
+          const sponsorsData = snapshot.val();
+          const bannersList: string[] = [];
+          for (const sponsorId in sponsorsData) {
+            const sponsor = sponsorsData[sponsorId];
+            if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
+              const sponsorBannersArray: BannerItem[] = sponsor.banners;
+              sponsorBannersArray.forEach(bannerObject => {
+                if (typeof bannerObject === 'object' && bannerObject !== null && typeof bannerObject.imagemUrl === 'string') {
+                  bannersList.push(bannerObject.imagemUrl);
+                }
+              });
             }
-            if (bannersList.length > 0) {
-              setAllBanners(bannersList);
-              setCurrentBannerUrl(bannersList[0]);
-              setCurrentBannerIndex(0);
-              Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 200,
-                useNativeDriver: true,
-              }).start();
-            } else {
-              setCurrentBannerUrl(null);
-              fadeAnim.setValue(0);
-            }
+          }
+          if (bannersList.length > 0) {
+            setAllBanners(bannersList);
+            setCurrentBannerUrl(bannersList[0]);
+            setCurrentBannerIndex(0);
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+            }).start();
           } else {
             setCurrentBannerUrl(null);
             fadeAnim.setValue(0);
           }
-        } catch (error) {
-          console.error('Erro ao buscar banners dos patrocinadores:', error);
-          Alert.alert("Erro", "Não foi possível carregar os banners dos patrocinadores.");
+        } else {
           setCurrentBannerUrl(null);
           fadeAnim.setValue(0);
         }
-      };
-      fetchBanners();
-    }, [fadeAnim]);
-    useEffect(() => {
-      let intervalId: ReturnType<typeof setInterval> | null = null;
-      if (allBanners.length > 1) {
-        intervalId = setInterval(() => {
-          Animated.timing(fadeAnim, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => {
-            setCurrentBannerIndex(prevIndex => {
-              const nextIndex = (prevIndex + 1) % allBanners.length;
-              setCurrentBannerUrl(allBanners[nextIndex]);
-              Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 200,
-                useNativeDriver: true,
-              }).start();
-              return nextIndex;
-            });
-          });
-        }, 6000);
+      } catch (error) {
+        console.error('Erro ao buscar banners dos patrocinadores:', error);
+        Alert.alert("Erro", "Não foi possível carregar os banners dos patrocinadores.");
+        setCurrentBannerUrl(null);
+        fadeAnim.setValue(0);
       }
-      return () => {
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
-      };
-    }, [allBanners, fadeAnim]);
+    };
+    fetchBanners();
+  }, [fadeAnim]);
 
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    if (allBanners.length > 1) {
+      intervalId = setInterval(() => {
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => {
+          setCurrentBannerIndex(prevIndex => {
+            const nextIndex = (prevIndex + 1) % allBanners.length;
+            setCurrentBannerUrl(allBanners[nextIndex]);
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+            }).start();
+            return nextIndex;
+          });
+        });
+      }, 6000);
+    }
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [allBanners, fadeAnim]);
 
   useEffect(() => {
     const intervalId = setInterval(() => { setCurrentTimeTick(prev => prev + 1); }, 60000);
     return () => clearInterval(intervalId);
   }, []);
-  
-  // <<< ALTERAÇÃO: LÓGICA DE SOLICITAÇÃO DE PERMISSÃO ATUALIZADA >>>
+
+  // Lógica de solicitação de permissão e status de compartilhamento
   useEffect(() => {
     if (!usuarioLogadoId) {
       setLoadingStatus(false);
@@ -281,10 +289,10 @@ const MapaAmigosScreen = () => {
       setLocationPermissionStatus(null);
       return;
     }
-  
+
     let isMounted = true;
     setLoadingStatus(true);
-  
+
     const statusRef = ref(database, `usuarios/${usuarioLogadoId}/compartilhando`);
     const unsubscribeStatus = onValue(statusRef, (snapshot) => {
       if (isMounted) {
@@ -292,19 +300,32 @@ const MapaAmigosScreen = () => {
         setCompartilhando(isSharing);
       }
     });
-  
+
     const requestPermissions = async () => {
-      // 1. Pede permissão de primeiro plano (Foreground)
       const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-      
+
       if (isMounted) {
         setLocationPermissionStatus(foregroundStatus);
-  
-        // 2. Se concedida, pede a de segundo plano (Background)
+
         if (foregroundStatus === 'granted') {
           const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
+          
+          // --- NOVA LÓGICA: Salvar compartilhando: true ao conceder permissões ---
+          // Se ambas as permissões (foreground e background) foram concedidas,
+          // ou se pelo menos a foreground foi concedida e estamos no iOS (onde background é mais flexível)
+          // E se o usuário ainda não está marcado como compartilhando no nosso estado local
+          // Isso garante que o 'compartilhando' seja ativado automaticamente na primeira vez que o usuário permite
+          if ((backgroundStatus === 'granted' || Platform.OS === 'ios') && compartilhando !== true) {
+              try {
+                  await set(statusRef, true); // Salva 'compartilhando: true' no Firebase
+                  console.log('Status de compartilhamento definido como TRUE no Firebase após permissão.');
+              } catch (dbError) {
+                  console.error('Erro ao salvar status de compartilhamento após permissão:', dbError);
+              }
+          }
+          // --- FIM DA NOVA LÓGICA ---
+
           if (backgroundStatus !== 'granted') {
-            // Opcional: Avisar o usuário sobre a importância da permissão de background
             Alert.alert(
               "Permissão Adicional Necessária",
               "Para uma melhor experiência e para que seus amigos o encontrem mesmo com o app fechado, por favor, escolha a opção 'Permitir o tempo todo' para a localização.",
@@ -312,34 +333,33 @@ const MapaAmigosScreen = () => {
             );
           }
         }
-        setLoadingStatus(false); // Finaliza o loading após as permissões
+        setLoadingStatus(false);
       }
     };
-  
+
     requestPermissions();
-  
+
     return () => {
       isMounted = false;
       unsubscribeStatus();
     };
-  }, [usuarioLogadoId]);
-
+  }, [usuarioLogadoId, compartilhando]); // 'compartilhando' adicionado como dependência para reavaliação
 
   useEffect(() => {
     if (!usuarioLogadoId) { setAmigosLista([]); return; }
     const amigosRef = ref(database, `amigos/${usuarioLogadoId}`);
     const unsubscribeAmigos = onValue(amigosRef, async (snapshot) => {
-        const amigosData = snapshot.val();
-        const amigosIdsAceitos = amigosData ? Object.keys(amigosData).filter(key => amigosData[key] === 'aceito') : [];
-        if (amigosIdsAceitos.length === 0) { setAmigosLista([]); return; }
-        const amigosPromises = amigosIdsAceitos.map(async (amigoId) => {
-            const uRef = ref(database, `usuarios/${amigoId}`);
-            const uSnap = await get(uRef);
-            const uData = uSnap.val();
-            return uData?.nome ? { id: amigoId, nome: uData.nome, telefone: uData.telefone, imagem: uData.imagem, instagram: uData.instagram } : null;
-        });
-        const amigosCarregados = (await Promise.all(amigosPromises)).filter(Boolean) as Amigo[];
-        setAmigosLista(amigosCarregados);
+      const amigosData = snapshot.val();
+      const amigosIdsAceitos = amigosData ? Object.keys(amigosData).filter(key => amigosData[key] === 'aceito') : [];
+      if (amigosIdsAceitos.length === 0) { setAmigosLista([]); return; }
+      const amigosPromises = amigosIdsAceitos.map(async (amigoId) => {
+        const uRef = ref(database, `usuarios/${amigoId}`);
+        const uSnap = await get(uRef);
+        const uData = uSnap.val();
+        return uData?.nome ? { id: amigoId, nome: uData.nome, telefone: uData.telefone, imagem: uData.imagem, instagram: uData.instagram } : null;
+      });
+      const amigosCarregados = (await Promise.all(amigosPromises)).filter(Boolean) as Amigo[];
+      setAmigosLista(amigosCarregados);
     });
     return () => unsubscribeAmigos();
   }, [usuarioLogadoId]);
@@ -365,7 +385,7 @@ const MapaAmigosScreen = () => {
       }
       const todosEventos: EventoFirebase[] = [];
       if (lineupSnapshot.exists()) {
-        lineupSnapshot.forEach(child => { todosEventos.push({ id: child.key!, ...child.val() }); });
+        lineupSnapshot.forEach(child => { todosEventos.push({ id: child.key!, ...child.val() }); }); // CORRIGIDO AQUI
       }
       const hojeFormatado = moment().format('DD/MM/YYYY');
       const eventosDeHojeFiltrados = todosEventos
@@ -410,8 +430,8 @@ const MapaAmigosScreen = () => {
 
   useEffect(() => {
     if (loadingStatus || loadingEventos) {
-        setPodeRastrearAmigos(false);
-        return;
+      setPodeRastrearAmigos(false);
+      return;
     }
     if (!compartilhando || !minhaLocalizacao || eventosDoDiaProcessados.length === 0) {
       setPodeRastrearAmigos(false);
@@ -422,14 +442,14 @@ const MapaAmigosScreen = () => {
     for (const evento of eventosDoDiaProcessados) {
       if (agora.isBetween(evento.janelaStartTime, evento.janelaEndTime)) {
         if (evento.coordenadas) {
-            const distancia = calcularDistancia(
+          const distancia = calcularDistancia(
             minhaLocalizacao.latitude, minhaLocalizacao.longitude,
             evento.coordenadas.latitude, evento.coordenadas.longitude
-            );
-            if (distancia <= 3) {
+          );
+          if (distancia <= 3) {
             condicaoAtendidaParaAlgumEvento = true;
             break;
-            }
+          }
         }
       }
     }
@@ -446,43 +466,43 @@ const MapaAmigosScreen = () => {
     const amigosRef = ref(database, `amigos/${usuarioLogadoId}`);
     let activeLocationListeners: (() => void)[] = [];
     const unsubscribePrincipal = onValue(amigosRef, (snapshotAmigos) => {
-        activeLocationListeners.forEach(unsub => unsub());
-        activeLocationListeners = [];
-        const amigosData = snapshotAmigos.val();
-        const amigosIdsConfirmados = amigosData ? Object.keys(amigosData).filter(key => amigosData[key] === 'aceito') : [];
-        if (amigosIdsConfirmados.length === 0) {
-            setAmigosLocalizacao([]);
-            setLoadingAmigosLoc(false);
-            return;
-        }
-        let initialLocations: Localizacao[] = [];
-        const initialLoadPromises = amigosIdsConfirmados.map(amigoId => {
-            const locRef = ref(database, `localizacoes/${amigoId}`);
-            return get(locRef).then(snapLoc => {
-                const dataLoc = snapLoc.val();
-                if (dataLoc?.compartilhando && dataLoc.latitude && dataLoc.longitude && dataLoc.nome) {
-                    initialLocations.push({id: amigoId, nome: dataLoc.nome, latitude: dataLoc.latitude, longitude: dataLoc.longitude });
-                }
-            });
+      activeLocationListeners.forEach(unsub => unsub());
+      activeLocationListeners = [];
+      const amigosData = snapshotAmigos.val();
+      const amigosIdsConfirmados = amigosData ? Object.keys(amigosData).filter(key => amigosData[key] === 'aceito') : [];
+      if (amigosIdsConfirmados.length === 0) {
+        setAmigosLocalizacao([]);
+        setLoadingAmigosLoc(false);
+        return;
+      }
+      let initialLocations: Localizacao[] = [];
+      const initialLoadPromises = amigosIdsConfirmados.map(amigoId => {
+        const locRef = ref(database, `localizacoes/${amigoId}`);
+        return get(locRef).then(snapLoc => {
+          const dataLoc = snapLoc.val();
+          if (dataLoc?.compartilhando && dataLoc.latitude && dataLoc.longitude && dataLoc.nome) {
+            initialLocations.push({id: amigoId, nome: dataLoc.nome, latitude: dataLoc.latitude, longitude: dataLoc.longitude });
+          }
         });
-        Promise.all(initialLoadPromises)
+      });
+      Promise.all(initialLoadPromises)
         .then(() => {
-            setAmigosLocalizacao([...initialLocations]);
-            setLoadingAmigosLoc(false);
-            amigosIdsConfirmados.forEach((amigoId) => {
-                const locRef = ref(database, `localizacoes/${amigoId}`);
-                const unsubLoc = onValue(locRef, (snapLoc) => {
-                    const dataLoc = snapLoc.val();
-                    setAmigosLocalizacao(prevLocs => {
-                        const newLocs = prevLocs.filter(l => l.id !== amigoId);
-                        if (dataLoc?.compartilhando && dataLoc.latitude && dataLoc.longitude && dataLoc.nome) {
-                            newLocs.push({ id: amigoId, nome: dataLoc.nome, latitude: dataLoc.latitude, longitude: dataLoc.longitude });
-                        }
-                        return newLocs;
-                    });
-                });
-                activeLocationListeners.push(unsubLoc);
+          setAmigosLocalizacao([...initialLocations]);
+          setLoadingAmigosLoc(false);
+          amigosIdsConfirmados.forEach((amigoId) => {
+            const locRef = ref(database, `localizacoes/${amigoId}`);
+            const unsubLoc = onValue(locRef, (snapLoc) => {
+              const dataLoc = snapLoc.val();
+              setAmigosLocalizacao(prevLocs => {
+                const newLocs = prevLocs.filter(l => l.id !== amigoId);
+                if (dataLoc?.compartilhando && dataLoc.latitude && dataLoc.longitude && dataLoc.nome) {
+                  newLocs.push({ id: amigoId, nome: dataLoc.nome, latitude: dataLoc.latitude, longitude: dataLoc.longitude });
+                }
+                return newLocs;
+              });
             });
+            activeLocationListeners.push(unsubLoc);
+          });
         })
         .catch(() => setLoadingAmigosLoc(false));
     });
@@ -490,7 +510,7 @@ const MapaAmigosScreen = () => {
   }, [usuarioLogadoId, podeRastrearAmigos]);
 
 
-  // <<< ALTERAÇÃO: NOVO useEffect PARA GERENCIAR A TAREFA DE BACKGROUND >>>
+  // useEffect para GERENCIAR A TAREFA DE BACKGROUND
   useEffect(() => {
     const manageBackgroundTask = async () => {
         if (!usuarioLogadoId || compartilhando === null) return;
@@ -499,7 +519,6 @@ const MapaAmigosScreen = () => {
 
         try {
             if (compartilhando && !isTaskRunning) {
-                // Inicia a tarefa de background
                 await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
                     accuracy: Location.Accuracy.High,
                     timeInterval: 60000, // 1 minuto
@@ -513,9 +532,16 @@ const MapaAmigosScreen = () => {
                 });
                 console.log('Tarefa de localização em background iniciada.');
             } else if (!compartilhando && isTaskRunning) {
-                // Para a tarefa de background
                 await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
                 console.log('Tarefa de localização em background parada.');
+                if (usuarioLogadoId) {
+                    await update(ref(database, `localizacoes/${usuarioLogadoId}`), {
+                        compartilhando: false,
+                        latitude: null,
+                        longitude: null,
+                        timestamp: null
+                    }).catch(err => console.error("Erro ao desativar compartilhamento no Firebase:", err));
+                }
             }
         } catch (error) {
             console.error("Erro ao gerenciar a tarefa de background:", error);
@@ -526,29 +552,25 @@ const MapaAmigosScreen = () => {
   }, [compartilhando, usuarioLogadoId]);
 
 
-  // <<< ALTERAÇÃO: useEffect de RASTREAMENTO EM PRIMEIRO PLANO (para UI) >>>
-  // Este hook agora serve para atualizar a UI (marcador 'EU' e centralização do mapa) em tempo real quando o app está aberto.
+  // useEffect de RASTREAMENTO EM PRIMEIRO PLANO (para UI)
   useEffect(() => {
     const manageForegroundTracking = async () => {
-      // Remove a inscrição anterior para evitar duplicatas
       if (locationSubscriptionRef.current) {
         locationSubscriptionRef.current.remove();
         locationSubscriptionRef.current = null;
       }
-  
-      // Se não estiver compartilhando ou não tiver permissão, para tudo.
+
       if (compartilhando !== true || locationPermissionStatus !== PermissionStatus.GRANTED) {
         setMinhaLocalizacao(null);
         return;
       }
-  
-      // Inicia o watchPositionAsync para atualizações em tempo real na UI
+
       try {
         locationSubscriptionRef.current = await Location.watchPositionAsync(
           { accuracy: Location.Accuracy.High, timeInterval: 10000, distanceInterval: 20 },
           (location) => {
             if (!usuarioLogadoId) return;
-  
+
             const newMinhaLocalizacao: Localizacao = {
               id: usuarioLogadoId,
               nome: 'Você',
@@ -556,8 +578,7 @@ const MapaAmigosScreen = () => {
               longitude: location.coords.longitude,
             };
             setMinhaLocalizacao(newMinhaLocalizacao);
-  
-            // Centraliza o mapa no usuário apenas se nenhum amigo estiver selecionado
+
             if (!selectedAmigoId) {
               const isInitialRegion = mapRegion.latitude === -7.2291;
               setMapRegion(prevRegion => ({
@@ -575,17 +596,16 @@ const MapaAmigosScreen = () => {
         setMinhaLocalizacao(null);
       }
     };
-  
+
     manageForegroundTracking();
-  
-    // Função de limpeza para parar o rastreamento quando o componente/efeito for desmontado
+
     return () => {
       if (locationSubscriptionRef.current) {
         locationSubscriptionRef.current.remove();
         locationSubscriptionRef.current = null;
       }
     };
-  }, [compartilhando, usuarioLogadoId, locationPermissionStatus, selectedAmigoId]); // Adicionado locationPermissionStatus como dependência
+  }, [compartilhando, usuarioLogadoId, locationPermissionStatus, selectedAmigoId]);
 
   const handleBuscaAmigos = (texto: string) => { setTermoBusca(texto); };
 
@@ -618,8 +638,7 @@ const MapaAmigosScreen = () => {
 
   const isLoadingGeral = loadingStatus || loadingEventos;
 
-  // --- Renderização (sem alterações significativas, apenas condicionais atualizadas) ---
-
+  // --- Renderização ---
   if (isLoadingGeral && usuarioLogadoId) {
     return (
         <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
@@ -656,7 +675,7 @@ const MapaAmigosScreen = () => {
     );
   }
   if (podeRastrearAmigos && loadingAmigosLoc && amigosLista.length > 0) {
-     return (
+      return (
         <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
             <View style={styles.center}><ActivityIndicator size="large" color="#FFFFFF" /><Text style={styles.loadingText}>Carregando localizações dos amigos...</Text></View>
         </ImageBackground>
@@ -666,20 +685,20 @@ const MapaAmigosScreen = () => {
   return (
     <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
       <View style={styles.adBanner}>
-              {currentBannerUrl ? (
-                <Animated.Image 
-                  source={{ uri: currentBannerUrl }}
-                  style={[
-                    styles.bannerImage,
-                    { opacity: fadeAnim } 
-                  ]}
-                  resizeMode="contain"
-                  onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
-                />
-              ) : (
-                <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
-              )}
-            </View>
+          {currentBannerUrl ? (
+            <Animated.Image
+              source={{ uri: currentBannerUrl }}
+              style={[
+                styles.bannerImage,
+                { opacity: fadeAnim }
+              ]}
+              resizeMode="contain"
+              onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
+            />
+          ) : (
+            <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
+          )}
+      </View>
       <SafeAreaView style={styles.container}>
         <TextInput
           style={styles.searchInput}
@@ -715,11 +734,11 @@ const MapaAmigosScreen = () => {
             {podeRastrearAmigos && amigosLocalizacao.map((amigo) => {
                 const amigoInfo = amigosLista.find(a => a.id === amigo.id);
                 return (
-                    <Marker key={amigo.id} coordinate={amigo} title={amigo.nome} >
-                        {amigoInfo?.imagem ? ( <Image source={{uri: amigoInfo.imagem}} style={[styles.markerImage, selectedAmigoId === amigo.id && styles.markerImageSelected]} />
-                        ) : ( <View style={[styles.markerPlaceholder, selectedAmigoId === amigo.id && styles.markerPlaceholderSelected]}><Text style={styles.markerInitial}>{amigo.nome ? amigo.nome.charAt(0).toUpperCase() : '?'}</Text></View>
-                        )}
-                    </Marker>
+                  <Marker key={amigo.id} coordinate={amigo} title={amigo.nome} >
+                      {amigoInfo?.imagem ? ( <Image source={{uri: amigoInfo.imagem}} style={[styles.markerImage, selectedAmigoId === amigo.id && styles.markerImageSelected]} />
+                      ) : ( <View style={[styles.markerPlaceholder, selectedAmigoId === amigo.id && styles.markerPlaceholderSelected]}><Text style={styles.markerInitial}>{amigo.nome ? amigo.nome.charAt(0).toUpperCase() : '?'}</Text></View>
+                      )}
+                  </Marker>
                 );
             })}
           </MapView>
@@ -732,7 +751,7 @@ const MapaAmigosScreen = () => {
   );
 };
 
-// Estilos (sem alterações)
+// Estilos
 const styles = StyleSheet.create({
   background: { flex: 1, resizeMode: 'cover' },
   adBanner: {
@@ -878,6 +897,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   infoOverlayText: { color: 'white', textAlign: 'center', fontSize: 14, lineHeight: 20 },
+  statusAndInstagramContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    width: '100%',
+    marginTop: 4,
+  },
+  instagramButtonWrapper: {
+    marginLeft: 'auto',
+  },
 });
 
 export default MapaAmigosScreen;
