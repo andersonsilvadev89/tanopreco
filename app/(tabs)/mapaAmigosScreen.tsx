@@ -9,6 +9,8 @@ import * as TaskManager from 'expo-task-manager'; // <<< ALTERAÇÃO: Importado 
 import { useFocusEffect } from '@react-navigation/native';
 import moment from 'moment';
 import 'moment/locale/pt-br';
+import { LinearGradient } from 'expo-linear-gradient';
+
 
 
 // <<< ALTERAÇÃO: DEFINIÇÃO DA TAREFA DE BACKGROUND (FORA DO COMPONENTE) >>>
@@ -61,6 +63,7 @@ interface Amigo {
   nome: string;
   telefone?: string;
   imagem?: string;
+  instagram?: string;
 }
 interface EventoFirebase { id: string; nomeBanda: string; horaInicio: string; local: string; imagemUrl?: string; dataMomento: string; duracao: string; }
 interface LocalInfoFirebase { id: string; descricao: string; latitude: number; longitude: number; }
@@ -73,7 +76,39 @@ interface BannerItem {
 }
 
 const { height: screenHeight } = Dimensions.get('window');
+const handleInstagramPress = async (instagramInput: string | undefined) => {
+        if (!instagramInput) return;
 
+        let instagramUsername = instagramInput.trim();
+        // Expressão regular para capturar o username de URLs do Instagram
+        // Esta regex é mais robusta e lida com http/https, www, e paths adicionais
+        const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)(?:\/.*)?/;
+        const match = instagramUsername.match(instagramUrlRegex);
+
+        if (match && match[1]) {
+            instagramUsername = match[1]; // Extrai apenas o username da URL
+        } else if (instagramUsername.startsWith('@')) {
+            instagramUsername = instagramUsername.substring(1); // Remove o '@' se houver
+        }
+
+        // Se, após processar, o username ainda estiver vazio, é inválido
+        if (!instagramUsername) { 
+            Alert.alert("Erro", `Formato de usuário do Instagram inválido.`);
+            return;
+        }
+
+        const url = `https://www.instagram.com/${instagramUsername}`; // Constrói a URL padrão do perfil
+        try {
+            const supported = await Linking.canOpenURL(url);
+            if (supported) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert("Erro", `Não foi possível abrir o perfil do Instagram.`);
+            }
+        } catch (error) {
+            Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
+        }
+    };
 const AmigoItem = React.memo(({ item, isSelected, amigoLocal, handleAmigoPress }: {
   item: Amigo;
   isSelected: boolean;
@@ -97,8 +132,19 @@ const AmigoItem = React.memo(({ item, isSelected, amigoLocal, handleAmigoPress }
       )}
       <View style={styles.amigoInfo}>
         <Text style={styles.amigoNome} numberOfLines={1}>{item.nome}</Text>
-        <Text style={styles.amigoNome} numberOfLines={1}>{item.telefone}</Text>
         {!amigoLocal && <Text style={styles.amigoOffline}>Offline</Text>}
+        {item.instagram && (
+          <TouchableOpacity onPress={() => handleInstagramPress(item.instagram)}>
+            <LinearGradient
+              colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
+              start={{ x: 0.0, y: 1.0 }}
+              end={{ x: 1.0, y: 0.0 }}
+              style={styles.instagramButton}
+            >
+              <Text style={styles.instagramButtonText}>Instagram</Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -290,7 +336,7 @@ const MapaAmigosScreen = () => {
             const uRef = ref(database, `usuarios/${amigoId}`);
             const uSnap = await get(uRef);
             const uData = uSnap.val();
-            return uData?.nome ? { id: amigoId, nome: uData.nome, telefone: uData.telefone, imagem: uData.imagem } : null;
+            return uData?.nome ? { id: amigoId, nome: uData.nome, telefone: uData.telefone, imagem: uData.imagem, instagram: uData.instagram } : null;
         });
         const amigosCarregados = (await Promise.all(amigosPromises)).filter(Boolean) as Amigo[];
         setAmigosLista(amigosCarregados);
@@ -818,6 +864,19 @@ const styles = StyleSheet.create({
   markerPlaceholderSelected: { backgroundColor: '#FFC107', borderColor: 'white', transform: [{scale: 1.2}] },
   markerInitial: { color: 'white', fontSize: 18, fontWeight: 'bold' },
   infoOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.75)', paddingVertical: 12, paddingHorizontal: 15, alignItems: 'center', zIndex: 10 },
+  instagramButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    minWidth: 90,
+  },
+  instagramButtonText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: 'bold',
+  },
   infoOverlayText: { color: 'white', textAlign: 'center', fontSize: 14, lineHeight: 20 },
 });
 

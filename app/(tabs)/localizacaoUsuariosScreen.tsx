@@ -222,20 +222,39 @@ const LocalizacaoScreen = () => {
     }
   };
   
-  const handleInstagramPress = async (instagramUsername: string | undefined) => {
-      if (!instagramUsername) return;
-      const url = `https://www.instagram.com/${instagramUsername.replace('@', '')}`;
-      try {
-        const supported = await Linking.canOpenURL(url);
-        if (supported) {
-          await Linking.openURL(url);
-        } else {
-          Alert.alert("Erro", `Não foi possível abrir o perfil do Instagram.`);
+  const handleInstagramPress = async (instagramInput: string | undefined) => {
+        if (!instagramInput) return;
+
+        let instagramUsername = instagramInput.trim();
+        // Expressão regular para capturar o username de URLs do Instagram
+        // Esta regex é mais robusta e lida com http/https, www, e paths adicionais
+        const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)(?:\/.*)?/;
+        const match = instagramUsername.match(instagramUrlRegex);
+
+        if (match && match[1]) {
+            instagramUsername = match[1]; // Extrai apenas o username da URL
+        } else if (instagramUsername.startsWith('@')) {
+            instagramUsername = instagramUsername.substring(1); // Remove o '@' se houver
         }
-      } catch (error) {
-        Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
-      }
-  };
+
+        // Se, após processar, o username ainda estiver vazio, é inválido
+        if (!instagramUsername) { 
+            Alert.alert("Erro", `Formato de usuário do Instagram inválido.`);
+            return;
+        }
+
+        const url = `https://www.instagram.com/${instagramUsername}`; // Constrói a URL padrão do perfil
+        try {
+            const supported = await Linking.canOpenURL(url);
+            if (supported) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert("Erro", `Não foi possível abrir o perfil do Instagram.`);
+            }
+        } catch (error) {
+            Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
+        }
+    };
 
   const desfazerAmizade = async (usuario: Usuario) => {
     if (!usuarioLogadoId) return;

@@ -21,7 +21,7 @@ import { administrativoDatabase } from '../../firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
 import 'moment/locale/pt-br';
-import { Audio, AVPlaybackStatus, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
+// REMOVIDO: import { Audio, AVPlaybackStatus, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av'; // Removido por não usar áudio
 
 // --- Interfaces ---
 interface Evento {
@@ -46,20 +46,16 @@ interface Locais {
   descricao: string;
   latitude?: number;
   longitude?: number;
-  url?: string | undefined;
+  // REMOVIDO: url?: string | undefined; // Removido por não ser mais para rádio
 }
 
-interface Radio {
-  id: string;
-  nome: string;
-  url: string;
-}
+// REMOVIDO: interface Radio { ... } // Removido por não ser mais necessário para rádio
 
 // --- Constantes ---
 
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
-const radiosListHeight = screenHeight * 0.25;
+// REMOVIDO: const radiosListHeight = screenHeight * 0.25; // Removido por não ter lista de rádios
 const ITEM_PROGRAMACAO_HEIGHT = screenHeight * 0.13;
 
 const LineUpScreen = () => {
@@ -76,11 +72,12 @@ const LineUpScreen = () => {
   const [dataTitulo, setDataTitulo] = useState('Programação do Dia');
   const [locaisData, setLocaisData] = useState<Locais[]>([]);
 
-  const [selectedRadio, setSelectedRadio] = useState<Locais | null>(null);
-  const soundRef = useRef<Audio.Sound | null>(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [isLoadingRadio, setIsLoadingRadio] = useState(false);
-  const [radioError, setRadioError] = useState<string | null>(null);
+  // REMOVIDO: Estados relacionados à rádio
+  // const [selectedRadio, setSelectedRadio] = useState<Locais | null>(null);
+  // const soundRef = useRef<Audio.Sound | null>(null);
+  // const [isPlaying, setIsPlaying] = useState(false);
+  // const [isLoadingRadio, setIsLoadingRadio] = useState(false);
+  // const [radioError, setRadioError] = useState<string | null>(null);
 
   const cratoLocation = { latitude: -7.2345, longitude: -39.4056 };
 
@@ -143,7 +140,7 @@ const LineUpScreen = () => {
           fadeAnim.setValue(0);
         }
       };
-  
+    
       fetchBanners();
     }, [fadeAnim]); // fadeAnim adicionado como dependência, pois é usado no efeito
   
@@ -182,28 +179,37 @@ const LineUpScreen = () => {
       };
     }, [allBanners, fadeAnim]);
 
-  useEffect(() => {
-    Audio.setAudioModeAsync({
-      allowsRecordingIOS: false,
-      staysActiveInBackground: true,
-      interruptionModeIOS: InterruptionModeIOS.DoNotMix,
-      playsInSilentModeIOS: true,
-      shouldDuckAndroid: true,
-      interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
-      playThroughEarpieceAndroid: false,
-    }).catch(e => console.error("Erro ao configurar modo de áudio:", e));
+  // REMOVIDO: useEffect para configuração do modo de áudio
+  // useEffect(() => {
+  //   Audio.setAudioModeAsync({
+  //     allowsRecordingIOS: false,
+  //     staysActiveInBackground: true,
+  //     interruptionModeIOS: InterruptionModeIOS.DoNotMix,
+  //     playsInSilentModeIOS: true,
+  //     shouldDuckAndroid: true,
+  //     interruptionModeAndroid: InterruptionModeAndroid.DoNotMix,
+  //     playThroughEarpieceAndroid: false,
+  //   }).catch(e => console.error("Erro ao configurar modo de áudio:", e));
 
-    return () => {
-      soundRef.current?.unloadAsync().catch(e => console.warn("Erro ao descarregar som no desmonte:", e));
-    };
-  }, []);
+  //   return () => {
+  //     soundRef.current?.unloadAsync().catch(e => console.warn("Erro ao descarregar som no desmonte:", e));
+  //   };
+  // }, []);
 
+  // MANTIDO: useEffect para carregar locais (pois são usados no mapa), mas sem o 'url'
   useEffect(() => {
     const locaisRef = ref(administrativoDatabase, 'locais');
     const unsubscribeLocais = onValue(locaisRef, (snapshot) => {
       const locais: Locais[] = [];
       snapshot.forEach((childSnapshot) => {
-        locais.push({ id: childSnapshot.key!, ...childSnapshot.val() });
+        const localData = childSnapshot.val();
+        locais.push({
+          id: childSnapshot.key!,
+          descricao: localData.descricao,
+          latitude: localData.latitude,
+          longitude: localData.longitude,
+          // url não é mais necessário aqui
+        });
       });
       setLocaisData(locais);
     });
@@ -238,76 +244,11 @@ const LineUpScreen = () => {
     }
   }, [diaSelecionado]);
 
-  const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => {
-    if (!status.isLoaded) {
-      if (status.error) {
-        console.error(`Radio playback error: ${status.error}`);
-        setRadioError(`Erro: ${status.error}.`);
-        setIsLoadingRadio(false);
-        setIsPlaying(false);
-      }
-    } else {
-      setIsPlaying(status.isPlaying);
-      setIsLoadingRadio(status.isBuffering);
-      setRadioError(null);
-      if (status.didJustFinish && !status.isLooping) {
-        setIsPlaying(false);
-      }
-    }
-  };
-
-  const stopAndUnloadRadio = useCallback(async () => {
-    if (soundRef.current) {
-      try {
-        await soundRef.current.stopAsync();
-        await soundRef.current.unloadAsync();
-      } catch (e) { console.warn("Erro ao parar/descarregar som (stopAndUnloadRadio):", e); }
-      soundRef.current = null;
-    }
-    setIsPlaying(false);
-    setIsLoadingRadio(false);
-  }, []);
-
-  const playRadio = useCallback(async (radio: Locais) => {
-    if (isLoadingRadio && selectedRadio?.id === radio.id) return;
-    
-    await stopAndUnloadRadio();
-
-    setSelectedRadio(radio);
-    setIsLoadingRadio(true);
-    setRadioError(null);
-    try {
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: radio.url?radio.url:"" },
-        { 
-          shouldPlay: true, 
-          androidImplementation: 'MediaPlayer',
-        },
-        handlePlaybackStatusUpdate
-      );
-      soundRef.current = newSound;
-    } catch (e: any) {
-      console.error(`Erro ao carregar ${radio.descricao}:`, e.message);
-      setRadioError(`Falha ao carregar: ${radio.descricao}. Verifique a URL ou conexão.`);
-      setIsLoadingRadio(false);
-      setSelectedRadio(null);
-    }
-  }, [isLoadingRadio, selectedRadio, stopAndUnloadRadio]);
-
-  const togglePlayPauseCurrentRadio = useCallback(async () => {
-    if (!selectedRadio) {
-      if (locaisData.length > 0) {
-        playRadio(locaisData[0]);
-      }
-      return;
-    }
-
-    if (isPlaying) {
-      await stopAndUnloadRadio();
-    } else {
-      await playRadio(selectedRadio);
-    }
-  }, [isPlaying, selectedRadio, playRadio, stopAndUnloadRadio]);
+  // REMOVIDO: Funções relacionadas à reprodução de áudio
+  // const handlePlaybackStatusUpdate = (status: AVPlaybackStatus) => { ... };
+  // const stopAndUnloadRadio = useCallback(async () => { ... }, []);
+  // const playRadio = useCallback(async (radio: Locais) => { ... }, [...]);
+  // const togglePlayPauseCurrentRadio = useCallback(async () => { ... }, [...]);
 
 
   const visualizarNoMapa = (evento: Evento) => {
@@ -365,11 +306,11 @@ const LineUpScreen = () => {
       );
     } else {
       return (
-         // O TouchableOpacity wrapper não terá mais onPress aqui
+          // O TouchableOpacity wrapper não terá mais onPress aqui
         <View style={styles.programacaoItemSemImagem}>
           <Text style={styles.nomeEventoSemImagem}>{item.nomeBanda}</Text>
           <Text style={styles.detalhesEventoSemImagem}>{moment(item.dataMomento, 'DD-MM-YYYY').format('dddd, DD/MM')} - {item.horaInicio}</Text>
-           {/* Botão "Ver no Mapa" Adicionado Aqui, abaixo da data/hora */}
+            {/* Botão "Ver no Mapa" Adicionado Aqui, abaixo da data/hora */}
           <TouchableOpacity onPress={handlePressVerNoMapa} style={[styles.verNoMapaButtonBase, styles.verNoMapaButtonSemImagem]}>
             <Feather name="map-pin" size={14} color="#007bff" />
             <Text style={[styles.verNoMapaButtonTextBase, styles.verNoMapaButtonTextSemImagem]}>Ver no Mapa</Text>
@@ -380,52 +321,29 @@ const LineUpScreen = () => {
     }
   };
 
-  const renderRadioItem = ({ item }: { item: Locais }) => (
-    <TouchableOpacity
-      style={[ styles.radioItem, selectedRadio?.id === item.id && styles.radioItemSelected ]}
-      onPress={() => {
-        if (selectedRadio?.id === item.id && isPlaying) { 
-            togglePlayPauseCurrentRadio(); 
-        } else {
-            playRadio(item); 
-        }
-      }}
-      disabled={isLoadingRadio && selectedRadio?.id === item.id && selectedRadio?.id !== item.id}
-    >
-      <View style={styles.radioItemContent}>
-        <Text style={[ styles.radioNome, selectedRadio?.id === item.id && isPlaying && styles.radioNomePlaying ]}>
-          {item.descricao}
-        </Text>
-        {selectedRadio?.id === item.id && isLoadingRadio && 
-            <ActivityIndicator size="small" color="#007bff" style={styles.radioActivityIndicator} />
-        }
-        {selectedRadio?.id === item.id && isPlaying && !isLoadingRadio && 
-            <Feather name="bar-chart-2" size={18} color="#27ae60" style={styles.radioPlayingIndicator}/>
-        }
-      </View>
-    </TouchableOpacity>
-  );
+  // REMOVIDO: Componente de renderização de item da rádio
+  // const renderRadioItem = ({ item }: { item: Locais }) => ( ... );
 
   return (
     <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
     <View style={styles.adBanner}>
-            {currentBannerUrl ? (
-              <Animated.Image // Usando Animated.Image
-                source={{ uri: currentBannerUrl }}
-                style={[
-                  styles.bannerImage,
-                  { opacity: fadeAnim } // Aplicando a opacidade animada
-                ]}
-                resizeMode="contain"
-                onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
-              />
-            ) : (
-              // O texto de fallback não precisa ser animado da mesma forma,
-              // mas podemos envolvê-lo se quisermos um fade para ele também.
-              // Por ora, ele aparece quando não há currentBannerUrl e fadeAnim está em 0.
-              <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
-            )}
-          </View>
+          {currentBannerUrl ? (
+            <Animated.Image // Usando Animated.Image
+              source={{ uri: currentBannerUrl }}
+              style={[
+                styles.bannerImage,
+                { opacity: fadeAnim } // Aplicando a opacidade animada
+              ]}
+              resizeMode="contain"
+              onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
+            />
+          ) : (
+            // O texto de fallback não precisa ser animado da mesma forma,
+            // mas podemos envolvê-lo se quisermos um fade para ele também.
+            // Por ora, ele aparece quando não há currentBannerUrl e fadeAnim está em 0.
+            <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
+          )}
+        </View>
       <SafeAreaView style={styles.safeAreaContainer}>
         <View style={styles.container}>
           <View style={styles.headerDate}>
@@ -446,6 +364,8 @@ const LineUpScreen = () => {
             contentContainerStyle={styles.programacaoListContent}
           />
           
+          {/* REMOVIDO: Seção de Rádios */}
+          {/*
           <View style={[styles.radiosSectionContainer, { height: radiosListHeight }]}>
             <View style={styles.radioTitleContainer}>
                 <Text style={styles.radioTitulo}>Ouça o que está acontecendo agora!</Text>
@@ -472,10 +392,8 @@ const LineUpScreen = () => {
                     <Feather name="play-circle" size={40} color="#FFFFFF" />
                   )}
                 </TouchableOpacity>
-                
             </View>
             
-
             <FlatList
               data={locaisData}
               keyExtractor={(item) => item.id}
@@ -484,6 +402,7 @@ const LineUpScreen = () => {
               contentContainerStyle={styles.radiosListContent}
             />
           </View>
+          */}
         </View>
       </SafeAreaView>
 
@@ -669,39 +588,39 @@ const styles = StyleSheet.create({
   map: { ...StyleSheet.absoluteFillObject },
   fecharMapa: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(255, 255, 255, 0.95)', padding: 8, borderRadius: 20, elevation: 6, zIndex:1 },
   
-  radiosSectionContainer: { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 12, paddingTop: 5, marginTop: 5, paddingBottom: 5, },
-
-  radioTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 5,
-    marginHorizontal: 15,
-  },
-  radioTitleContainerPlayer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 5,
-    marginHorizontal: 15,
-  },
-  radioTitulo: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', textShadowColor: 'rgba(0, 0, 0, 0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
-  radioTitleLoadingIndicator: {
-    marginLeft: 10,
-  },
-  playerArea: { alignItems: 'center', marginBottom: 5, borderBottomColor: 'rgba(255,255,255,0.2)', },
-  playerCurrentRadio: { fontSize: 15, color: '#E0E0E0', fontStyle: 'italic', textAlign: 'center' },
-  playerButton: {},
-  playerErrorText: { color: '#FF8A80', fontSize: 13, textAlign: 'center', marginTop: 5, paddingHorizontal:10 },
-  radiosList: { flexGrow: 0 }, 
-  radioItem: { backgroundColor: 'rgba(255, 255, 255, 0.88)', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, marginBottom: 8, marginHorizontal: 10},
-  radioItemContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  radioItemSelected: { backgroundColor: 'rgba(200, 230, 255, 0.95)', borderColor: '#007bff', borderWidth: 1.5 },
-  radioNome: { fontSize: 15, color: '#2c3e50', fontWeight: '500', textAlign: 'center' }, 
-  radioNomePlaying: { fontWeight: 'bold', color: '#27ae60' },
-  radioActivityIndicator: { marginLeft: 10 },
-  radioPlayingIndicator: { marginLeft: 10 },
-  radiosListContent: { paddingBottom: 5 },
+  // REMOVIDO: Estilos da seção de rádios
+  // radiosSectionContainer: { backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: 12, paddingTop: 5, marginTop: 5, paddingBottom: 5, },
+  // radioTitleContainer: {
+  //   flexDirection: 'row',
+  //   alignItems: 'center',
+  //   justifyContent: 'center',
+  //   marginBottom: 5,
+  //   marginHorizontal: 15,
+  // },
+  // radioTitleContainerPlayer: {
+  //   flexDirection: 'row',
+  //   alignItems: 'center',
+  //   justifyContent: 'space-between',
+  //   marginBottom: 5,
+  //   marginHorizontal: 15,
+  // },
+  // radioTitulo: { fontSize: 18, fontWeight: 'bold', color: '#FFFFFF', textAlign: 'center', textShadowColor: 'rgba(0, 0, 0, 0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  // radioTitleLoadingIndicator: {
+  //   marginLeft: 10,
+  // },
+  // playerArea: { alignItems: 'center', marginBottom: 5, borderBottomColor: 'rgba(255,255,255,0.2)', },
+  // playerCurrentRadio: { fontSize: 15, color: '#E0E0E0', fontStyle: 'italic', textAlign: 'center' },
+  // playerButton: {},
+  // playerErrorText: { color: '#FF8A80', fontSize: 13, textAlign: 'center', marginTop: 5, paddingHorizontal:10 },
+  // radiosList: { flexGrow: 0 }, 
+  // radioItem: { backgroundColor: 'rgba(255, 255, 255, 0.88)', paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, marginBottom: 8, marginHorizontal: 10},
+  // radioItemContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
+  // radioItemSelected: { backgroundColor: 'rgba(200, 230, 255, 0.95)', borderColor: '#007bff', borderWidth: 1.5 },
+  // radioNome: { fontSize: 15, color: '#2c3e50', fontWeight: '500', textAlign: 'center' }, 
+  // radioNomePlaying: { fontWeight: 'bold', color: '#27ae60' },
+  // radioActivityIndicator: { marginLeft: 10 },
+  // radioPlayingIndicator: { marginLeft: 10 },
+  // radiosListContent: { paddingBottom: 5 },
 
   markerImageBase: { width: 28, height: 28 },
   selectedMarkerImage: { width: 38, height: 38 },

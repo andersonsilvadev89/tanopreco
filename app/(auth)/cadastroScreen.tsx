@@ -299,7 +299,13 @@ export default function CadastroScreen({ navigation }: any) {
             )}
           </TouchableOpacity>
 
-          <TextInput placeholder="Nome Completo*" value={nome} onChangeText={setNome} style={styles.input} />
+          <TextInput 
+            placeholder="Nome Completo*"
+            value={nome}
+            onChangeText={setNome}
+            style={styles.input}
+            placeholderTextColor='#666'
+          />
           <TextInput
             placeholder="Email*"
             value={email}
@@ -307,6 +313,7 @@ export default function CadastroScreen({ navigation }: any) {
             keyboardType="email-address"
             autoCapitalize="none"
             style={styles.input}
+            placeholderTextColor='#666'
           />
 
           {/* ALTERAÇÃO 5: Remover o * do placeholder */}
@@ -319,6 +326,7 @@ export default function CadastroScreen({ navigation }: any) {
             placeholder="Telefone (opcional)" 
             keyboardType="phone-pad"
             style={styles.input}
+            placeholderTextColor='#666'
           />
 
           {/* NOVO CAMPO DE INSTAGRAM */}
@@ -328,6 +336,7 @@ export default function CadastroScreen({ navigation }: any) {
             onChangeText={setInstagram}
             autoCapitalize="none"
             style={styles.input}
+            placeholderTextColor='#666'
           />
 
           <View style={styles.inputContainer}>
@@ -337,6 +346,7 @@ export default function CadastroScreen({ navigation }: any) {
               onChangeText={setSenha}
               secureTextEntry={!mostrarSenha}
               style={styles.inputSenha}
+              placeholderTextColor='#666'
             />
             <TouchableOpacity onPress={() => setMostrarSenha(!mostrarSenha)} style={styles.eyeIcon}>
               {mostrarSenha ? <EyeOff size={24} color="#888" /> : <Eye size={24} color="#888" />}
@@ -350,6 +360,7 @@ export default function CadastroScreen({ navigation }: any) {
               onChangeText={setConfirmarSenha}
               secureTextEntry={!mostrarConfirmarSenha}
               style={styles.inputSenha}
+              placeholderTextColor='#666'
             />
             <TouchableOpacity onPress={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)} style={styles.eyeIcon}>
               {mostrarConfirmarSenha ? <EyeOff size={24} color="#888" /> : <Eye size={24} color="#888" />}
@@ -475,7 +486,7 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: 'rgba(255,255,255,0.9)',
-    padding: 20,
+    padding: 0,
     borderRadius: 10,
   },
   title: {

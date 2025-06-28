@@ -11,22 +11,22 @@ import {
   ImageBackground,
   Dimensions,
   Animated,
-  Platform,   // Mantido
-  Linking,    // Mantido
+  Platform,
+  Linking,
   ActivityIndicator,
-  SafeAreaView 
+  SafeAreaView
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as Location from 'expo-location';
-import * as TaskManager from 'expo-task-manager';
+import *as TaskManager from 'expo-task-manager';
 import { ref, set, get, remove } from 'firebase/database';
 import { auth, database, administrativoDatabase } from '../../firebaseConfig';
 import { deleteUser } from 'firebase/auth';
 
 const LOCATION_TASK_NAME = 'background-location-task';
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
-const UPLOAD_PRESET = 'expocrato';  
+const UPLOAD_PRESET = 'expocrato';
 
 interface UserProfile {
   nome: string;
@@ -34,6 +34,7 @@ interface UserProfile {
   telefone?: string;
   imagem?: string;
   compartilhando?: boolean;
+  instagram?: string; // ADICIONADO: Campo instagram na interface
 }
 interface BannerItem {
   descricao: string;
@@ -44,102 +45,102 @@ interface BannerItem {
 
 const ConfiguracoesScreen = () => {
   const [allBanners, setAllBanners] = useState<string[]>([]);
-    const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-    const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+
+  // Valor animado para a opacidade do banner
+  const fadeAnim = useRef(new Animated.Value(0)).current; // Começa invisível (opacidade 0)
+
+  useEffect(() => {
+    const fetchBanners = async () => {
+      try {
+        // Usando administrativoDatabase conforme seu código anterior
+        const sponsorsRef = ref(administrativoDatabase, 'patrocinadores');
+        
+        const snapshot = await get(sponsorsRef);
   
-    // Valor animado para a opacidade do banner
-    const fadeAnim = useRef(new Animated.Value(0)).current; // Começa invisível (opacidade 0)
+        if (snapshot.exists()) {
+          const sponsorsData = snapshot.val();
+          const bannersList: string[] = [];
   
-    useEffect(() => {
-      const fetchBanners = async () => {
-        try {
-          // Usando administrativoDatabase conforme seu código anterior
-          const sponsorsRef = ref(administrativoDatabase, 'patrocinadores');
-          
-          const snapshot = await get(sponsorsRef);
-  
-          if (snapshot.exists()) {
-            const sponsorsData = snapshot.val();
-            const bannersList: string[] = [];
-  
-            for (const sponsorId in sponsorsData) {
-              const sponsor = sponsorsData[sponsorId];
-              if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
-                const sponsorBannersArray: BannerItem[] = sponsor.banners;
-                sponsorBannersArray.forEach(bannerObject => {
-                  if (typeof bannerObject === 'object' && bannerObject !== null && typeof bannerObject.imagemUrl === 'string') {
-                    bannersList.push(bannerObject.imagemUrl);
-                  }
-                });
-              }
+          for (const sponsorId in sponsorsData) {
+            const sponsor = sponsorsData[sponsorId];
+            if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
+              const sponsorBannersArray: BannerItem[] = sponsor.banners;
+              sponsorBannersArray.forEach(bannerObject => {
+                if (typeof bannerObject === 'object' && bannerObject !== null && typeof bannerObject.imagemUrl === 'string') {
+                  bannersList.push(bannerObject.imagemUrl);
+                }
+              });
             }
-  
-            if (bannersList.length > 0) {
-              setAllBanners(bannersList);
-              setCurrentBannerUrl(bannersList[0]);
-              setCurrentBannerIndex(0);
-              // Animação de Fade-in para o primeiro banner
-              Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 200, // Duração do fade-in
-                useNativeDriver: true, // Importante para performance
-              }).start();
-            } else {
-              console.log('Nenhum banner de patrocinador encontrado com a estrutura esperada.');
-              setCurrentBannerUrl(null);
-              fadeAnim.setValue(0); // Garante que a opacidade seja 0 se não houver banners
-            }
-          } else {
-            // Ajuste na mensagem de log para refletir o caminho usado
-            console.log('Nó "patrocinadores" não encontrado em administrativoDatabase.');
-            setCurrentBannerUrl(null);
-            fadeAnim.setValue(0);
           }
-        } catch (error) {
-          console.error('Erro ao buscar banners dos patrocinadores:', error);
-          Alert.alert("Erro", "Não foi possível carregar os banners dos patrocinadores.");
+  
+          if (bannersList.length > 0) {
+            setAllBanners(bannersList);
+            setCurrentBannerUrl(bannersList[0]);
+            setCurrentBannerIndex(0);
+            // Animação de Fade-in para o primeiro banner
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 200, // Duração do fade-in
+              useNativeDriver: true, // Importante para performance
+            }).start();
+          } else {
+            console.log('Nenhum banner de patrocinador encontrado com a estrutura esperada.');
+            setCurrentBannerUrl(null);
+            fadeAnim.setValue(0); // Garante que a opacidade seja 0 se não houver banners
+          }
+        } else {
+          // Ajuste na mensagem de log para refletir o caminho usado
+          console.log('Nó "patrocinadores" não encontrado em administrativoDatabase.');
           setCurrentBannerUrl(null);
           fadeAnim.setValue(0);
         }
-      };
-  
-      fetchBanners();
-    }, [fadeAnim]); // fadeAnim adicionado como dependência, pois é usado no efeito
-  
-    useEffect(() => {
-      let intervalId: ReturnType<typeof setInterval> | null = null;
-      
-      if (allBanners.length > 1) {
-        intervalId = setInterval(() => {
-          Animated.timing(fadeAnim, { // 1. Fade-out do banner atual
-            toValue: 0,
-            duration: 200, // Duração do fade-out
-            useNativeDriver: true,
-          }).start(() => {
-            // 2. Atualiza o banner APÓS o fade-out
-            setCurrentBannerIndex(prevIndex => {
-              const nextIndex = (prevIndex + 1) % allBanners.length;
-              setCurrentBannerUrl(allBanners[nextIndex]); // Define a URL para o próximo banner
-              
-              // 3. Fade-in do novo banner
-              Animated.timing(fadeAnim, {
-                toValue: 1,
-                duration: 200, // Duração do fade-in
-                useNativeDriver: true,
-              }).start();
-              
-              return nextIndex; // Retorna o novo índice
-            });
-          });
-        }, 6000); // Tempo entre o início de cada transição
+      } catch (error) {
+        console.error('Erro ao buscar banners dos patrocinadores:', error);
+        Alert.alert("Erro", "Não foi possível carregar os banners dos patrocinadores.");
+        setCurrentBannerUrl(null);
+        fadeAnim.setValue(0);
       }
+    };
+    
+    fetchBanners();
+  }, [fadeAnim]); // fadeAnim adicionado como dependência, pois é usado no efeito
   
-      return () => { // Limpa o intervalo quando o componente é desmontado ou allBanners muda
-        if (intervalId) {
-          clearInterval(intervalId);
-        }
-      };
-    }, [allBanners, fadeAnim]);
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    
+    if (allBanners.length > 1) {
+      intervalId = setInterval(() => {
+        Animated.timing(fadeAnim, { // 1. Fade-out do banner atual
+          toValue: 0,
+          duration: 200, // Duração do fade-out
+          useNativeDriver: true,
+        }).start(() => {
+          // 2. Atualiza o banner APÓS o fade-out
+          setCurrentBannerIndex(prevIndex => {
+            const nextIndex = (prevIndex + 1) % allBanners.length;
+            setCurrentBannerUrl(allBanners[nextIndex]); // Define a URL para o próximo banner
+            
+            // 3. Fade-in do novo banner
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 200, // Duração do fade-in
+              useNativeDriver: true,
+            }).start();
+            
+            return nextIndex; // Retorna o novo índice
+          });
+        });
+      }, 6000); // Tempo entre o início de cada transição
+    }
+  
+    return () => { // Limpa o intervalo quando o componente é desmontado ou allBanners muda
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [allBanners, fadeAnim]);
   const [compartilhando, setCompartilhando] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [editandoPerfil, setEditandoPerfil] = useState(false);
@@ -151,16 +152,17 @@ const ConfiguracoesScreen = () => {
   const [telefone, setTelefone] = useState('');
   const [imagem, setImagem] = useState(auth.currentUser?.photoURL || ''); // URL da imagem atual (pode ser da nuvem)
   const [novaImagemUri, setNovaImagemUri] = useState<string | null>(null); // URI local da nova imagem selecionada/capturada
+  const [instagram, setInstagram] = useState(''); // ADICIONADO: Estado para o instagram
 
   const usuarioId = auth.currentUser?.uid;
 
   useEffect(() => {
     if (!usuarioId) {
         setCarregando(false);
-        setCompartilhando(false); 
+        setCompartilhando(false);
         return;
     }
-    const userRef = ref(database, `usuarios/${usuarioId}`); 
+    const userRef = ref(database, `usuarios/${usuarioId}`);
     let isMounted = true;
 
     const checkStatusAndProfile = async () => {
@@ -175,6 +177,7 @@ const ConfiguracoesScreen = () => {
           setEmail(profileData.email || auth.currentUser?.email || ''); // Email geralmente não é editável se for do provedor de auth
           setTelefone(profileData.telefone || '');
           setImagem(profileData.imagem || auth.currentUser?.photoURL || '');
+          setInstagram(profileData.instagram || ''); // ADICIONADO: Carregar instagram
         } else if (isMounted && auth.currentUser) {
           const initialNome = auth.currentUser.displayName || '';
           const initialEmail = auth.currentUser.email || '';
@@ -184,11 +187,12 @@ const ConfiguracoesScreen = () => {
           setEmail(initialEmail);
           setTelefone('');
           setImagem(initialImagem);
+          setInstagram(''); // ADICIONADO: Inicializar instagram
           setCompartilhando(false);
 
           await set(userRef, {
             nome: initialNome, email: initialEmail, telefone: '',
-            imagem: initialImagem, compartilhando: false,
+            imagem: initialImagem, compartilhando: false, instagram: '' // ADICIONADO: Salvar instagram inicial
           });
         }
         setNovaImagemUri(null); // Limpa qualquer seleção pendente ao carregar dados
@@ -199,6 +203,7 @@ const ConfiguracoesScreen = () => {
             setEmail(auth.currentUser.email || '');
             setTelefone('');
             setImagem(auth.currentUser.photoURL || '');
+            setInstagram(''); // ADICIONADO: Resetar instagram em caso de erro
             setCompartilhando(false);
             setNovaImagemUri(null);
           }
@@ -213,11 +218,11 @@ const ConfiguracoesScreen = () => {
 
   const toggleCompartilhamento = async (valor: boolean) => {
     if (!usuarioId) return;
-    setCompartilhando(valor); 
+    setCompartilhando(valor);
     const userStatusRef = ref(database, `usuarios/${usuarioId}/compartilhando`);
     try {
-        await set(userStatusRef, valor); 
-        if (valor) { 
+        await set(userStatusRef, valor);
+        if (valor) {
             const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
             if (foregroundStatus !== 'granted') {
                 Alert.alert('Permissão Negada', 'Permissão de localização em primeiro plano é necessária.');
@@ -234,32 +239,32 @@ const ConfiguracoesScreen = () => {
                 await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
             }
             await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-                accuracy: Location.Accuracy.Balanced, 
-                timeInterval: 60000 * 1, 
-                distanceInterval: 50,   
+                accuracy: Location.Accuracy.Balanced,
+                timeInterval: 60000 * 1,
+                distanceInterval: 50,
                 showsBackgroundLocationIndicator: true,
-                pausesUpdatesAutomatically: true,   
-                activityType: Location.ActivityType.Other, 
+                pausesUpdatesAutomatically: true,
+                activityType: Location.ActivityType.Other,
                 foregroundService: {
                     notificationTitle: 'Assistente de Eventos', // Nome do seu App
                     notificationBody: 'Compartilhamento de localização ativo.',
-                    notificationColor: '#007BFF', 
+                    notificationColor: '#007BFF',
                 },
             });
             Alert.alert('Compartilhamento Ativado', 'Sua localização será gerenciada pela task de background.');
-        } else { 
+        } else {
             await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-            await set(ref(database, `localizacoes/${usuarioId}`), null); 
+            await set(ref(database, `localizacoes/${usuarioId}`), null);
             Alert.alert('Compartilhamento Desativado');
         }
     } catch (error) {
         console.error("Erro ao alternar compartilhamento:", error);
         Alert.alert("Erro", "Falha ao alterar status de compartilhamento.");
-        setCompartilhando(!valor); 
+        setCompartilhando(!valor);
         try { await set(userStatusRef, !valor); } catch (dbError) { /* ignore */ }
     }
   };
-  
+
   const uploadImagem = async (uri: string): Promise<string | null> => {
     if (!uri || !uri.startsWith('file://')) {
         return uri || null; // Se não é uma URI de arquivo local, retorna o que foi passado
@@ -295,13 +300,13 @@ const ConfiguracoesScreen = () => {
   const handleSalvarPerfil = async () => {
     if (!usuarioId || uploadingImage) return;
     
-    setUploadingImage(true); 
-    let finalImageUrl = imagem; 
+    setUploadingImage(true);
+    let finalImageUrl = imagem;
 
-    if (novaImagemUri) { 
-        const uploadedUrl = await uploadImagem(novaImagemUri); 
+    if (novaImagemUri) {
+        const uploadedUrl = await uploadImagem(novaImagemUri);
         if (uploadedUrl) {
-            finalImageUrl = uploadedUrl; 
+            finalImageUrl = uploadedUrl;
         } else {
             setUploadingImage(false);
             // O Alert de falha já foi mostrado em uploadImagem
@@ -310,20 +315,35 @@ const ConfiguracoesScreen = () => {
             // ou se a imagem anterior era nula, ficará nula.
         }
     }
-    
+
+    // Lógica para extrair o handle do Instagram
+    let processedInstagram = instagram ? instagram.trim() : null;
+    if (processedInstagram) {
+        // Expressão regular para capturar o username de URLs do Instagram
+        const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)/;
+        const match = processedInstagram.match(instagramUrlRegex);
+        if (match && match[1]) {
+            processedInstagram = match[1];
+        } else if (processedInstagram.startsWith('@')) {
+            processedInstagram = processedInstagram.substring(1); // Remove o '@' se houver
+        }
+    }
+    processedInstagram = processedInstagram === '' ? null : processedInstagram; // Garante que strings vazias sejam null
+
     const userRef = ref(database, `usuarios/${usuarioId}`);
     try {
         const snapshotCompartilhando = await get(ref(database, `usuarios/${usuarioId}/compartilhando`));
         const compartilhandoDB = snapshotCompartilhando.exists() ? snapshotCompartilhando.val() : false;
 
         await set(userRef, {
-            nome, email, telefone,
-            imagem: finalImageUrl, 
-            compartilhando: compartilhandoDB
+            nome, email, telefone: telefone || null,
+            imagem: finalImageUrl,
+            compartilhando: compartilhandoDB,
+            instagram: processedInstagram, // ALTERADO: Salvar Instagram processado
         });
 
-        setImagem(finalImageUrl); 
-        setNovaImagemUri(null);   
+        setImagem(finalImageUrl);
+        setNovaImagemUri(null);
         setEditandoPerfil(false);
         Alert.alert('Sucesso', 'Perfil atualizado!');
     } catch (error) {
@@ -338,7 +358,7 @@ const ConfiguracoesScreen = () => {
 
   const handleCancelarEdicao = () => {
     setEditandoPerfil(false);
-    setNovaImagemUri(null); 
+    setNovaImagemUri(null);
     if (!usuarioId) return;
     const userRef = ref(database, `usuarios/${usuarioId}`);
     get(userRef).then((snapshot) => {
@@ -348,6 +368,7 @@ const ConfiguracoesScreen = () => {
         setEmail(profileData.email || auth.currentUser?.email || '');
         setTelefone(profileData.telefone || '');
         setImagem(profileData.imagem || auth.currentUser?.photoURL || '');
+        setInstagram(profileData.instagram || ''); // Resetar instagram ao cancelar
       }
     }).catch(error => console.error("Erro ao recarregar perfil:", error));
   };
@@ -355,9 +376,9 @@ const ConfiguracoesScreen = () => {
   const selecionarDaGaleria = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permissão negada', 'Permissão para acessar a galeria é necessária.'); return; }
-    const result = await ImagePicker.launchImageLibraryAsync({ 
-        mediaTypes: ImagePicker.MediaTypeOptions.Images, 
-        allowsEditing: true, 
+    const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
         aspect: [1, 1], // Mantido 1:1 para fotos de perfil
         quality: 0.7 // Qualidade reduzida para uploads mais rápidos
     });
@@ -369,10 +390,10 @@ const ConfiguracoesScreen = () => {
   const tirarFotoComCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') { Alert.alert('Permissão negada', 'Permissão para usar a câmera é necessária.'); return;}
-    const result = await ImagePicker.launchCameraAsync({ 
-        allowsEditing: true, 
-        aspect: [1, 1], 
-        quality: 0.7 
+    const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.7
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
         setNovaImagemUri(result.assets[0].uri);
@@ -392,62 +413,62 @@ const ConfiguracoesScreen = () => {
   };
 
 const handleDeleteAccount = async () => {
-    Alert.alert(
-      "Excluir conta permanentemente?",
-      "Esta ação é irreversível. Todos os seus dados de perfil e localização serão apagados. Deseja continuar?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Excluir", 
-          style: "destructive", 
-          onPress: async () => {
-            const user = auth.currentUser;
-            if (!user) {
-              Alert.alert("Erro", "Nenhum usuário encontrado para exclusão.");
-              return;
-            }
+    Alert.alert(
+      "Excluir conta permanentemente?",
+      "Esta ação é irreversível. Todos os seus dados de perfil e localização serão apagados. Deseja continuar?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Excluir",
+          style: "destructive",
+          onPress: async () => {
+            const user = auth.currentUser;
+            if (!user) {
+              Alert.alert("Erro", "Nenhum usuário encontrado para exclusão.");
+              return;
+            }
 
-            setIsDeleting(true);
+            setIsDeleting(true);
 
-            try {
-              // 1. Parar tasks de localização em background
-              if (await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME)) {
-                await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-              }
+            try {
+              // 1. Parar tasks de localização em background
+              if (await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME)) {
+                await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+              }
 
-              // 2. Deletar dados do Realtime Database
-              const userId = user.uid;
-              const userProfileRef = ref(database, `usuarios/${userId}`);
-              const userLocationRef = ref(database, `localizacoes/${userId}`);
-              
-              await remove(userProfileRef);
-              await remove(userLocationRef);
+              // 2. Deletar dados do Realtime Database
+              const userId = user.uid;
+              const userProfileRef = ref(database, `usuarios/${userId}`);
+              const userLocationRef = ref(database, `localizacoes/${userId}`);
+              
+              await remove(userProfileRef);
+              await remove(userLocationRef);
 
-              // 3. Deletar o usuário do Firebase Auth
-              await deleteUser(user);
+              // 3. Deletar o usuário do Firebase Auth
+              await deleteUser(user);
 
-              Alert.alert("Conta Excluída", "Sua conta foi removida com sucesso.");
+              Alert.alert("Conta Excluída", "Sua conta foi removida com sucesso.");
 
-            } catch (error: any) {
-              console.error("Erro ao excluir conta:", error);
-              // Erro comum: o usuário precisa ter feito login recentemente.
-              if (error.code === 'auth/requires-recent-login') {
-                Alert.alert(
-                  "Ação Requer Autenticação",
-                  "Por segurança, você precisa fazer login novamente antes de excluir sua conta. Por favor, saia e entre no aplicativo novamente."
-                );
-              } else {
-                Alert.alert("Erro", `Não foi possível excluir a conta. ${error.message}`);
-              }
-            } finally {
-              setIsDeleting(false);
-            }
-          },
-        },
-      ],
-      { cancelable: true }
-    );
-  };
+            } catch (error: any) {
+              console.error("Erro ao excluir conta:", error);
+              // Erro comum: o usuário precisa ter feito login recentemente.
+              if (error.code === 'auth/requires-recent-login') {
+                Alert.alert(
+                  "Ação Requer Autenticação",
+                  "Por segurança, você precisa fazer login novamente antes de excluir sua conta. Por favor, saia e entre no aplicativo novamente."
+                );
+              } else {
+                Alert.alert("Erro", `Não foi possível excluir a conta. ${error.message}`);
+              }
+            } finally {
+              setIsDeleting(false);
+            }
+          },
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   if (carregando) {
     return (
@@ -465,27 +486,27 @@ const handleDeleteAccount = async () => {
   return (
     <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
       <View style={styles.adBanner}>
-              {currentBannerUrl ? (
-                <Animated.Image // Usando Animated.Image
-                  source={{ uri: currentBannerUrl }}
-                  style={[
-                    styles.bannerImage,
-                    { opacity: fadeAnim } // Aplicando a opacidade animada
-                  ]}
-                  resizeMode="contain"
-                  onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
-                />
-              ) : (
-                // O texto de fallback não precisa ser animado da mesma forma,
-                // mas podemos envolvê-lo se quisermos um fade para ele também.
-                // Por ora, ele aparece quando não há currentBannerUrl e fadeAnim está em 0.
-                <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
-              )}
-            </View>
-      <KeyboardAwareScrollView 
-        contentContainerStyle={styles.scrollContainer} 
+            {currentBannerUrl ? (
+              <Animated.Image // Usando Animated.Image
+                source={{ uri: currentBannerUrl }}
+                style={[
+                  styles.bannerImage,
+                  { opacity: fadeAnim } // Aplicando a opacidade animada
+                ]}
+                resizeMode="contain"
+                onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
+              />
+            ) : (
+              // O texto de fallback não precisa ser animado da mesma forma,
+              // mas podemos envolvê-lo se quisermos um fade para ele também.
+              // Por ora, ele aparece quando não há currentBannerUrl e fadeAnim está em 0.
+              <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
+            )}
+          </View>
+      <KeyboardAwareScrollView
+        contentContainerStyle={styles.scrollContainer}
         extraScrollHeight={Platform.OS === 'ios' ? 20 : 0} // Ajuste para iOS
-        enableOnAndroid={true} 
+        enableOnAndroid={true}
         keyboardShouldPersistTaps="handled"
       >
         <SafeAreaView style={styles.innerContainer}>
@@ -504,6 +525,8 @@ const handleDeleteAccount = async () => {
                 <Text style={styles.profileName}>{nome || 'Nome não definido'}</Text>
                 <Text style={styles.profileEmail}>{email || 'Email não definido'}</Text>
                 {telefone ? <Text style={styles.profileDetail}>Telefone: {telefone}</Text> : null}
+                {/* ADICIONADO: Exibir Instagram quando não estiver editando */}
+                {instagram ? <Text style={styles.profileDetail}>Instagram: {instagram}</Text> : null}
                 <TouchableOpacity style={styles.editButton} onPress={handleEditarPerfil}>
                   <Text style={styles.editButtonText}>Editar Perfil</Text>
                 </TouchableOpacity>
@@ -520,10 +543,12 @@ const handleDeleteAccount = async () => {
                   )}
                   <Text style={styles.changePhotoText}>Alterar Foto</Text>
                 </TouchableOpacity>
-                <TextInput style={styles.input} value={nome} onChangeText={setNome} placeholder="Nome Completo" placeholderTextColor="#888"/>
-                <TextInput style={styles.input} value={email} placeholder="Email" autoCapitalize="none" placeholderTextColor="#888" editable={false} />
-                <TextInput style={styles.input} value={telefone} onChangeText={setTelefone} placeholder="Telefone (Ex: 88912345678)" keyboardType="phone-pad" placeholderTextColor="#888"/>
-                {uploadingImage && 
+                <TextInput style={styles.input} value={nome} onChangeText={setNome} placeholder="Nome Completo" placeholderTextColor="#666"/>
+                <TextInput style={styles.input} value={email} placeholder="Email" autoCapitalize="none" placeholderTextColor="#666" editable={false} />
+                <TextInput style={styles.input} value={telefone} onChangeText={setTelefone} placeholder="Telefone (Ex: 88912345678)" keyboardType="phone-pad" placeholderTextColor="#666"/>
+                {/* ADICIONADO: Campo de Instagram para edição */}
+                <TextInput style={styles.input} value={instagram} onChangeText={setInstagram} placeholder="Instagram (opcional)" autoCapitalize="none" placeholderTextColor="#666"/>
+                {uploadingImage &&
                     <View style={styles.uploadingContainer}>
                         <ActivityIndicator size="small" color="#007BFF" />
                         <Text style={styles.uploadingText}>Enviando imagem...</Text>
@@ -559,8 +584,8 @@ const handleDeleteAccount = async () => {
           {/* Espaço extra para rolagem, se necessário */}
           <View style={styles.card}>
             <Text style={styles.dangerZoneTitle}>Zona de Perigo</Text>
-            <TouchableOpacity 
-            style={styles.deleteButton} 
+            <TouchableOpacity
+            style={styles.deleteButton}
             onPress={handleDeleteAccount}
             disabled={isDeleting}>
               {isDeleting?(<ActivityIndicator size="small" color="#FFFFFF" />):(<Text style={styles.deleteButtonText}>Excluir Minha Conta</Text>)}
@@ -568,7 +593,7 @@ const handleDeleteAccount = async () => {
             <Text style={styles.dangerZoneDescription}>
               Esta ação não pode ser desfeita. Todos os seus dados serão apagados permanentemente.
             </Text>
-          </View> 
+          </View>
         </SafeAreaView>
       </KeyboardAwareScrollView>
     </ImageBackground>
@@ -578,32 +603,32 @@ const handleDeleteAccount = async () => {
 // Estilos (mantidos como na sua última versão, com as adições que fizemos)
 const styles = StyleSheet.create({
   dangerZoneTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#d9534f',
-    marginBottom: 15,
-    textAlign: 'center'
-  },
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#d9534f',
+    marginBottom: 15,
+    textAlign: 'center'
+  },
   deleteButton: {
-    backgroundColor: '#d9534f',
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#d9534f',
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
     minHeight: 48,
   },
   deleteButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
   dangerZoneDescription: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 10,
-    lineHeight: 18,
-    textAlign: 'center',
-  },
+    fontSize: 13,
+    color: '#666',
+    marginTop: 10,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
   background: { flex: 1 },
   adBanner: {
     height: 60,
