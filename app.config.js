@@ -36,13 +36,13 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.ae.stoantoniobarbalhacliente",
-      buildNumber: "1.0.3",
+      buildNumber: "1.0.4",
       config: {
         googleMapsApiKey: "AIzaSyBY4ZBNVZ1VkyqJqY_M7u3LPdT6Ielcuw0"
       },
       googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
-        UIBackgroundModes: ["location", "audio"],
+        UIBackgroundModes: ["location"],
         NSPhotoLibraryUsageDescription: "Precisamos de acesso à sua galeria de fotos.",
         NSCameraUsageDescription: "Precisamos de acesso à sua câmera para você tirar uma foto de perfil.",
         NSLocationWhenInUseUsageDescription: "Precisamos da sua localização para mostrar seus amigos no mapa.",
