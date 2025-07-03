@@ -3,7 +3,7 @@ export default {
     name: "A. E. Vaquejada - Missão Velha",
     slug: "petrolina",
     platforms: ["android", "ios"],
-    version: "1.0.0",
+    version: "1.0.6",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     splash: {
@@ -36,7 +36,7 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.ae.stoantoniobarbalhacliente",
-      buildNumber: "1.0.5",
+      buildNumber: "1.0.6",
       config: {
         googleMapsApiKey: "AIzaSyBY4ZBNVZ1VkyqJqY_M7u3LPdT6Ielcuw0"
       },
