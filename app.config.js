@@ -20,7 +20,7 @@ export default {
           apiKey: "AIzaSyDOY_dZzTNgjeMX2z7ssWi755eznnBO68o"
         }
       },
-      versionCode: 14,
+      versionCode: 15,
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -36,7 +36,7 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.ae.stoantoniobarbalhacliente",
-      buildNumber: "1.0.4",
+      buildNumber: "1.0.5",
       config: {
         googleMapsApiKey: "AIzaSyBY4ZBNVZ1VkyqJqY_M7u3LPdT6Ielcuw0"
       },
