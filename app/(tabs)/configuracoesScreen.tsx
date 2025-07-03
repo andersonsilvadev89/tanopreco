@@ -9,8 +9,6 @@ import {
   TextInput,
   Image,
   ImageBackground,
-  Dimensions,
-  Animated,
   Platform,
   Linking,
   ActivityIndicator,
@@ -20,9 +18,10 @@ import * as ImagePicker from 'expo-image-picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as Location from 'expo-location';
 import *as TaskManager from 'expo-task-manager';
-import { ref, set, get, remove } from 'firebase/database';
-import { auth, database, administrativoDatabase } from '../../firebaseConfig';
+import { ref, set, remove, get } from 'firebase/database';
+import { auth, database } from '../../firebaseConfig';
 import { deleteUser } from 'firebase/auth';
+import AdBanner from '../components/AdBanner'; 
 
 const LOCATION_TASK_NAME = 'background-location-task';
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
@@ -34,125 +33,21 @@ interface UserProfile {
   telefone?: string;
   imagem?: string;
   compartilhando?: boolean;
-  instagram?: string; // ADICIONADO: Campo instagram na interface
-}
-interface BannerItem {
-  descricao: string;
-  id: string;
-  imagemUrl: string;
-  linkUrl: string;
+  instagram?: string;
 }
 
 const ConfiguracoesScreen = () => {
-  const [allBanners, setAllBanners] = useState<string[]>([]);
-  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-
-  // Valor animado para a opacidade do banner
-  const fadeAnim = useRef(new Animated.Value(0)).current; // Começa invisível (opacidade 0)
-
-  useEffect(() => {
-    const fetchBanners = async () => {
-      try {
-        // Usando administrativoDatabase conforme seu código anterior
-        const sponsorsRef = ref(administrativoDatabase, 'patrocinadores');
-        
-        const snapshot = await get(sponsorsRef);
-  
-        if (snapshot.exists()) {
-          const sponsorsData = snapshot.val();
-          const bannersList: string[] = [];
-  
-          for (const sponsorId in sponsorsData) {
-            const sponsor = sponsorsData[sponsorId];
-            if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
-              const sponsorBannersArray: BannerItem[] = sponsor.banners;
-              sponsorBannersArray.forEach(bannerObject => {
-                if (typeof bannerObject === 'object' && bannerObject !== null && typeof bannerObject.imagemUrl === 'string') {
-                  bannersList.push(bannerObject.imagemUrl);
-                }
-              });
-            }
-          }
-  
-          if (bannersList.length > 0) {
-            setAllBanners(bannersList);
-            setCurrentBannerUrl(bannersList[0]);
-            setCurrentBannerIndex(0);
-            // Animação de Fade-in para o primeiro banner
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 200, // Duração do fade-in
-              useNativeDriver: true, // Importante para performance
-            }).start();
-          } else {
-            console.log('Nenhum banner de patrocinador encontrado com a estrutura esperada.');
-            setCurrentBannerUrl(null);
-            fadeAnim.setValue(0); // Garante que a opacidade seja 0 se não houver banners
-          }
-        } else {
-          // Ajuste na mensagem de log para refletir o caminho usado
-          console.log('Nó "patrocinadores" não encontrado em administrativoDatabase.');
-          setCurrentBannerUrl(null);
-          fadeAnim.setValue(0);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar banners dos patrocinadores:', error);
-        Alert.alert("Erro", "Não foi possível carregar os banners dos patrocinadores.");
-        setCurrentBannerUrl(null);
-        fadeAnim.setValue(0);
-      }
-    };
-    
-    fetchBanners();
-  }, [fadeAnim]); // fadeAnim adicionado como dependência, pois é usado no efeito
-  
-  useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-    
-    if (allBanners.length > 1) {
-      intervalId = setInterval(() => {
-        Animated.timing(fadeAnim, { // 1. Fade-out do banner atual
-          toValue: 0,
-          duration: 200, // Duração do fade-out
-          useNativeDriver: true,
-        }).start(() => {
-          // 2. Atualiza o banner APÓS o fade-out
-          setCurrentBannerIndex(prevIndex => {
-            const nextIndex = (prevIndex + 1) % allBanners.length;
-            setCurrentBannerUrl(allBanners[nextIndex]); // Define a URL para o próximo banner
-            
-            // 3. Fade-in do novo banner
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 200, // Duração do fade-in
-              useNativeDriver: true,
-            }).start();
-            
-            return nextIndex; // Retorna o novo índice
-          });
-        });
-      }, 6000); // Tempo entre o início de cada transição
-    }
-  
-    return () => { // Limpa o intervalo quando o componente é desmontado ou allBanners muda
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [allBanners, fadeAnim]);
   const [compartilhando, setCompartilhando] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [editandoPerfil, setEditandoPerfil] = useState(false);
-  const [uploadingImage, setUploadingImage] = useState(false); // Para feedback de upload
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  // Estados para os dados do perfil
   const [nome, setNome] = useState(auth.currentUser?.displayName || '');
   const [email, setEmail] = useState(auth.currentUser?.email || '');
   const [telefone, setTelefone] = useState('');
-  const [imagem, setImagem] = useState(auth.currentUser?.photoURL || ''); // URL da imagem atual (pode ser da nuvem)
-  const [novaImagemUri, setNovaImagemUri] = useState<string | null>(null); // URI local da nova imagem selecionada/capturada
-  const [instagram, setInstagram] = useState(''); // ADICIONADO: Estado para o instagram
+  const [imagem, setImagem] = useState(auth.currentUser?.photoURL || '');
+  const [novaImagemUri, setNovaImagemUri] = useState<string | null>(null);
+  const [instagram, setInstagram] = useState('');
 
   const usuarioId = auth.currentUser?.uid;
 
@@ -174,10 +69,10 @@ const ConfiguracoesScreen = () => {
           const profileData = userSnapshot.val() as UserProfile;
           setCompartilhando(profileData.compartilhando === true);
           setNome(profileData.nome || auth.currentUser?.displayName || '');
-          setEmail(profileData.email || auth.currentUser?.email || ''); // Email geralmente não é editável se for do provedor de auth
+          setEmail(profileData.email || auth.currentUser?.email || '');
           setTelefone(profileData.telefone || '');
           setImagem(profileData.imagem || auth.currentUser?.photoURL || '');
-          setInstagram(profileData.instagram || ''); // ADICIONADO: Carregar instagram
+          setInstagram(profileData.instagram || '');
         } else if (isMounted && auth.currentUser) {
           const initialNome = auth.currentUser.displayName || '';
           const initialEmail = auth.currentUser.email || '';
@@ -187,15 +82,15 @@ const ConfiguracoesScreen = () => {
           setEmail(initialEmail);
           setTelefone('');
           setImagem(initialImagem);
-          setInstagram(''); // ADICIONADO: Inicializar instagram
+          setInstagram('');
           setCompartilhando(false);
 
           await set(userRef, {
             nome: initialNome, email: initialEmail, telefone: '',
-            imagem: initialImagem, compartilhando: false, instagram: '' // ADICIONADO: Salvar instagram inicial
+            imagem: initialImagem, compartilhando: false, instagram: ''
           });
         }
-        setNovaImagemUri(null); // Limpa qualquer seleção pendente ao carregar dados
+        setNovaImagemUri(null);
       } catch (error) {
           console.error("Erro ao buscar perfil e status:", error);
           if(isMounted && auth.currentUser){
@@ -203,7 +98,7 @@ const ConfiguracoesScreen = () => {
             setEmail(auth.currentUser.email || '');
             setTelefone('');
             setImagem(auth.currentUser.photoURL || '');
-            setInstagram(''); // ADICIONADO: Resetar instagram em caso de erro
+            setInstagram('');
             setCompartilhando(false);
             setNovaImagemUri(null);
           }
@@ -233,8 +128,6 @@ const ConfiguracoesScreen = () => {
                 Alert.alert('Permissão Recomendada', 'Para melhor experiência, permita a localização em segundo plano ("Permitir o tempo todo").');
             }
             const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-            // Para e reinicia a task para garantir que as opções mais recentes sejam aplicadas,
-            // ou apenas inicia se não estiver rodando.
             if (isTaskRunning) {
                 await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
             }
@@ -246,7 +139,7 @@ const ConfiguracoesScreen = () => {
                 pausesUpdatesAutomatically: true,
                 activityType: Location.ActivityType.Other,
                 foregroundService: {
-                    notificationTitle: 'Assistente de Eventos', // Nome do seu App
+                    notificationTitle: 'Assistente de Eventos',
                     notificationBody: 'Compartilhamento de localização ativo.',
                     notificationColor: '#007BFF',
                 },
@@ -267,7 +160,7 @@ const ConfiguracoesScreen = () => {
 
   const uploadImagem = async (uri: string): Promise<string | null> => {
     if (!uri || !uri.startsWith('file://')) {
-        return uri || null; // Se não é uma URI de arquivo local, retorna o que foi passado
+        return uri || null;
     }
     setUploadingImage(true);
     const formData = new FormData();
@@ -309,26 +202,28 @@ const ConfiguracoesScreen = () => {
             finalImageUrl = uploadedUrl;
         } else {
             setUploadingImage(false);
-            // O Alert de falha já foi mostrado em uploadImagem
-            // Se quiser, pode adicionar um Alert.alert aqui informando que o perfil foi salvo sem a nova imagem.
-            // Por ora, se o upload falhar, usamos a imagem que já estava (finalImageUrl já tem esse valor)
-            // ou se a imagem anterior era nula, ficará nula.
+            // Se o upload falhar, não continuamos para não salvar o perfil incompleto
+            return; 
         }
     }
 
-    // Lógica para extrair o handle do Instagram
-    let processedInstagram = instagram ? instagram.trim() : null;
-    if (processedInstagram) {
-        // Expressão regular para capturar o username de URLs do Instagram
-        const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)/;
-        const match = processedInstagram.match(instagramUrlRegex);
-        if (match && match[1]) {
-            processedInstagram = match[1];
-        } else if (processedInstagram.startsWith('@')) {
-            processedInstagram = processedInstagram.substring(1); // Remove o '@' se houver
-        }
+    // --- LÓGICA DO INSTAGRAM PADRONIZADA (INÍCIO) ---
+    let processedInstagram: string | null = null;
+    const rawInstagramInput = instagram?.trim(); // Pega o valor do estado 'instagram'
+
+    if (rawInstagramInput) {
+      const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)/;
+      const match = rawInstagramInput.match(instagramUrlRegex);
+
+      if (match && match[1]) {
+        // Se encontrou uma URL, usa o grupo capturado (o nome de usuário)
+        processedInstagram = match[1];
+      } else {
+        // Se não for uma URL, remove o '@' se houver
+        processedInstagram = rawInstagramInput.startsWith('@') ? rawInstagramInput.substring(1) : rawInstagramInput;
+      }
     }
-    processedInstagram = processedInstagram === '' ? null : processedInstagram; // Garante que strings vazias sejam null
+    // --- LÓGICA DO INSTAGRAM PADRONIZADA (FIM) ---
 
     const userRef = ref(database, `usuarios/${usuarioId}`);
     try {
@@ -336,13 +231,18 @@ const ConfiguracoesScreen = () => {
         const compartilhandoDB = snapshotCompartilhando.exists() ? snapshotCompartilhando.val() : false;
 
         await set(userRef, {
-            nome, email, telefone: telefone || null,
+            nome, 
+            email, 
+            telefone: telefone || null,
             imagem: finalImageUrl,
             compartilhando: compartilhandoDB,
-            instagram: processedInstagram, // ALTERADO: Salvar Instagram processado
+            // ALTERADO: Salva a variável processada
+            instagram: processedInstagram, 
         });
 
+        // Atualiza os estados locais com os valores limpos/finais
         setImagem(finalImageUrl);
+        setInstagram(processedInstagram || ''); 
         setNovaImagemUri(null);
         setEditandoPerfil(false);
         Alert.alert('Sucesso', 'Perfil atualizado!');
@@ -368,7 +268,7 @@ const ConfiguracoesScreen = () => {
         setEmail(profileData.email || auth.currentUser?.email || '');
         setTelefone(profileData.telefone || '');
         setImagem(profileData.imagem || auth.currentUser?.photoURL || '');
-        setInstagram(profileData.instagram || ''); // Resetar instagram ao cancelar
+        setInstagram(profileData.instagram || '');
       }
     }).catch(error => console.error("Erro ao recarregar perfil:", error));
   };
@@ -379,8 +279,8 @@ const ConfiguracoesScreen = () => {
     const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [1, 1], // Mantido 1:1 para fotos de perfil
-        quality: 0.7 // Qualidade reduzida para uploads mais rápidos
+        aspect: [1, 1],
+        quality: 0.7
     });
     if (!result.canceled && result.assets && result.assets.length > 0) {
         setNovaImagemUri(result.assets[0].uri);
@@ -412,7 +312,7 @@ const ConfiguracoesScreen = () => {
     );
   };
 
-const handleDeleteAccount = async () => {
+  const handleDeleteAccount = async () => {
     Alert.alert(
       "Excluir conta permanentemente?",
       "Esta ação é irreversível. Todos os seus dados de perfil e localização serão apagados. Deseja continuar?",
@@ -431,12 +331,9 @@ const handleDeleteAccount = async () => {
             setIsDeleting(true);
 
             try {
-              // 1. Parar tasks de localização em background
               if (await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME)) {
                 await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
               }
-
-              // 2. Deletar dados do Realtime Database
               const userId = user.uid;
               const userProfileRef = ref(database, `usuarios/${userId}`);
               const userLocationRef = ref(database, `localizacoes/${userId}`);
@@ -444,14 +341,11 @@ const handleDeleteAccount = async () => {
               await remove(userProfileRef);
               await remove(userLocationRef);
 
-              // 3. Deletar o usuário do Firebase Auth
               await deleteUser(user);
-
               Alert.alert("Conta Excluída", "Sua conta foi removida com sucesso.");
 
             } catch (error: any) {
               console.error("Erro ao excluir conta:", error);
-              // Erro comum: o usuário precisa ter feito login recentemente.
               if (error.code === 'auth/requires-recent-login') {
                 Alert.alert(
                   "Ação Requer Autenticação",
@@ -485,27 +379,11 @@ const handleDeleteAccount = async () => {
 
   return (
     <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
-      <View style={styles.adBanner}>
-            {currentBannerUrl ? (
-              <Animated.Image // Usando Animated.Image
-                source={{ uri: currentBannerUrl }}
-                style={[
-                  styles.bannerImage,
-                  { opacity: fadeAnim } // Aplicando a opacidade animada
-                ]}
-                resizeMode="contain"
-                onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
-              />
-            ) : (
-              // O texto de fallback não precisa ser animado da mesma forma,
-              // mas podemos envolvê-lo se quisermos um fade para ele também.
-              // Por ora, ele aparece quando não há currentBannerUrl e fadeAnim está em 0.
-              <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
-            )}
-          </View>
+      <AdBanner />
+
       <KeyboardAwareScrollView
         contentContainerStyle={styles.scrollContainer}
-        extraScrollHeight={Platform.OS === 'ios' ? 20 : 0} // Ajuste para iOS
+        extraScrollHeight={Platform.OS === 'ios' ? 20 : 0}
         enableOnAndroid={true}
         keyboardShouldPersistTaps="handled"
       >
@@ -518,15 +396,14 @@ const handleDeleteAccount = async () => {
                     <Image source={{ uri: displayImageUri }} style={styles.profileImage} />
                   ) : (
                     <View style={styles.profileImagePlaceholder}>
-                       <Text style={styles.profileImagePlaceholderText}>{nome ? nome.charAt(0).toUpperCase() : 'P'}</Text>
+                        <Text style={styles.profileImagePlaceholderText}>{nome ? nome.charAt(0).toUpperCase() : 'P'}</Text>
                     </View>
                   )}
                 </TouchableOpacity>
                 <Text style={styles.profileName}>{nome || 'Nome não definido'}</Text>
                 <Text style={styles.profileEmail}>{email || 'Email não definido'}</Text>
                 {telefone ? <Text style={styles.profileDetail}>Telefone: {telefone}</Text> : null}
-                {/* ADICIONADO: Exibir Instagram quando não estiver editando */}
-                {instagram ? <Text style={styles.profileDetail}>Instagram: {instagram}</Text> : null}
+                {instagram ? <Text style={styles.profileDetail}>Instagram: @{instagram}</Text> : null}
                 <TouchableOpacity style={styles.editButton} onPress={handleEditarPerfil}>
                   <Text style={styles.editButtonText}>Editar Perfil</Text>
                 </TouchableOpacity>
@@ -546,7 +423,6 @@ const handleDeleteAccount = async () => {
                 <TextInput style={styles.input} value={nome} onChangeText={setNome} placeholder="Nome Completo" placeholderTextColor="#666"/>
                 <TextInput style={styles.input} value={email} placeholder="Email" autoCapitalize="none" placeholderTextColor="#666" editable={false} />
                 <TextInput style={styles.input} value={telefone} onChangeText={setTelefone} placeholder="Telefone (Ex: 88912345678)" keyboardType="phone-pad" placeholderTextColor="#666"/>
-                {/* ADICIONADO: Campo de Instagram para edição */}
                 <TextInput style={styles.input} value={instagram} onChangeText={setInstagram} placeholder="Instagram (opcional)" autoCapitalize="none" placeholderTextColor="#666"/>
                 {uploadingImage &&
                     <View style={styles.uploadingContainer}>
@@ -581,7 +457,7 @@ const handleDeleteAccount = async () => {
               Sua localização será enviada ao servidor quando as condições de evento (proximidade e horário) forem atendidas.
             </Text>
           </View>
-          {/* Espaço extra para rolagem, se necessário */}
+          
           <View style={styles.card}>
             <Text style={styles.dangerZoneTitle}>Zona de Perigo</Text>
             <TouchableOpacity
@@ -600,7 +476,6 @@ const handleDeleteAccount = async () => {
   );
 };
 
-// Estilos (mantidos como na sua última versão, com as adições que fizemos)
 const styles = StyleSheet.create({
   dangerZoneTitle: {
     fontSize: 20,
@@ -630,24 +505,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   background: { flex: 1 },
-  adBanner: {
-    height: 60,
-    backgroundColor: 'rgba(220,220,220,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  adBannerText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#555',
-  },
   scrollContainer: { flexGrow: 1, justifyContent: 'center' },
-  innerContainer: { paddingHorizontal: 20, paddingVertical: 20, }, // Aumentado paddingVertical
+  innerContainer: { paddingHorizontal: 20, paddingVertical: 20, },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   loadingText: { marginTop: 10, fontSize: 16, color: 'white' },
   card: { backgroundColor: 'rgba(255, 255, 255, 0.92)', borderRadius: 12, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
@@ -658,8 +517,8 @@ const styles = StyleSheet.create({
   profileImagePlaceholderText: { fontSize: 48, color: '#FFFFFF', fontWeight: 'bold'},
   profileName: { fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 5, textAlign: 'center' },
   profileEmail: { fontSize: 16, color: '#666', marginBottom: 10, textAlign: 'center' },
-  profileDetail: { fontSize: 16, color: '#666', marginBottom: 20, textAlign: 'center' },
-  editButton: { backgroundColor: '#007BFF', paddingVertical: 10, paddingHorizontal: 25, borderRadius: 20 },
+  profileDetail: { fontSize: 16, color: '#666', marginBottom: 10, textAlign: 'center' },
+  editButton: { backgroundColor: '#007BFF', paddingVertical: 10, paddingHorizontal: 25, borderRadius: 20, marginTop: 10 },
   editButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
   profileEditContainer: { alignItems: 'stretch' },
   imagePickerButton: { alignItems: 'center', marginBottom: 20 },

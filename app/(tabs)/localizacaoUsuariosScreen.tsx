@@ -12,14 +12,14 @@ import {
     Image, 
     InteractionManager, 
     Dimensions, 
-    Animated, 
     ActivityIndicator,
     Linking
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ref, get, set, remove, onValue } from 'firebase/database';
-import { auth, database, administrativoDatabase } from '../../firebaseConfig';
+import { auth, database } from '../../firebaseConfig';
 import { useFocusEffect } from '@react-navigation/native';
+import AdBanner from '../components/AdBanner'; 
 
 // --- INTERFACES ---
 interface Usuario {
@@ -31,23 +31,12 @@ interface Usuario {
   instagram?: string; 
 }
 
-interface BannerItem {
-  descricao: string;
-  id: string;
-  imagemUrl: string;
-  linkUrl: string;
-}
-
 // --- CONSTANTES ---
 const { height: screenHeight } = Dimensions.get('window');
 const ITEMS_POR_PAGINA = 15;
 
 // --- COMPONENTE ---
 const LocalizacaoScreen = () => {
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const [allBanners, setAllBanners] = useState<string[]>([]);
-  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
   const [usuariosOriginais, setUsuariosOriginais] = useState<Usuario[]>([]);
   const [usuariosFiltrados, setUsuariosFiltrados] = useState<Usuario[]>([]);
   const [busca, setBusca] = useState('');
@@ -59,66 +48,6 @@ const LocalizacaoScreen = () => {
   const [todosCarregados, setTodosCarregados] = useState(false);
   const [loadingInicial, setLoadingInicial] = useState(true);
   const usuarioLogadoId = auth.currentUser?.uid;
-
-  useEffect(() => {
-    const fetchBanners = async () => {
-      try {
-        const sponsorsRef = ref(administrativoDatabase, 'patrocinadores');
-        const snapshot = await get(sponsorsRef);
-        if (snapshot.exists()) {
-          const sponsorsData = snapshot.val();
-          const bannersList: string[] = [];
-          for (const sponsorId in sponsorsData) {
-            const sponsor = sponsorsData[sponsorId];
-            if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
-              const sponsorBannersArray: BannerItem[] = sponsor.banners;
-              sponsorBannersArray.forEach(bannerObject => {
-                if (typeof bannerObject === 'object' && bannerObject !== null && typeof bannerObject.imagemUrl === 'string') {
-                  bannersList.push(bannerObject.imagemUrl);
-                }
-              });
-            }
-          }
-          if (bannersList.length > 0) {
-            setAllBanners(bannersList);
-            setCurrentBannerUrl(bannersList[0]);
-            setCurrentBannerIndex(0);
-            Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-          } else {
-            setCurrentBannerUrl(null);
-            fadeAnim.setValue(0);
-          }
-        } else {
-          setCurrentBannerUrl(null);
-          fadeAnim.setValue(0);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar banners:', error);
-        Alert.alert("Erro", "Não foi possível carregar os banners.");
-        setCurrentBannerUrl(null);
-        fadeAnim.setValue(0);
-      }
-    };
-    fetchBanners();
-  }, [fadeAnim]);
-
-  useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-    
-    if (allBanners.length > 1) {
-      intervalId = setInterval(() => {
-        Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-          setCurrentBannerIndex(prevIndex => {
-            const nextIndex = (prevIndex + 1) % allBanners.length;
-            setCurrentBannerUrl(allBanners[nextIndex]);
-            Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-            return nextIndex;
-          });
-        });
-      }, 6000);
-    }
-    return () => { if (intervalId) clearInterval(intervalId); };
-  }, [allBanners, fadeAnim]);
 
   const buscarUsuarios = useCallback(async () => {
     if (!usuarioLogadoId) return;
@@ -222,39 +151,26 @@ const LocalizacaoScreen = () => {
     }
   };
   
-  const handleInstagramPress = async (instagramInput: string | undefined) => {
-        if (!instagramInput) return;
-
-        let instagramUsername = instagramInput.trim();
-        // Expressão regular para capturar o username de URLs do Instagram
-        // Esta regex é mais robusta e lida com http/https, www, e paths adicionais
-        const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)(?:\/.*)?/;
-        const match = instagramUsername.match(instagramUrlRegex);
-
-        if (match && match[1]) {
-            instagramUsername = match[1]; // Extrai apenas o username da URL
-        } else if (instagramUsername.startsWith('@')) {
-            instagramUsername = instagramUsername.substring(1); // Remove o '@' se houver
-        }
-
-        // Se, após processar, o username ainda estiver vazio, é inválido
-        if (!instagramUsername) { 
-            Alert.alert("Erro", `Formato de usuário do Instagram inválido.`);
-            return;
-        }
-
-        const url = `https://www.instagram.com/${instagramUsername}`; // Constrói a URL padrão do perfil
-        try {
-            const supported = await Linking.canOpenURL(url);
-            if (supported) {
-                await Linking.openURL(url);
-            } else {
-                Alert.alert("Erro", `Não foi possível abrir o perfil do Instagram.`);
-            }
-        } catch (error) {
-            Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
-        }
-    };
+  // --- FUNÇÃO DE ABERTURA DO INSTAGRAM (VERSÃO SIMPLIFICADA) ---
+  const openInstagramProfile = async (username: string | undefined) => {
+    if (!username) {
+      Alert.alert("Instagram não informado", "Este usuário não possui um Instagram cadastrado.");
+      return;
+    }
+    
+    const url = `https://www.instagram.com/${username}`;
+    
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert("Erro", `Não foi possível abrir o perfil: ${url}`);
+      }
+    } catch (error) {
+      Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
+    }
+  };
 
   const desfazerAmizade = async (usuario: Usuario) => {
     if (!usuarioLogadoId) return;
@@ -363,7 +279,7 @@ const LocalizacaoScreen = () => {
           <Text style={styles.usuarioNome}>{item.nome}</Text>
           <View style={styles.actionsContainer}>
             {item.instagram && (
-              <TouchableOpacity onPress={() => handleInstagramPress(item.instagram)}>
+              <TouchableOpacity onPress={() => openInstagramProfile(item.instagram)}>
                 <LinearGradient
                   colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
                   start={{ x: 0.0, y: 1.0 }}
@@ -399,9 +315,8 @@ const LocalizacaoScreen = () => {
       <View style={styles.infoContainerSolicitacao}>
         <Text style={styles.usuarioNome}>{item.nome}</Text>
         <View style={styles.botoesSolicitacao}>
-          {/* --- CÓDIGO DO BOTÃO DO INSTAGRAM ADICIONADO ABAIXO --- */}
           {item.instagram && (
-            <TouchableOpacity onPress={() => handleInstagramPress(item.instagram)}>
+            <TouchableOpacity onPress={() => openInstagramProfile(item.instagram)}>
               <LinearGradient
                 colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
                 start={{ x: 0.0, y: 1.0 }}
@@ -412,7 +327,6 @@ const LocalizacaoScreen = () => {
               </LinearGradient>
             </TouchableOpacity>
           )}
-          {/* --- FIM DO CÓDIGO ADICIONADO --- */}
           <TouchableOpacity style={[styles.button, styles.buttonSolicitar]} onPress={() => aceitarSolicitacao(item)}>
             <Text style={styles.buttonTextSmall}>Aceitar</Text>
           </TouchableOpacity>
@@ -431,13 +345,7 @@ const LocalizacaoScreen = () => {
 
   return (
     <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
-      <View style={styles.adBanner}>
-        {currentBannerUrl ? (
-          <Animated.Image source={{ uri: currentBannerUrl }} style={[styles.bannerImage, { opacity: fadeAnim }]} resizeMode="contain"/>
-        ) : (
-          <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
-        )}
-      </View>
+      <AdBanner />
       <SafeAreaView style={styles.container}>
         <TextInput
           style={styles.input}
@@ -482,9 +390,6 @@ const styles = StyleSheet.create({
   loadingText: { textAlign: 'center', marginTop: 10, fontSize: 16, color: '#fff' },
   container: { flex: 1, padding: 10 },
   background: { flex: 1, resizeMode: 'cover' },
-  adBanner: { height: 60, backgroundColor: 'rgba(220,220,220,0.7)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  bannerImage: { width: '100%', height: '100%' },
-  adBannerText: { fontSize: 14, fontWeight: '500', color: '#555' },
   input: { height: 40, borderColor: 'gray', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, marginBottom: 8, backgroundColor: 'white' },
   listaUsuarios: { backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 10, padding: 10, flex: 1 },
   usuarioContainer: { flexDirection: 'row', backgroundColor: '#fff', borderRadius: 10, padding: 5, marginBottom: 5, alignItems: 'center', elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 2 },

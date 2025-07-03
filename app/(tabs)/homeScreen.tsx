@@ -7,6 +7,8 @@ import {
   ImageBackground,
   Alert,
   Animated,
+  FlatList, // Adicionado para organizar os botões em grade
+  Dimensions // Adicionado para calcular a largura dos itens
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -17,6 +19,8 @@ import {
   LogOut,
   CircleHelp,
   Sandwich,
+  Briefcase, // Ícone para Empresa
+  Shield // Ícone para Admin
 } from 'lucide-react-native';
 import { signOut } from 'firebase/auth';
 import { auth, administrativoDatabase } from '../../firebaseConfig'; // 'administrativoDatabase' já estava sendo usado
@@ -31,6 +35,11 @@ interface BannerItem {
   imagemUrl: string;
   linkUrl: string;
 }
+
+const { width: screenWidth } = Dimensions.get('window');
+const NUM_COLUMNS = 2; // Número de colunas para os botões
+const ITEM_MARGIN = 15; // Margem entre os itens
+const ITEM_PADDING = 20; // Padding interno do card
 
 const HomeScreen = () => {
   const navigate = (path: string) => router.push(path as any);
@@ -133,6 +142,7 @@ const HomeScreen = () => {
     };
   }, [allBanners, fadeAnim]);
 
+  // ALTERAÇÃO: Adicionadas novas opções para Empresa e Admin
   const options = [
     { label: 'Localização de Usuários', icon: Users, path: '/localizacaoUsuariosScreen' },
     { label: 'Localização em Tempo Real', icon: MapPin, path: '/mapaAmigosScreen' },
@@ -140,6 +150,8 @@ const HomeScreen = () => {
     { label: 'LineUp', icon: Radio, path: '/lineUpScreen' },
     { label: 'Configurações', icon: Settings, path: '/configuracoesScreen' },
     { label: 'Sobre', icon: CircleHelp, path: '/sobreScreen' },
+    { label: 'Área da Empresa', icon: Briefcase, path: '/empresaScreen' }, // NOVO BOTÃO EMPRESA
+    { label: 'Área Admin', icon: Shield, path: '/adminScreen' }, // NOVO BOTÃO ADMIN
   ];
 
   const confirmarLogout = () => {
@@ -165,6 +177,18 @@ const HomeScreen = () => {
     );
   };
 
+  // Renderização de cada item do grid
+  const renderGridItem = ({ item }: { item: typeof options[0] }) => (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.8}
+      onPress={() => navigate(item.path)}
+    >
+      <item.icon size={28} color="#007aff" style={styles.iconStyle} />
+      <Text style={styles.cardText}>{item.label}</Text>
+    </TouchableOpacity>
+  );
+
   return (
     <ImageBackground source={fundo} style={styles.background} resizeMode="cover">
       <View style={styles.adBanner}>
@@ -187,20 +211,18 @@ const HomeScreen = () => {
       </View>
 
       <View style={styles.content}>
-        {options.map(({ label, icon: Icon, path }, index) => (
-          <TouchableOpacity
-            key={index}
-            style={styles.card}
-            activeOpacity={0.8}
-            onPress={() => navigate(path)}
-          >
-            <Icon size={28} color="#007aff" style={styles.iconStyle} />
-            <Text style={styles.cardText}>{label}</Text>
-          </TouchableOpacity>
-        ))}
+        <FlatList
+          data={options} // Usando o array de opções para renderizar os botões
+          renderItem={renderGridItem}
+          keyExtractor={(item, index) => item.label + index}
+          numColumns={NUM_COLUMNS} // Define 2 colunas para os botões
+          contentContainerStyle={styles.gridContainer} // Estilo para o container da FlatList
+          columnWrapperStyle={styles.row} // Estilo para cada linha (para espaçamento entre colunas)
+        />
 
+        {/* Botão de Sair separado, no final */}
         <TouchableOpacity
-          style={styles.card}
+          style={[styles.card, styles.logoutButton]} // Adicionado estilo específico para logout
           activeOpacity={0.8}
           onPress={confirmarLogout}
         >
@@ -235,15 +257,24 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     paddingTop: 5,
-    paddingHorizontal: 20,
+    paddingHorizontal: ITEM_MARGIN, // Ajustado para usar a margem dos itens
     paddingBottom: 5,
-    justifyContent: 'space-evenly',
+    // justifyContent: 'space-evenly', // Removido, pois a FlatList gerencia o espaçamento
+  },
+  gridContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 10, // Padding vertical para a grade
+  },
+  row: {
+    justifyContent: 'space-around', // Espaço entre as colunas
+    marginBottom: ITEM_MARGIN, // Margem inferior de cada linha
   },
   card: {
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 20,
-    paddingVertical: 15,
-    paddingHorizontal: 20,
+    paddingVertical: ITEM_PADDING, // Padding vertical do card
+    paddingHorizontal: ITEM_PADDING, // Padding horizontal do card
     alignItems: 'center',
     flexDirection: 'column',
     shadowColor: '#000',
@@ -251,6 +282,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
+    // Cálculo da largura para 2 colunas com margem
+    width: (screenWidth - (ITEM_MARGIN * 2) - (ITEM_MARGIN * (NUM_COLUMNS - 1))) / NUM_COLUMNS,
+    marginHorizontal: ITEM_MARGIN / 2, // Metade da margem total para cada lado do item
+    minHeight: 125,
   },
   iconStyle: {
     marginBottom: 10,
@@ -261,6 +296,13 @@ const styles = StyleSheet.create({
     color: '#333',
     textAlign: 'center',
   },
+  logoutButton: {
+    marginTop: 20, // Margem superior para separar do grid
+    marginBottom: 10, // Margem inferior para o final da tela
+    width: (screenWidth - (ITEM_MARGIN * 2) - (ITEM_MARGIN * (NUM_COLUMNS - 1))) / NUM_COLUMNS, // Mesma largura dos outros cards
+    alignSelf: 'center', // Centralizar o botão de logout
+    backgroundColor: 'rgba(255,255,255,0.9)', // Pode manter o mesmo estilo do card
+  }
 });
 
 export default HomeScreen;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -9,24 +9,16 @@ import {
   StyleSheet,
   TouchableOpacity,
   ImageBackground,
-  Animated,
-  Alert,
   Linking,
+  Alert,
 } from 'react-native';
-import { Feather } from '@expo/vector-icons'; // Importar Feather icons
-import { empresaDatabase, administrativoDatabase } from '../../firebaseConfig';
+import { Feather } from '@expo/vector-icons';
+import { database } from '../../firebaseConfig'; 
 import { ref, onValue, get } from 'firebase/database';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect } from '@react-navigation/native';
-import MapView, { Marker, Callout } from 'react-native-maps'; // Callout adicionado para o futuro
-
-// ... (Interfaces e Constantes permanecem as mesmas) ...
-interface BannerItem {
-  descricao: string;
-  id: string;
-  imagemUrl: string;
-  linkUrl: string;
-}
+import MapView, { Marker, Callout } from 'react-native-maps';
+import AdBanner from '../components/AdBanner'; 
 
 interface ProdutoComEmpresa {
   id: string;
@@ -35,8 +27,8 @@ interface ProdutoComEmpresa {
   imagemUrl?: string;
   palavrasChave?: string;
   empresaId: string;
-  nome: string; 
-  localizacao: {
+  nome: string;
+  localizacao?: {
     latitude: number;
     longitude: number;
   };
@@ -44,13 +36,12 @@ interface ProdutoComEmpresa {
 }
 
 interface EmpresaData {
-  nome: string;
-  localizacao: { latitude: number; longitude: number };
+  nomeEmpresa: string;
+  localizacao?: { latitude: number; longitude: number };
   linkInstagram?: string;
 }
 
 const ITEMS_POR_PAGINA = 10;
-
 
 export default function VisualizarProdutosServicos() {
   const [produtosComEmpresa, setProdutosComEmpresa] = useState<ProdutoComEmpresa[]>([]);
@@ -64,8 +55,8 @@ export default function VisualizarProdutosServicos() {
     longitude: number;
     latitudeDelta: number;
     longitudeDelta: number;
-  } | null>({ // Inicialização padrão para evitar null no MapView
-    latitude: -7.2345, 
+  }>({
+    latitude: -7.2345,
     longitude: -39.4056,
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
@@ -74,82 +65,14 @@ export default function VisualizarProdutosServicos() {
     latitude: number;
     longitude: number;
     nome: string;
-    empresaId?: string; // Para identificar unicamente o marcador selecionado
-    produtoId?: string; // Para identificar unicamente o marcador selecionado
+    empresaId?: string;
+    produtoId?: string;
   } | null>(null);
   const [empresas, setEmpresas] = useState<{ [key: string]: EmpresaData }>({});
-
-  const [allBanners, setAllBanners] = useState<string[]>([]);
-  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-
-  const [mostrarMapa, setMostrarMapa] = useState(false); 
-
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  // ... (useEffect para banners e empresas permanecem os mesmos) ...
-  useEffect(() => {
-    const fetchBanners = async () => {
-      try {
-        const sponsorsRef = ref(administrativoDatabase, 'patrocinadores');
-        const snapshot = await get(sponsorsRef);
-        if (snapshot.exists()) {
-          const sponsorsData = snapshot.val();
-          const bannersList: string[] = [];
-          for (const sponsorId in sponsorsData) {
-            const sponsor = sponsorsData[sponsorId];
-            if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
-              const sponsorBannersArray: BannerItem[] = sponsor.banners;
-              sponsorBannersArray.forEach(bannerObject => {
-                if (typeof bannerObject === 'object' && bannerObject !== null && typeof bannerObject.imagemUrl === 'string') {
-                  bannersList.push(bannerObject.imagemUrl);
-                }
-              });
-            }
-          }
-          if (bannersList.length > 0) {
-            setAllBanners(bannersList);
-            setCurrentBannerUrl(bannersList[0]);
-            setCurrentBannerIndex(0);
-            Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-          } else {
-            setCurrentBannerUrl(null);
-            fadeAnim.setValue(0);
-          }
-        } else {
-          setCurrentBannerUrl(null);
-          fadeAnim.setValue(0);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar banners:', error);
-        Alert.alert("Erro", "Não foi possível carregar os banners.");
-        setCurrentBannerUrl(null);
-        fadeAnim.setValue(0);
-      }
-    };
-    fetchBanners();
-  }, [fadeAnim]);
+  const [mostrarMapa, setMostrarMapa] = useState(false);
 
   useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-    
-    if (allBanners.length > 1) {
-      intervalId = setInterval(() => {
-        Animated.timing(fadeAnim, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
-          setCurrentBannerIndex(prevIndex => {
-            const nextIndex = (prevIndex + 1) % allBanners.length;
-            setCurrentBannerUrl(allBanners[nextIndex]);
-            Animated.timing(fadeAnim, { toValue: 1, duration: 200, useNativeDriver: true }).start();
-            return nextIndex;
-          });
-        });
-      }, 6000);
-    }
-    return () => { if (intervalId) clearInterval(intervalId); };
-  }, [allBanners, fadeAnim]);
-
-  useEffect(() => {
-    const empresasRef = ref(empresaDatabase, 'usuarios');
+    const empresasRef = ref(database, 'solicitacoesEmpresas'); 
     const unsubscribeEmpresas = onValue(empresasRef, (snapshot) => {
       const data: { [key: string]: EmpresaData } = snapshot.val() || {};
       setEmpresas(data);
@@ -157,36 +80,67 @@ export default function VisualizarProdutosServicos() {
     return () => unsubscribeEmpresas();
   }, []);
 
-  const fetchInitialData = useCallback(() => {
+  const fetchInitialData = useCallback(async () => {
+    if (Object.keys(empresas).length === 0) {
+        setLoadingInicial(true);
+        return;
+    }
+    
     setLoadingInicial(true);
-    const produtosRef = ref(empresaDatabase, 'produtos');
-    const unsubscribeProdutos = onValue(produtosRef, (snapshot) => {
-      const data: ProdutoComEmpresa[] = [];
-      snapshot.forEach((userSnapshot) => {
-        const empresaId = userSnapshot.key!;
-        userSnapshot.forEach((produtoSnapshot) => {
-          const produto = produtoSnapshot.val();
-          const empresaInfo = empresas[empresaId];
-          if (empresaInfo) {
-            data.push({
-              id: produtoSnapshot.key!, ...produto, empresaId,
-              nome: empresaInfo.nome, localizacao: empresaInfo.localizacao,
-              linkInstagram: empresaInfo.linkInstagram,
+    const produtosRef = ref(database, 'produtos');
+    const snapshot = await get(produtosRef);
+    
+    const data: ProdutoComEmpresa[] = [];
+    if (snapshot.exists()) {
+        const promises: Promise<void>[] = [];
+        snapshot.forEach((userSnapshot) => {
+            const empresaId = userSnapshot.key!;
+            userSnapshot.forEach((produtoSnapshot) => {
+                const promise = (async () => {
+                    const produto = produtoSnapshot.val();
+                    let empresaInfo = empresas[empresaId];
+                    
+                    if (empresaInfo) {
+                        // Se a localização não estiver nos dados da empresa, busca no nó 'localizacoes'
+                        if (!empresaInfo.localizacao) {
+                            const locRef = ref(database, `localizacoes/${empresaId}`);
+                            const locSnapshot = await get(locRef);
+                            if (locSnapshot.exists()) {
+                                const locData = locSnapshot.val();
+                                empresaInfo.localizacao = {
+                                    latitude: locData.latitude,
+                                    longitude: locData.longitude
+                                };
+                            }
+                        }
+
+                        data.push({
+                            id: produtoSnapshot.key!,
+                            ...produto,
+                            empresaId,
+                            nome: empresaInfo.nomeEmpresa, 
+                            localizacao: empresaInfo.localizacao,
+                            linkInstagram: empresaInfo.linkInstagram,
+                        });
+                    }
+                })();
+                promises.push(promise);
             });
-          }
         });
-      });
-      setProdutosComEmpresa(data);
-      setLoadingInicial(false);
-      // O mapRegion inicial já está definido no useState.
-      // Se precisar de uma lógica mais complexa baseada nos dados carregados, pode ser adicionada aqui.
-    });
-    return () => unsubscribeProdutos();
+        await Promise.all(promises);
+    }
+    
+    setProdutosComEmpresa(data.sort((a, b) => a.nome.localeCompare(b.nome)));
+    setLoadingInicial(false);
+
   }, [empresas]);
 
-  useFocusEffect(fetchInitialData);
+  useFocusEffect(
+    useCallback(() => {
+        fetchInitialData();
+    }, [fetchInitialData])
+  );
 
-  // ... (buscarProdutos, carregarMaisProdutos, renderFooter, produtosFiltrados, dadosParaExibir permanecem os mesmos) ...
   const buscarProdutos = (texto: string) => {
     setTermoBusca(texto);
     setPagina(1);
@@ -232,13 +186,12 @@ export default function VisualizarProdutosServicos() {
     ? produtosFiltrados
     : produtosComEmpresa.slice(0, pagina * ITEMS_POR_PAGINA);
 
-
   const handleVerNoMapa = (produto: ProdutoComEmpresa) => {
     if (produto.localizacao?.latitude && produto.localizacao?.longitude) {
-      setSelectedLocation({ 
-        latitude: produto.localizacao.latitude, 
-        longitude: produto.localizacao.longitude, 
-        nome: produto.nome, // Nome da empresa
+      setSelectedLocation({
+        latitude: produto.localizacao.latitude,
+        longitude: produto.localizacao.longitude,
+        nome: produto.nome,
         empresaId: produto.empresaId,
         produtoId: produto.id,
       });
@@ -250,39 +203,42 @@ export default function VisualizarProdutosServicos() {
       });
       setMostrarMapa(true);
     } else {
-      Alert.alert("Localização Indisponível", "Este item não possui dados de localização para exibir no mapa.");
+      Alert.alert("Localização Indisponível", "Esta empresa não possui uma localização cadastrada para este produto.");
     }
   };
 
-  const handleInstagramPress = async (instagramUsername: string | undefined) => {
-        if (!instagramUsername) return;
-        const url = `https://www.instagram.com/${instagramUsername.replace('@', '')}`;
-        try {
-          const supported = await Linking.canOpenURL(url);
-          if (supported) {
-            await Linking.openURL(url);
-          } else {
-            Alert.alert("Erro", `Não foi possível abrir o perfil do Instagram.`);
-          }
-        } catch (error) {
-          Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
-        }
-    };
+  const openInstagramProfile = async (username: string | undefined) => {
+    if (!username) {
+      Alert.alert("Instagram não informado", "Esta empresa não possui um Instagram cadastrado.");
+      return;
+    }
+    const url = `https://www.instagram.com/${username}`;
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert("Erro", `Não foi possível abrir o perfil: ${url}`);
+      }
+    } catch (error) {
+      Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
+    }
+  };
 
-  if (loadingInicial && produtosComEmpresa.length === 0) {
+  if (loadingInicial) {
     return (
       <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
-        <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#FFFFFF" /><Text style={styles.loadingText}>Carregando...</Text></View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.loadingText}>Carregando...</Text>
+        </View>
       </ImageBackground>
     );
   }
 
   return (
     <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
-      <View style={styles.adBanner}>
-        {currentBannerUrl ? <Animated.Image source={{ uri: currentBannerUrl }} style={[styles.bannerImage, { opacity: fadeAnim }]} resizeMode="contain" onError={(e) => console.warn("Erro banner:", e.nativeEvent.error)} />
-          : <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>}
-      </View>
+      <AdBanner />
       <View style={styles.container}>
         <TextInput style={styles.input} placeholder="Buscar (mínimo 3 caracteres)" value={termoBusca} onChangeText={buscarProdutos} />
         <FlatList
@@ -300,27 +256,26 @@ export default function VisualizarProdutosServicos() {
                       {item.localizacao?.latitude && item.localizacao?.longitude && (
                         <TouchableOpacity
                           style={[styles.itemActionButton, styles.mapItemButton, styles.botaoEspacado]}
-                          onPress={() => handleVerNoMapa(item)} // Passa o item inteiro
+                          onPress={() => handleVerNoMapa(item)}
                         >
                           <Text style={styles.itemActionButtonText}>Ver no Mapa</Text>
                         </TouchableOpacity>
                       )}
                       {item.linkInstagram && (
-                        <TouchableOpacity onPress={() => handleInstagramPress(item.linkInstagram)}>
-                                      <LinearGradient
-                                        colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
-                                        start={{ x: 0.0, y: 1.0 }}
-                                        end={{ x: 1.0, y: 0.0 }}
-                                        style={styles.instagramButton}
-                                      >
-                                        <Text style={styles.instagramButtonText}>Instagram</Text>
-                                      </LinearGradient>
-                                    </TouchableOpacity>
+                        <TouchableOpacity onPress={() => openInstagramProfile(item.linkInstagram)}>
+                          <LinearGradient
+                            colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
+                            start={{ x: 0.0, y: 1.0 }} end={{ x: 1.0, y: 0.0 }}
+                            style={styles.instagramButton}
+                          >
+                            <Text style={styles.instagramButtonText}>Instagram</Text>
+                          </LinearGradient>
+                        </TouchableOpacity>
                       )}
                     </View>
                   </View>
                   <View style={styles.precoContainer}>
-                    {item.preco ? <Text style={styles.preco}>{item.preco.substring(3,item.preco.length)}</Text> : <View />}
+                    {item.preco ? <Text style={styles.preco}>{item.preco.substring(3, item.preco.length)}</Text> : <View />}
                   </View>
                 </View>
               </View>
@@ -329,27 +284,20 @@ export default function VisualizarProdutosServicos() {
           ListFooterComponent={renderFooter}
           onEndReachedThreshold={0.1}
           onEndReached={termoBusca.length < 3 ? carregarMaisProdutos : undefined}
+          ListEmptyComponent={!loadingInicial ? <Text style={styles.mensagemNenhumResultado}>Nenhum produto encontrado.</Text> : null}
         />
 
-        {/* Visualização do Mapa estilo Overlay */}
         {mostrarMapa && (
           <View style={styles.mapOverlayContainer}>
             <View style={styles.mapDisplayBox}>
               {mapRegion ? (
-                <MapView
-                  style={styles.mapViewStyle}
-                  region={mapRegion}
-                >
-                  {/* Marcador para a localização selecionada */}
+                <MapView style={styles.mapViewStyle} region={mapRegion}>
                   {selectedLocation && (
                     <Marker
                       coordinate={{ latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }}
-                      title={selectedLocation.nome} // Nome da empresa
-                      description={"Local selecionado"}
-                      pinColor="blue"
-                      zIndex={1} // Para garantir que fique na frente se outros marcadores sobreporem
+                      title={selectedLocation.nome} description={"Local selecionado"} pinColor="blue" zIndex={1}
                     >
-                       <Callout tooltip>
+                      <Callout tooltip>
                         <View style={styles.calloutView}>
                           <Text style={styles.calloutTitle}>{selectedLocation.nome}</Text>
                           <Text style={styles.calloutDescription}>Este é o local selecionado.</Text>
@@ -357,27 +305,21 @@ export default function VisualizarProdutosServicos() {
                       </Callout>
                     </Marker>
                   )}
-
-                  {/* Marcadores para outros produtos/empresas */}
                   {produtosComEmpresa
-                    .filter(p => 
-                      p.localizacao?.latitude && 
-                      p.localizacao?.longitude &&
-                      // Evita renderizar o marcador padrão para o item já destacado como selectedLocation
-                      !(selectedLocation && p.empresaId === selectedLocation.empresaId && p.id === selectedLocation.produtoId) 
+                    .filter(p =>
+                      p.localizacao?.latitude && p.localizacao?.longitude &&
+                      !(selectedLocation && p.empresaId === selectedLocation.empresaId && p.id === selectedLocation.produtoId)
                     )
                     .map((produto) => (
                       <Marker
                         key={produto.id + produto.empresaId + "_mapmarker"}
-                        coordinate={produto.localizacao}
-                        title={produto.nome} // Nome da empresa
-                        description={produto.descricao.substring(0,40) + "..."}
-                        pinColor="red" // Cor padrão para outros marcadores
+                        coordinate={produto.localizacao!} title={produto.nome}
+                        description={produto.descricao.substring(0, 40) + "..."} pinColor="red"
                       >
                         <Callout tooltip>
                           <View style={styles.calloutView}>
                             <Text style={styles.calloutTitle}>{produto.nome}</Text>
-                            <Text style={styles.calloutDescription}>{produto.descricao.substring(0,60) + "..."}</Text>
+                            <Text style={styles.calloutDescription}>{produto.descricao.substring(0, 60) + "..."}</Text>
                           </View>
                         </Callout>
                       </Marker>
@@ -393,7 +335,7 @@ export default function VisualizarProdutosServicos() {
                 style={styles.closeMapButtonOverlay}
                 onPress={() => {
                   setMostrarMapa(false);
-                  setSelectedLocation(null); // Limpa a seleção
+                  setSelectedLocation(null);
                 }}
               >
                 <Feather name="x" size={24} color="#333" />
@@ -410,9 +352,6 @@ export default function VisualizarProdutosServicos() {
 
 const styles = StyleSheet.create({
   background: { flex: 1, resizeMode: 'cover' },
-  adBanner: { height: 60, backgroundColor: 'rgba(220,220,220,0.7)', justifyContent: 'center', alignItems: 'center', overflow: 'hidden' },
-  bannerImage: { width: '100%', height: '100%' },
-  adBannerText: { fontSize: 14, fontWeight: '500', color: '#555' },
   container: { flex: 1, padding: 10 },
   input: { height: 40, borderColor: 'gray', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, marginBottom: 8, backgroundColor: 'white' },
   itemContainer: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.9)', padding: 8, marginBottom: 8, borderRadius: 8, elevation: 3, alignItems: 'center' },
@@ -422,7 +361,7 @@ const styles = StyleSheet.create({
   corpoItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 4 },
   infoEmpresaBotoes: { flexDirection: 'column', alignItems: 'center', flex: 1.8, paddingRight: 5 },
   nome: { fontSize: 14, color: '#0056b3', marginBottom: 8, textAlign: 'center', fontWeight: 'bold' },
-  botoesAcaoLinha: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', width: '100%' },
+  botoesAcaoLinha: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', width: '100%', minHeight: 22 },
   botaoEspacado: { marginRight: 8 },
   precoContainer: { flex: 1, alignItems: 'flex-end', justifyContent: 'center' },
   preco: { fontSize: 30, color: 'green', fontWeight: '600', textAlign: 'right' },
@@ -435,78 +374,33 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
   loadingText: { marginTop: 10, fontSize: 16, color: 'white' },
   mapLoadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-
-
-  // Novos estilos para o Overlay do Mapa (inspirados no LineUpScreen)
   mapOverlayContainer: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    top: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.6)', // Fundo escurecido
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000, // Para garantir que fique sobre outros elementos
+    position: 'absolute', left: 0, right: 0, top: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center',
+    alignItems: 'center', zIndex: 1000,
   },
   mapDisplayBox: {
-    width: '90%', // Largura da caixa do mapa
-    height: '70%', // Altura da caixa do mapa
-    backgroundColor: 'white',
-    borderRadius: 15,
-    overflow: 'hidden', // Necessário para o MapView respeitar o borderRadius
-    elevation: 10, // Sombra no Android
-    shadowColor: '#000', // Sombra no iOS
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
-    padding: 5, // Pequeno padding interno se necessário antes do mapa
+    width: '90%', height: '70%', backgroundColor: 'white',
+    borderRadius: 15, overflow: 'hidden', elevation: 10,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3, shadowRadius: 5, padding: 5,
   },
-  mapViewStyle: {
-    flex: 1, // Para o MapView preencher o mapDisplayBox
-    borderRadius: 10, // Para arredondar o mapa em si, se o padding acima for usado
-  },
+  mapViewStyle: { flex: 1, borderRadius: 10 },
   closeMapButtonOverlay: {
-    position: 'absolute',
-    top: 10, // Ajuste conforme necessário (dentro do padding do mapDisplayBox)
-    right: 10, // Ajuste conforme necessário
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 8,
-    borderRadius: 20, // Botão redondo
-    elevation: 12, // Para ficar sobre o mapa se houver sobreposição
-    zIndex: 10,
+    position: 'absolute', top: 10, right: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)', padding: 8,
+    borderRadius: 20, elevation: 12, zIndex: 10,
   },
-  // Callout styles (opcional, mas bom ter)
   calloutView: {
-    width: 200, // Largura do callout
-    padding: 10,
-    backgroundColor: 'white',
-    borderRadius: 8,
-    borderColor: '#ccc',
-    borderWidth: 0.5,
+    width: 200, padding: 10, backgroundColor: 'white',
+    borderRadius: 8, borderColor: '#ccc', borderWidth: 0.5,
   },
-  calloutTitle: {
-    fontWeight: 'bold',
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 3,
-  },
-  calloutDescription: {
-    fontSize: 12,
-    color: '#555',
-  },
+  calloutTitle: { fontWeight: 'bold', fontSize: 14, color: '#333', marginBottom: 3 },
+  calloutDescription: { fontSize: 12, color: '#555' },
   instagramButton: {
-    paddingVertical: 1,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 90,
-    minHeight: 20,
+    paddingVertical: 1, paddingHorizontal: 10, borderRadius: 20,
+    justifyContent: 'center', alignItems: 'center',
+    minWidth: 90, minHeight: 20,
   },
-  instagramButtonText: {
-    color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
+  instagramButtonText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
 });

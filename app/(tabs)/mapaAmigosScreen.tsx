@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, Text, StyleSheet, ActivityIndicator, ImageBackground, FlatList, TouchableOpacity, Dimensions, Linking, Platform, Image, Alert, TextInput, SafeAreaView, InteractionManager, Animated, } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, ImageBackground, FlatList, TouchableOpacity, Dimensions, Linking, Platform, Image, Alert, TextInput, SafeAreaView, InteractionManager } from 'react-native';
+// REMOVIDO: Animated
 import MapView, { Marker, Region } from 'react-native-maps';
-import { ref, onValue, get, update, set } from 'firebase/database'; // 'set' adicionado aqui
-import { auth, database, administrativoDatabase } from '../../firebaseConfig';
+import { ref, onValue, get, update, set } from 'firebase/database';
+import { auth, database } from '../../firebaseConfig';
 import * as Location from 'expo-location';
 import { LocationSubscription, PermissionStatus } from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
@@ -10,8 +11,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 import { LinearGradient } from 'expo-linear-gradient';
+import AdBanner from '../components/AdBanner';
 
-// DEFINIÇÃO DA TAREFA DE BACKGROUND (FORA DO COMPONENTE)
+// DEFINIÇÃO DA TAREFA DE BACKGROUND
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
 
 TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
@@ -25,89 +27,52 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
     const userId = auth.currentUser?.uid;
 
     if (location && userId) {
-      console.log('[Background] Localização recebida:', location.coords);
       const userLocationRef = ref(database, `localizacoes/${userId}`);
-
-      let userName = 'Usuário Desconhecido';
+      let userName = 'Usuário';
       try {
-          const userProfileRef = ref(database, `usuarios/${userId}`);
-          const userProfileSnap = await get(userProfileRef);
-          if (userProfileSnap.exists() && userProfileSnap.val().nome) {
-              userName = userProfileSnap.val().nome;
-          }
-      } catch (profileError) {
-          console.error('[Background] Erro ao buscar nome do usuário:', profileError);
-      }
+        const userProfileSnap = await get(ref(database, `usuarios/${userId}`));
+        if (userProfileSnap.exists() && userProfileSnap.val().nome) {
+            userName = userProfileSnap.val().nome;
+        }
+      } catch (e) { /* ignore */ }
 
-      const locationDataToUpdate = {
+      await update(userLocationRef, {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
         timestamp: location.timestamp,
         compartilhando: true,
         nome: userName,
-      };
-
-      try {
-        await update(userLocationRef, locationDataToUpdate);
-        console.log('[Background] Localização e status de compartilhamento atualizados no Firebase.');
-      } catch (dbError) {
-        console.error('[Background] Erro ao atualizar Firebase:', dbError);
-      }
+      }).catch(dbError => console.error('[Background] Erro ao atualizar Firebase:', dbError));
     }
   }
 });
 
 // --- Interfaces ---
-interface Localizacao {
-  latitude: number;
-  longitude: number;
-  nome: string;
-  id: string;
-}
-interface Amigo {
-  id: string;
-  nome: string;
-  telefone?: string;
-  imagem?: string;
-  instagram?: string;
-}
+interface Localizacao { latitude: number; longitude: number; nome: string; id: string; }
+interface Amigo { id: string; nome: string; telefone?: string; imagem?: string; instagram?: string; }
 interface EventoFirebase { id: string; nomeBanda: string; horaInicio: string; local: string; imagemUrl?: string; dataMomento: string; duracao: string; }
 interface LocalInfoFirebase { id: string; descricao: string; latitude: number; longitude: number; }
 interface EventoProcessado extends EventoFirebase { coordenadas: { latitude: number; longitude: number }; startTime: moment.Moment; endTime: moment.Moment; janelaStartTime: moment.Moment; janelaEndTime: moment.Moment; }
-interface BannerItem {
-  descricao: string;
-  id: string;
-  imagemUrl: string;
-  linkUrl: string;
-}
+// REMOVIDO: Interface BannerItem não é mais necessária
+// interface BannerItem { descricao: string; id: string; imagemUrl: string; linkUrl: string; }
 
 const { height: screenHeight } = Dimensions.get('window');
 
-const handleInstagramPress = async (instagramInput: string | undefined) => {
-  if (!instagramInput) return;
-
-  let instagramUsername = instagramInput.trim();
-  const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)(?:\/.*)?/;
-  const match = instagramUsername.match(instagramUrlRegex);
-
-  if (match && match[1]) {
-    instagramUsername = match[1];
-  } else if (instagramUsername.startsWith('@')) {
-    instagramUsername = instagramUsername.substring(1);
-  }
-
-  if (!instagramUsername) {
-    Alert.alert("Erro", `Formato de usuário do Instagram inválido.`);
+// --- FUNÇÃO DE ABERTURA DO INSTAGRAM (VERSÃO SIMPLIFICADA) ---
+const handleInstagramPress = async (username: string | undefined) => {
+  if (!username) {
+    Alert.alert("Instagram não informado", "Este usuário não possui um Instagram cadastrado.");
     return;
   }
-
-  const url = `https://www.instagram.com/${instagramUsername}`;
+  
+  const url = `https://www.instagram.com/${username}`;
+  
   try {
     const supported = await Linking.canOpenURL(url);
     if (supported) {
       await Linking.openURL(url);
     } else {
-      Alert.alert("Erro", `Não foi possível abrir o perfil do Instagram.`);
+      Alert.alert("Erro", `Não foi possível abrir o perfil: ${url}`);
     }
   } catch (error) {
     Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
@@ -140,6 +105,7 @@ const AmigoItem = React.memo(({ item, isSelected, amigoLocal, handleAmigoPress }
         <View style={styles.statusAndInstagramContainer}>
           {!amigoLocal && <Text style={styles.amigoOffline}>Offline</Text>}
           {item.instagram && (
+            // A chamada aqui permanece a mesma, pois a função externa foi atualizada
             <TouchableOpacity onPress={() => handleInstagramPress(item.instagram)} style={styles.instagramButtonWrapper}>
               <LinearGradient
                 colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
@@ -157,6 +123,7 @@ const AmigoItem = React.memo(({ item, isSelected, amigoLocal, handleAmigoPress }
   );
 });
 
+
 const MapaAmigosScreen = () => {
   const [compartilhando, setCompartilhando] = useState<boolean | null>(null);
   const [amigosLocalizacao, setAmigosLocalizacao] = useState<Localizacao[]>([]);
@@ -167,10 +134,7 @@ const MapaAmigosScreen = () => {
   const [amigosLista, setAmigosLista] = useState<Amigo[]>([]);
   const [selectedAmigoId, setSelectedAmigoId] = useState<string | null>(null);
   const [locationPermissionStatus, setLocationPermissionStatus] = useState<PermissionStatus | null>(null);
-  const [mapRegion, setMapRegion] = useState<Region>({
-    latitude: -7.2291, longitude: -39.4126,
-    latitudeDelta: 0.1, longitudeDelta: 0.1,
-  });
+  const [mapRegion, setMapRegion] = useState<Region>({ latitude: -7.2291, longitude: -39.4126, latitudeDelta: 0.1, longitudeDelta: 0.1 });
   const [termoBusca, setTermoBusca] = useState('');
   const [amigosListaFiltrada, setAmigosListaFiltrada] = useState<Amigo[]>([]);
   const [eventosDoDiaProcessados, setEventosDoDiaProcessados] = useState<EventoProcessado[]>([]);
@@ -195,93 +159,11 @@ const MapaAmigosScreen = () => {
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); return R * c;
   }, []);
 
-  // --- Lógica de Banners ---
-  const [allBanners, setAllBanners] = useState<string[]>([]);
-  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const fetchBanners = async () => {
-      try {
-        const sponsorsRef = ref(administrativoDatabase, 'patrocinadores');
-        const snapshot = await get(sponsorsRef);
-        if (snapshot.exists()) {
-          const sponsorsData = snapshot.val();
-          const bannersList: string[] = [];
-          for (const sponsorId in sponsorsData) {
-            const sponsor = sponsorsData[sponsorId];
-            if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
-              const sponsorBannersArray: BannerItem[] = sponsor.banners;
-              sponsorBannersArray.forEach(bannerObject => {
-                if (typeof bannerObject === 'object' && bannerObject !== null && typeof bannerObject.imagemUrl === 'string') {
-                  bannersList.push(bannerObject.imagemUrl);
-                }
-              });
-            }
-          }
-          if (bannersList.length > 0) {
-            setAllBanners(bannersList);
-            setCurrentBannerUrl(bannersList[0]);
-            setCurrentBannerIndex(0);
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 200,
-              useNativeDriver: true,
-            }).start();
-          } else {
-            setCurrentBannerUrl(null);
-            fadeAnim.setValue(0);
-          }
-        } else {
-          setCurrentBannerUrl(null);
-          fadeAnim.setValue(0);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar banners dos patrocinadores:', error);
-        Alert.alert("Erro", "Não foi possível carregar os banners dos patrocinadores.");
-        setCurrentBannerUrl(null);
-        fadeAnim.setValue(0);
-      }
-    };
-    fetchBanners();
-  }, [fadeAnim]);
-
-  useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-    if (allBanners.length > 1) {
-      intervalId = setInterval(() => {
-        Animated.timing(fadeAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }).start(() => {
-          setCurrentBannerIndex(prevIndex => {
-            const nextIndex = (prevIndex + 1) % allBanners.length;
-            setCurrentBannerUrl(allBanners[nextIndex]);
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 200,
-              useNativeDriver: true,
-            }).start();
-            return nextIndex;
-          });
-        });
-      }, 6000);
-    }
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [allBanners, fadeAnim]);
-
   useEffect(() => {
     const intervalId = setInterval(() => { setCurrentTimeTick(prev => prev + 1); }, 60000);
     return () => clearInterval(intervalId);
   }, []);
 
-  // Lógica de solicitação de permissão e status de compartilhamento
   useEffect(() => {
     if (!usuarioLogadoId) {
       setLoadingStatus(false);
@@ -289,61 +171,27 @@ const MapaAmigosScreen = () => {
       setLocationPermissionStatus(null);
       return;
     }
-
     let isMounted = true;
     setLoadingStatus(true);
-
     const statusRef = ref(database, `usuarios/${usuarioLogadoId}/compartilhando`);
     const unsubscribeStatus = onValue(statusRef, (snapshot) => {
       if (isMounted) {
-        const isSharing = snapshot.val() === true;
-        setCompartilhando(isSharing);
+        setCompartilhando(snapshot.val() === true);
       }
     });
-
     const requestPermissions = async () => {
       const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-
       if (isMounted) {
         setLocationPermissionStatus(foregroundStatus);
-
         if (foregroundStatus === 'granted') {
-          const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-          
-          // --- NOVA LÓGICA: Salvar compartilhando: true ao conceder permissões ---
-          // Se ambas as permissões (foreground e background) foram concedidas,
-          // ou se pelo menos a foreground foi concedida e estamos no iOS (onde background é mais flexível)
-          // E se o usuário ainda não está marcado como compartilhando no nosso estado local
-          // Isso garante que o 'compartilhando' seja ativado automaticamente na primeira vez que o usuário permite
-          if ((backgroundStatus === 'granted' || Platform.OS === 'ios') && compartilhando !== true) {
-              try {
-                  await set(statusRef, true); // Salva 'compartilhando: true' no Firebase
-                  console.log('Status de compartilhamento definido como TRUE no Firebase após permissão.');
-              } catch (dbError) {
-                  console.error('Erro ao salvar status de compartilhamento após permissão:', dbError);
-              }
-          }
-          // --- FIM DA NOVA LÓGICA ---
-
-          if (backgroundStatus !== 'granted') {
-            Alert.alert(
-              "Permissão Adicional Necessária",
-              "Para uma melhor experiência e para que seus amigos o encontrem mesmo com o app fechado, por favor, escolha a opção 'Permitir o tempo todo' para a localização.",
-              [{ text: "Entendi" }]
-            );
-          }
+          await Location.requestBackgroundPermissionsAsync();
         }
         setLoadingStatus(false);
       }
     };
-
     requestPermissions();
-
-    return () => {
-      isMounted = false;
-      unsubscribeStatus();
-    };
-  }, [usuarioLogadoId, compartilhando]); // 'compartilhando' adicionado como dependência para reavaliação
+    return () => { isMounted = false; unsubscribeStatus(); };
+  }, [usuarioLogadoId]);
 
   useEffect(() => {
     if (!usuarioLogadoId) { setAmigosLista([]); return; }
@@ -375,8 +223,8 @@ const MapaAmigosScreen = () => {
   const carregarDadosDoDia = useCallback(async () => {
     if (!usuarioLogadoId) { setLoadingEventos(false); return;}
     setLoadingEventos(true);
-    const locaisRef = ref(administrativoDatabase, "locais");
-    const lineupRef = ref(administrativoDatabase, "lineup");
+    const locaisRef = ref(database, "locais");
+    const lineupRef = ref(database, "lineup");
     try {
       const [locaisSnapshot, lineupSnapshot] = await Promise.all([get(locaisRef), get(lineupRef)]);
       const todosLocais: LocalInfoFirebase[] = [];
@@ -385,7 +233,7 @@ const MapaAmigosScreen = () => {
       }
       const todosEventos: EventoFirebase[] = [];
       if (lineupSnapshot.exists()) {
-        lineupSnapshot.forEach(child => { todosEventos.push({ id: child.key!, ...child.val() }); }); // CORRIGIDO AQUI
+        lineupSnapshot.forEach(child => { todosEventos.push({ id: child.key!, ...child.val() }); });
       }
       const hojeFormatado = moment().format('DD/MM/YYYY');
       const eventosDeHojeFiltrados = todosEventos
@@ -396,19 +244,12 @@ const MapaAmigosScreen = () => {
             const startTime = moment(`${evento.dataMomento} ${evento.horaInicio}`, 'DD/MM/YYYY HH:mm');
             const duracao = parseDuracao(evento.duracao);
             const endTime = startTime.clone().add(duracao);
-            return {
-              ...evento,
-              coordenadas: { latitude: localInfo.latitude, longitude: localInfo.longitude },
-              startTime, endTime,
-              janelaStartTime: startTime.clone().subtract(1, 'hour'),
-              janelaEndTime: endTime.clone().add(1, 'hour'),
-            };
+            return { ...evento, coordenadas: { latitude: localInfo.latitude, longitude: localInfo.longitude }, startTime, endTime, janelaStartTime: startTime.clone().subtract(1, 'hour'), janelaEndTime: endTime.clone().add(1, 'hour') };
           }
           return null;
         }).filter(Boolean) as EventoProcessado[];
       setEventosDoDiaProcessados(eventosDeHojeFiltrados.sort((a,b) => a.startTime.diff(b.startTime)));
     } catch (error) {
-      console.error("Erro ao carregar dados de eventos/locais:", error);
       setEventosDoDiaProcessados([]);
     } finally {
       setLoadingEventos(false);
@@ -422,30 +263,19 @@ const MapaAmigosScreen = () => {
         setTermoBusca('');
         carregarDadosDoDia();
       });
-      return () => {
-        task.cancel();
-      };
+      return () => task.cancel();
     }, [usuarioLogadoId, carregarDadosDoDia])
   );
 
   useEffect(() => {
-    if (loadingStatus || loadingEventos) {
-      setPodeRastrearAmigos(false);
-      return;
-    }
-    if (!compartilhando || !minhaLocalizacao || eventosDoDiaProcessados.length === 0) {
-      setPodeRastrearAmigos(false);
-      return;
-    }
+    if (loadingStatus || loadingEventos) { setPodeRastrearAmigos(false); return; }
+    if (!compartilhando || !minhaLocalizacao || eventosDoDiaProcessados.length === 0) { setPodeRastrearAmigos(false); return; }
     const agora = moment();
     let condicaoAtendidaParaAlgumEvento = false;
     for (const evento of eventosDoDiaProcessados) {
       if (agora.isBetween(evento.janelaStartTime, evento.janelaEndTime)) {
         if (evento.coordenadas) {
-          const distancia = calcularDistancia(
-            minhaLocalizacao.latitude, minhaLocalizacao.longitude,
-            evento.coordenadas.latitude, evento.coordenadas.longitude
-          );
+          const distancia = calcularDistancia(minhaLocalizacao.latitude, minhaLocalizacao.longitude, evento.coordenadas.latitude, evento.coordenadas.longitude);
           if (distancia <= 3) {
             condicaoAtendidaParaAlgumEvento = true;
             break;
@@ -457,11 +287,7 @@ const MapaAmigosScreen = () => {
   }, [compartilhando, minhaLocalizacao, eventosDoDiaProcessados, currentTimeTick, loadingStatus, loadingEventos, calcularDistancia]);
 
   useEffect(() => {
-    if (!usuarioLogadoId || !podeRastrearAmigos) {
-      setAmigosLocalizacao([]);
-      setLoadingAmigosLoc(false);
-      return () => {};
-    }
+    if (!usuarioLogadoId || !podeRastrearAmigos) { setAmigosLocalizacao([]); setLoadingAmigosLoc(false); return () => {}; }
     setLoadingAmigosLoc(true);
     const amigosRef = ref(database, `amigos/${usuarioLogadoId}`);
     let activeLocationListeners: (() => void)[] = [];
@@ -470,11 +296,7 @@ const MapaAmigosScreen = () => {
       activeLocationListeners = [];
       const amigosData = snapshotAmigos.val();
       const amigosIdsConfirmados = amigosData ? Object.keys(amigosData).filter(key => amigosData[key] === 'aceito') : [];
-      if (amigosIdsConfirmados.length === 0) {
-        setAmigosLocalizacao([]);
-        setLoadingAmigosLoc(false);
-        return;
-      }
+      if (amigosIdsConfirmados.length === 0) { setAmigosLocalizacao([]); setLoadingAmigosLoc(false); return; }
       let initialLocations: Localizacao[] = [];
       const initialLoadPromises = amigosIdsConfirmados.map(amigoId => {
         const locRef = ref(database, `localizacoes/${amigoId}`);
@@ -509,20 +331,26 @@ const MapaAmigosScreen = () => {
     return () => { unsubscribePrincipal(); activeLocationListeners.forEach(unsub => unsub()); };
   }, [usuarioLogadoId, podeRastrearAmigos]);
 
-
-  // useEffect para GERENCIAR A TAREFA DE BACKGROUND
   useEffect(() => {
     const manageBackgroundTask = async () => {
         if (!usuarioLogadoId || compartilhando === null) return;
-
         const isTaskRunning = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
-
         try {
-            if (compartilhando && !isTaskRunning) {
+            if (compartilhando) {
+                if (isTaskRunning) return;
+                const { status } = await Location.getBackgroundPermissionsAsync();
+                if (status !== 'granted') {
+                    console.log('Permissão de background não concedida. A tarefa não será iniciada.');
+                    Alert.alert(
+                        "Função Limitada",
+                        "O compartilhamento em segundo plano não pode ser iniciado porque a permissão 'Permitir o tempo todo' não foi concedida."
+                    );
+                    return;
+                }
                 await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
                     accuracy: Location.Accuracy.High,
-                    timeInterval: 60000, // 1 minuto
-                    distanceInterval: 50, // 50 metros
+                    timeInterval: 60000,
+                    distanceInterval: 50,
                     showsBackgroundLocationIndicator: true,
                     foregroundService: {
                         notificationTitle: 'Compartilhamento Ativo',
@@ -530,60 +358,34 @@ const MapaAmigosScreen = () => {
                         notificationColor: '#007BFF',
                     },
                 });
-                console.log('Tarefa de localização em background iniciada.');
             } else if (!compartilhando && isTaskRunning) {
                 await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
-                console.log('Tarefa de localização em background parada.');
                 if (usuarioLogadoId) {
-                    await update(ref(database, `localizacoes/${usuarioLogadoId}`), {
-                        compartilhando: false,
-                        latitude: null,
-                        longitude: null,
-                        timestamp: null
-                    }).catch(err => console.error("Erro ao desativar compartilhamento no Firebase:", err));
+                    await update(ref(database, `localizacoes/${usuarioLogadoId}`), { compartilhando: false });
                 }
             }
         } catch (error) {
             console.error("Erro ao gerenciar a tarefa de background:", error);
         }
     };
-
     manageBackgroundTask();
   }, [compartilhando, usuarioLogadoId]);
 
-
-  // useEffect de RASTREAMENTO EM PRIMEIRO PLANO (para UI)
   useEffect(() => {
     const manageForegroundTracking = async () => {
-      if (locationSubscriptionRef.current) {
-        locationSubscriptionRef.current.remove();
-        locationSubscriptionRef.current = null;
-      }
-
-      if (compartilhando !== true || locationPermissionStatus !== PermissionStatus.GRANTED) {
-        setMinhaLocalizacao(null);
-        return;
-      }
-
+      if (locationSubscriptionRef.current) { locationSubscriptionRef.current.remove(); locationSubscriptionRef.current = null; }
+      if (compartilhando !== true || locationPermissionStatus !== PermissionStatus.GRANTED) { setMinhaLocalizacao(null); return; }
       try {
         locationSubscriptionRef.current = await Location.watchPositionAsync(
           { accuracy: Location.Accuracy.High, timeInterval: 10000, distanceInterval: 20 },
           (location) => {
             if (!usuarioLogadoId) return;
-
-            const newMinhaLocalizacao: Localizacao = {
-              id: usuarioLogadoId,
-              nome: 'Você',
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-            };
+            const newMinhaLocalizacao: Localizacao = { id: usuarioLogadoId, nome: 'Você', latitude: location.coords.latitude, longitude: location.coords.longitude };
             setMinhaLocalizacao(newMinhaLocalizacao);
-
             if (!selectedAmigoId) {
               const isInitialRegion = mapRegion.latitude === -7.2291;
               setMapRegion(prevRegion => ({
-                latitude: newMinhaLocalizacao.latitude,
-                longitude: newMinhaLocalizacao.longitude,
+                latitude: newMinhaLocalizacao.latitude, longitude: newMinhaLocalizacao.longitude,
                 latitudeDelta: isInitialRegion ? 0.02 : (prevRegion?.latitudeDelta || 0.02),
                 longitudeDelta: isInitialRegion ? 0.02 : (prevRegion?.longitudeDelta || 0.02),
               }));
@@ -591,39 +393,24 @@ const MapaAmigosScreen = () => {
           }
         );
       } catch (error) {
-        console.error("Erro ao iniciar watchPositionAsync (foreground):", error);
-        Alert.alert("Erro de Localização", "Não foi possível obter sua localização em tempo real.");
         setMinhaLocalizacao(null);
       }
     };
-
     manageForegroundTracking();
-
-    return () => {
-      if (locationSubscriptionRef.current) {
-        locationSubscriptionRef.current.remove();
-        locationSubscriptionRef.current = null;
-      }
-    };
+    return () => { if (locationSubscriptionRef.current) { locationSubscriptionRef.current.remove(); locationSubscriptionRef.current = null; } };
   }, [compartilhando, usuarioLogadoId, locationPermissionStatus, selectedAmigoId]);
 
   const handleBuscaAmigos = (texto: string) => { setTermoBusca(texto); };
 
-  const handleAmigoPress = (amigoId: string, amigoLocal: Localizacao | undefined) => {
+  const handleAmigoPressInternal = (amigoId: string, amigoLocal: Localizacao | undefined) => {
     if (amigoLocal) {
       setSelectedAmigoId(amigoId);
-      setMapRegion({
-        latitude: amigoLocal.latitude, longitude: amigoLocal.longitude,
-        latitudeDelta: 0.01, longitudeDelta: 0.01,
-      });
+      setMapRegion({ latitude: amigoLocal.latitude, longitude: amigoLocal.longitude, latitudeDelta: 0.01, longitudeDelta: 0.01 });
     } else {
       setSelectedAmigoId(amigoId);
       Alert.alert("Amigo Offline", "Este amigo não está compartilhando a localização no momento.");
       if (minhaLocalizacao) {
-        setMapRegion({
-          latitude: minhaLocalizacao.latitude, longitude: minhaLocalizacao.longitude,
-          latitudeDelta: 0.02, longitudeDelta: 0.02,
-        });
+        setMapRegion({ latitude: minhaLocalizacao.latitude, longitude: minhaLocalizacao.longitude, latitudeDelta: 0.02, longitudeDelta: 0.02 });
       }
     }
   };
@@ -633,12 +420,11 @@ const MapaAmigosScreen = () => {
   const renderAmigoItem = ({ item }: { item: Amigo }) => {
     const isSelected = item.id === selectedAmigoId;
     const amigoLocal = amigosLocalizacao.find(loc => loc.id === item.id);
-    return ( <AmigoItem item={item} isSelected={isSelected} amigoLocal={amigoLocal} handleAmigoPress={handleAmigoPress}/> );
+    return ( <AmigoItem item={item} isSelected={isSelected} amigoLocal={amigoLocal} handleAmigoPress={handleAmigoPressInternal}/> );
   };
 
   const isLoadingGeral = loadingStatus || loadingEventos;
 
-  // --- Renderização ---
   if (isLoadingGeral && usuarioLogadoId) {
     return (
         <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
@@ -658,7 +444,7 @@ const MapaAmigosScreen = () => {
         <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
             <View style={styles.center}>
                 <Text style={styles.warningText}>A permissão de localização é essencial para o mapa de amigos.</Text>
-                <Text style={styles.subWarningText}>Por favor, habilite o acesso nas configurações do seu dispositivo. Compartilhar sua localização permite que você veja seus amigos e que eles também o encontrem.</Text>
+                <Text style={styles.subWarningText}>Por favor, habilite o acesso nas configurações do seu dispositivo.</Text>
                 <TouchableOpacity style={styles.settingsButton} onPress={openSettings}><Text style={styles.settingsButtonText}>Ir para Configurações</Text></TouchableOpacity>
             </View>
         </ImageBackground>
@@ -668,8 +454,8 @@ const MapaAmigosScreen = () => {
     return (
         <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
             <View style={styles.center}>
-                <Text style={styles.warningText}>Para visualizar a localização dos seus amigos e permitir que eles o vejam, ative o compartilhamento da sua localização.</Text>
-                <Text style={styles.subWarningText}>Você pode ativar o compartilhamento no seu perfil ou nas configurações do app. Manter o compartilhamento ativo, mesmo com o app em segundo plano, garante uma melhor experiência para todos.</Text>
+                <Text style={styles.warningText}>Para visualizar a localização dos seus amigos, ative o compartilhamento da sua localização.</Text>
+                <Text style={styles.subWarningText}>Você pode ativar o compartilhamento no seu perfil ou nas configurações do app.</Text>
             </View>
         </ImageBackground>
     );
@@ -684,69 +470,55 @@ const MapaAmigosScreen = () => {
 
   return (
     <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
-      <View style={styles.adBanner}>
-          {currentBannerUrl ? (
-            <Animated.Image
-              source={{ uri: currentBannerUrl }}
-              style={[
-                styles.bannerImage,
-                { opacity: fadeAnim }
-              ]}
-              resizeMode="contain"
-              onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
+        <AdBanner />
+        <SafeAreaView style={styles.container}>
+            <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar amigos na lista..."
+                value={termoBusca}
+                onChangeText={handleBuscaAmigos}
+                placeholderTextColor="#888"
             />
-          ) : (
-            <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
-          )}
-      </View>
-      <SafeAreaView style={styles.container}>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Buscar amigos na lista..."
-          value={termoBusca}
-          onChangeText={handleBuscaAmigos}
-          placeholderTextColor="#888"
-        />
-        {amigosLista.length > 0 ? (
-          <View style={styles.amigosListContainer}>
-            <FlatList
-              data={amigosListaFiltrada}
-              keyExtractor={(item) => item.id}
-              renderItem={renderAmigoItem}
-              contentContainerStyle={styles.amigosListContent}
-            />
-          </View>
-        ) : (
-          !loadingEventos && (
-            <View style={[styles.semAmigosContainer, styles.semAmigosVertical]}>
-                <Text style={styles.semAmigosText}>Você ainda não tem amigos.</Text>
-                <Text style={styles.semAmigosSubText}>Adicione amigos para vê-los no mapa!</Text>
-            </View>
-          )
-        )}
-        <View style={styles.mapContainer}>
-          <MapView style={styles.map} region={mapRegion} showsUserLocation={false} >
-            {minhaLocalizacao && (
-              <Marker coordinate={minhaLocalizacao} title={minhaLocalizacao.nome} zIndex={1} >
-                <View style={styles.myLocationMarker}><Text style={styles.myLocationMarkerText}>EU</Text></View>
-              </Marker>
+            {amigosLista.length > 0 ? (
+                <View style={styles.amigosListContainer}>
+                    <FlatList
+                        data={amigosListaFiltrada}
+                        keyExtractor={(item) => item.id}
+                        renderItem={renderAmigoItem}
+                        contentContainerStyle={styles.amigosListContent}
+                    />
+                </View>
+            ) : (
+                !loadingEventos && (
+                    <View style={[styles.semAmigosContainer, styles.semAmigosVertical]}>
+                        <Text style={styles.semAmigosText}>Você ainda não tem amigos.</Text>
+                        <Text style={styles.semAmigosSubText}>Adicione amigos para vê-los no mapa!</Text>
+                    </View>
+                )
             )}
-            {podeRastrearAmigos && amigosLocalizacao.map((amigo) => {
-                const amigoInfo = amigosLista.find(a => a.id === amigo.id);
-                return (
-                  <Marker key={amigo.id} coordinate={amigo} title={amigo.nome} >
-                      {amigoInfo?.imagem ? ( <Image source={{uri: amigoInfo.imagem}} style={[styles.markerImage, selectedAmigoId === amigo.id && styles.markerImageSelected]} />
-                      ) : ( <View style={[styles.markerPlaceholder, selectedAmigoId === amigo.id && styles.markerPlaceholderSelected]}><Text style={styles.markerInitial}>{amigo.nome ? amigo.nome.charAt(0).toUpperCase() : '?'}</Text></View>
-                      )}
-                  </Marker>
-                );
-            })}
-          </MapView>
-          {!podeRastrearAmigos && compartilhando && locationPermissionStatus === PermissionStatus.GRANTED && !loadingEventos && (
-            <View style={styles.infoOverlay}><Text style={styles.infoOverlayText}>{eventosDoDiaProcessados.length > 0 ? "O mapa de amigos é ativado automaticamente quando você estiver próximo (até 3km) de um evento do dia e dentro da janela de tempo do evento (1h antes do início até 1h após o fim)." : "Não há eventos programados para hoje. O mapa de amigos será ativado próximo aos horários e locais dos eventos quando houver."}</Text></View>
-          )}
-        </View>
-      </SafeAreaView>
+            <View style={styles.mapContainer}>
+                <MapView style={styles.map} region={mapRegion} showsUserLocation={false} >
+                    {minhaLocalizacao && (
+                        <Marker coordinate={minhaLocalizacao} title={minhaLocalizacao.nome} zIndex={1} >
+                            <View style={styles.myLocationMarker}><Text style={styles.myLocationMarkerText}>EU</Text></View>
+                        </Marker>
+                    )}
+                    {podeRastrearAmigos && amigosLocalizacao.map((amigo) => {
+                        const amigoInfo = amigosLista.find(a => a.id === amigo.id);
+                        return (
+                            <Marker key={amigo.id} coordinate={amigo} title={amigo.nome} >
+                                {amigoInfo?.imagem ? ( <Image source={{uri: amigoInfo.imagem}} style={[styles.markerImage, selectedAmigoId === amigo.id && styles.markerImageSelected]} />
+                                ) : ( <View style={[styles.markerPlaceholder, selectedAmigoId === amigo.id && styles.markerPlaceholderSelected]}><Text style={styles.markerInitial}>{amigo.nome ? amigo.nome.charAt(0).toUpperCase() : '?'}</Text></View>
+                                )}
+                            </Marker>
+                        );
+                    })}
+                </MapView>
+                {!podeRastrearAmigos && compartilhando && locationPermissionStatus === PermissionStatus.GRANTED && !loadingEventos && (
+                    <View style={styles.infoOverlay}><Text style={styles.infoOverlayText}>{eventosDoDiaProcessados.length > 0 ? "O mapa de amigos é ativado automaticamente quando você estiver próximo (até 3km) de um evento do dia e dentro da janela de tempo do evento (1h antes do início até 1h após o fim)." : "Não há eventos programados para hoje. O mapa de amigos será ativado próximo aos horários e locais dos eventos quando houver."}</Text></View>
+                )}
+            </View>
+        </SafeAreaView>
     </ImageBackground>
   );
 };
@@ -754,22 +526,6 @@ const MapaAmigosScreen = () => {
 // Estilos
 const styles = StyleSheet.create({
   background: { flex: 1, resizeMode: 'cover' },
-  adBanner: {
-    height: 60,
-    backgroundColor: 'rgba(220,220,220,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  adBannerText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#555',
-  },
   container: { flex: 1 },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 24, backgroundColor: 'rgba(0,0,0,0.5)' },
   loadingText: { marginTop: 15, fontSize: 16, color: '#FFFFFF', textAlign: 'center' },
@@ -777,102 +533,21 @@ const styles = StyleSheet.create({
   subWarningText: { fontSize: 15, textAlign: 'center', color: '#f0f0f0', marginBottom: 25, lineHeight: 22 },
   settingsButton: { backgroundColor: '#007BFF', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 25 },
   settingsButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-  searchInput: {
-    height: 45,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    fontSize: 16,
-    marginHorizontal: 10,
-    marginTop: Platform.OS === 'ios' ? 10 : 10,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: '#E0E0E0'
-  },
-  amigosListContainer: {
-    maxHeight: screenHeight * 0.35,
-    marginHorizontal: 10,
-    marginBottom: 10,
-  },
-  amigosListContent: {
-    paddingVertical: 5,
-  },
-  amigoItem: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
-    padding: 10,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginBottom: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1.5,
-  },
-  amigoItemSelected: {
-    backgroundColor: '#E3F2FD',
-    borderColor: '#007BFF',
-    borderWidth: 2,
-  },
-  amigoFoto: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    marginRight: 12,
-  },
-  amigoFotoPlaceholder: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#BDBDBD',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 12,
-  },
+  searchInput: { height: 45, backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: 10, paddingHorizontal: 15, fontSize: 16, marginHorizontal: 10, marginTop: Platform.OS === 'ios' ? 10 : 10, marginBottom: 10, borderWidth: 1, borderColor: '#E0E0E0' },
+  amigosListContainer: { maxHeight: screenHeight * 0.35, marginHorizontal: 10, marginBottom: 10 },
+  amigosListContent: { paddingVertical: 5 },
+  amigoItem: { flexDirection: 'row', backgroundColor: 'rgba(255, 255, 255, 0.98)', padding: 10, borderRadius: 10, alignItems: 'center', marginBottom: 10, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 1.5 },
+  amigoItemSelected: { backgroundColor: '#E3F2FD', borderColor: '#007BFF', borderWidth: 2 },
+  amigoFoto: { width: 50, height: 50, borderRadius: 25, marginRight: 12 },
+  amigoFotoPlaceholder: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#BDBDBD', justifyContent: 'center', alignItems: 'center', marginRight: 12 },
   amigoFotoPlaceholderText: { fontSize: 22, color: '#FFFFFF', fontWeight: 'bold' },
-  amigoInfo: {
-    flex: 1,
-    alignItems: 'flex-start',
-  },
-  amigoNome: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    textAlign: 'left',
-  },
-  amigoTelefone: {
-    fontSize: 12, color: '#666', marginBottom: 2, textAlign: 'left'
-  },
-  amigoOffline: {
-    fontSize: 12,
-    color: '#D32F2F',
-    fontStyle: 'italic',
-    textAlign: 'left',
-    marginTop: 3,
-  },
-  mapContainer: {
-    flex: 1,
-    marginHorizontal: 10,
-    marginBottom: 10,
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#BDBDBD'
-  },
+  amigoInfo: { flex: 1, alignItems: 'flex-start' },
+  amigoNome: { fontSize: 14, fontWeight: '600', color: '#333', textAlign: 'left' },
+  amigoOffline: { fontSize: 12, color: '#D32F2F', fontStyle: 'italic', textAlign: 'left', marginTop: 3 },
+  mapContainer: { flex: 1, marginHorizontal: 10, marginBottom: 10, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#BDBDBD' },
   map: { flex: 1 },
-  semAmigosContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 10,
-    borderRadius: 10,
-  },
-  semAmigosVertical: {
-    minHeight: 100,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 20,
-    marginBottom: 10,
-  },
+  semAmigosContainer: { alignItems: 'center', justifyContent: 'center', marginHorizontal: 10, borderRadius: 10 },
+  semAmigosVertical: { minHeight: 100, backgroundColor: 'rgba(255, 255, 255, 0.9)', padding: 20, marginBottom: 10 },
   semAmigosText: { fontSize: 16, color: '#000', textAlign: 'center', marginBottom: 8 },
   semAmigosSubText: { fontSize: 14, color: '#000', textAlign: 'center' },
   myLocationMarker: { backgroundColor: '#007BFF', padding: 6, borderRadius: 15, width: 30, height: 30, justifyContent: 'center', alignItems: 'center', borderColor: 'white', borderWidth: 1.5 },
@@ -883,30 +558,11 @@ const styles = StyleSheet.create({
   markerPlaceholderSelected: { backgroundColor: '#FFC107', borderColor: 'white', transform: [{scale: 1.2}] },
   markerInitial: { color: 'white', fontSize: 18, fontWeight: 'bold' },
   infoOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.75)', paddingVertical: 12, paddingHorizontal: 15, alignItems: 'center', zIndex: 10 },
-  instagramButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minWidth: 90,
-  },
-  instagramButtonText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: 'bold',
-  },
+  instagramButton: { paddingVertical: 4, paddingHorizontal: 10, borderRadius: 20, justifyContent: 'center', alignItems: 'center', minWidth: 90 },
+  instagramButtonText: { color: '#FFFFFF', fontSize: 11, fontWeight: 'bold' },
   infoOverlayText: { color: 'white', textAlign: 'center', fontSize: 14, lineHeight: 20 },
-  statusAndInstagramContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-end',
-    width: '100%',
-    marginTop: 4,
-  },
-  instagramButtonWrapper: {
-    marginLeft: 'auto',
-  },
+  statusAndInstagramContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end', width: '100%', marginTop: 4 },
+  instagramButtonWrapper: { marginLeft: 'auto' },
 });
 
 export default MapaAmigosScreen;
