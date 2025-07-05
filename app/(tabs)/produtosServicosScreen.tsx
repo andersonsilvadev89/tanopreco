@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,14 +11,15 @@ import {
   ImageBackground,
   Linking,
   Alert,
-} from 'react-native';
-import { Feather } from '@expo/vector-icons';
-import { database } from '../../firebaseConfig'; 
-import { ref, onValue, get } from 'firebase/database';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useFocusEffect } from '@react-navigation/native';
-import MapView, { Marker, Callout } from 'react-native-maps';
-import AdBanner from '../components/AdBanner'; 
+} from "react-native";
+import { Feather } from "@expo/vector-icons";
+import { database } from "../../firebaseConfig";
+import { ref, onValue, get } from "firebase/database";
+import { LinearGradient } from "expo-linear-gradient";
+import { useFocusEffect } from "@react-navigation/native";
+import MapView, { Marker, Callout } from "react-native-maps";
+import AdBanner from "../components/AdBanner";
+import * as Location from "expo-location"; // Importa a biblioteca de localização
 
 interface ProdutoComEmpresa {
   id: string;
@@ -56,8 +57,8 @@ export default function VisualizarProdutosServicos() {
     latitudeDelta: number;
     longitudeDelta: number;
   }>({
-    latitude: -7.2345,
-    longitude: -39.4056,
+    latitude: -7.2345, // Coordenadas padrão para Barbalha, Ceará
+    longitude: -39.4056, // Coordenadas padrão para Barbalha, Ceará
     latitudeDelta: 0.0922,
     longitudeDelta: 0.0421,
   });
@@ -70,9 +71,11 @@ export default function VisualizarProdutosServicos() {
   } | null>(null);
   const [empresas, setEmpresas] = useState<{ [key: string]: EmpresaData }>({});
   const [mostrarMapa, setMostrarMapa] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null); // Estado para a localização do usuário
+  const [gettingUserLocation, setGettingUserLocation] = useState(false); // Estado para indicar se está obtendo a localização do usuário
 
   useEffect(() => {
-    const empresasRef = ref(database, 'solicitacoesEmpresas'); 
+    const empresasRef = ref(database, 'solicitacoesEmpresas');
     const unsubscribeEmpresas = onValue(empresasRef, (snapshot) => {
       const data: { [key: string]: EmpresaData } = snapshot.val() || {};
       setEmpresas(data);
@@ -82,62 +85,86 @@ export default function VisualizarProdutosServicos() {
 
   const fetchInitialData = useCallback(async () => {
     if (Object.keys(empresas).length === 0) {
-        setLoadingInicial(true);
-        return;
+      setLoadingInicial(true);
+      return;
     }
-    
+
     setLoadingInicial(true);
     const produtosRef = ref(database, 'produtos');
     const snapshot = await get(produtosRef);
-    
+
     const data: ProdutoComEmpresa[] = [];
     if (snapshot.exists()) {
-        const promises: Promise<void>[] = [];
-        snapshot.forEach((userSnapshot) => {
-            const empresaId = userSnapshot.key!;
-            userSnapshot.forEach((produtoSnapshot) => {
-                const promise = (async () => {
-                    const produto = produtoSnapshot.val();
-                    let empresaInfo = empresas[empresaId];
-                    
-                    if (empresaInfo) {
-                        // Se a localização não estiver nos dados da empresa, busca no nó 'localizacoes'
-                        if (!empresaInfo.localizacao) {
-                            const locRef = ref(database, `localizacoes/${empresaId}`);
-                            const locSnapshot = await get(locRef);
-                            if (locSnapshot.exists()) {
-                                const locData = locSnapshot.val();
-                                empresaInfo.localizacao = {
-                                    latitude: locData.latitude,
-                                    longitude: locData.longitude
-                                };
-                            }
-                        }
+      const promises: Promise<void>[] = [];
+      snapshot.forEach((userSnapshot) => {
+        const empresaId = userSnapshot.key!;
+        userSnapshot.forEach((produtoSnapshot) => {
+          const promise = (async () => {
+            const produto = produtoSnapshot.val();
+            let empresaInfo = empresas[empresaId];
 
-                        data.push({
-                            id: produtoSnapshot.key!,
-                            ...produto,
-                            empresaId,
-                            nome: empresaInfo.nomeEmpresa, 
-                            localizacao: empresaInfo.localizacao,
-                            linkInstagram: empresaInfo.linkInstagram,
-                        });
-                    }
-                })();
-                promises.push(promise);
-            });
+            if (empresaInfo) {
+              // Se a localização não estiver nos dados da empresa, busca no nó 'localizacoes'
+              if (!empresaInfo.localizacao) {
+                const locRef = ref(database, `localizacoes/${empresaId}`);
+                const locSnapshot = await get(locRef);
+                if (locSnapshot.exists()) {
+                  const locData = locSnapshot.val();
+                  empresaInfo.localizacao = {
+                    latitude: locData.latitude,
+                    longitude: locData.longitude
+                  };
+                }
+              }
+
+              data.push({
+                id: produtoSnapshot.key!,
+                ...produto,
+                empresaId,
+                nome: empresaInfo.nomeEmpresa,
+                localizacao: empresaInfo.localizacao,
+                linkInstagram: empresaInfo.linkInstagram,
+              });
+            }
+          })();
+          promises.push(promise);
         });
-        await Promise.all(promises);
+      });
+      await Promise.all(promises);
     }
-    
+
     setProdutosComEmpresa(data.sort((a, b) => a.nome.localeCompare(b.nome)));
     setLoadingInicial(false);
-
   }, [empresas]);
+
+  // Função para obter a localização atual do usuário
+  const getUserCurrentLocation = async () => {
+    setGettingUserLocation(true);
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão de Localização', 'Precisamos da sua permissão para mostrar sua localização no mapa.');
+      setGettingUserLocation(false);
+      return;
+    }
+
+    try {
+      let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+    } catch (error) {
+      console.error("Erro ao obter localização do usuário:", error);
+      Alert.alert("Erro de Localização", "Não foi possível obter sua localização atual.");
+    } finally {
+      setGettingUserLocation(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
-        fetchInitialData();
+      fetchInitialData();
+      getUserCurrentLocation(); // Chama a função para obter a localização do usuário ao focar na tela
     }, [fetchInitialData])
   );
 
@@ -195,6 +222,7 @@ export default function VisualizarProdutosServicos() {
         empresaId: produto.empresaId,
         produtoId: produto.id,
       });
+      // Centraliza o mapa na localização do produto selecionado
       setMapRegion({
         latitude: produto.localizacao.latitude,
         longitude: produto.localizacao.longitude,
@@ -225,12 +253,15 @@ export default function VisualizarProdutosServicos() {
     }
   };
 
-  if (loadingInicial) {
+  if (loadingInicial || gettingUserLocation) { // Adiciona gettingUserLocation ao carregamento inicial
     return (
       <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FFFFFF" />
           <Text style={styles.loadingText}>Carregando...</Text>
+          {gettingUserLocation && (
+            <Text style={styles.loadingText}>Obtendo sua localização...</Text>
+          )}
         </View>
       </ImageBackground>
     );
@@ -292,10 +323,31 @@ export default function VisualizarProdutosServicos() {
             <View style={styles.mapDisplayBox}>
               {mapRegion ? (
                 <MapView style={styles.mapViewStyle} region={mapRegion}>
-                  {selectedLocation && (
+                  {userLocation && ( // Marcador para a localização do usuário com estilo "EU"
+                    <Marker
+                      coordinate={userLocation}
+                      // Removido pinColor daqui, pois o estilo personalizado já define a cor
+                      zIndex={2} // ZIndex maior para ficar por cima dos outros
+                    >
+                      {/* Aplicando o mesmo estilo do MapaAmigosScreen */}
+                      <View style={styles.myLocationMarker}>
+                        <Text style={styles.myLocationMarkerText}>EU</Text>
+                      </View>
+                      <Callout tooltip>
+                        <View style={styles.calloutView}>
+                          <Text style={styles.calloutTitle}>Você</Text>
+                          <Text style={styles.calloutDescription}>Sua localização atual.</Text>
+                        </View>
+                      </Callout>
+                    </Marker>
+                  )}
+                  {selectedLocation && ( // Marcador para a empresa do produto selecionado (vermelho)
                     <Marker
                       coordinate={{ latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }}
-                      title={selectedLocation.nome} description={"Local selecionado"} pinColor="blue" zIndex={1}
+                      title={selectedLocation.nome}
+                      description={"Local selecionado"}
+                      pinColor="red" // Cor vermelha para a empresa selecionada
+                      zIndex={1}
                     >
                       <Callout tooltip>
                         <View style={styles.calloutView}>
@@ -305,16 +357,19 @@ export default function VisualizarProdutosServicos() {
                       </Callout>
                     </Marker>
                   )}
+                  {/* Corrigindo a cor das outras empresas para lightgray */}
                   {produtosComEmpresa
                     .filter(p =>
                       p.localizacao?.latitude && p.localizacao?.longitude &&
                       !(selectedLocation && p.empresaId === selectedLocation.empresaId && p.id === selectedLocation.produtoId)
                     )
-                    .map((produto) => (
+                    .map((produto) => ( // Marcadores para as outras empresas (cinza claro)
                       <Marker
                         key={produto.id + produto.empresaId + "_mapmarker"}
-                        coordinate={produto.localizacao!} title={produto.nome}
-                        description={produto.descricao.substring(0, 40) + "..."} pinColor="red"
+                        coordinate={produto.localizacao!}
+                        title={produto.nome}
+                        description={produto.descricao.substring(0, 40) + "..."}
+                        pinColor="yellow"
                       >
                         <Callout tooltip>
                           <View style={styles.calloutView}>
@@ -403,4 +458,21 @@ const styles = StyleSheet.create({
     minWidth: 90, minHeight: 20,
   },
   instagramButtonText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
+  // Estilos para o marcador de localização do usuário, copiados do MapaAmigosScreen
+  myLocationMarker: {
+    backgroundColor: '#007BFF', // Azul vibrante para o "EU"
+    padding: 6,
+    borderRadius: 15,
+    width: 30, // Largura ajustada
+    height: 30, // Altura ajustada
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderColor: 'white',
+    borderWidth: 1.5,
+  },
+  myLocationMarkerText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 10, // Tamanho da fonte ajustado para caber
+  },
 });
