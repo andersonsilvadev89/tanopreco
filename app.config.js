@@ -67,14 +67,6 @@ export default {
         }
       ],
       "expo-secure-store",
-      [
-        "react-native-google-mobile-ads",
-        {
-          android_app_id: "ca-app-pub-5241782827769638~2412388769",
-          ios_app_id: "ca-app-pub-5241782827769638~5322425461",
-          "android_kotlin_version": "1.9.0",
-        }
-      ]
     ],
     experiments: {
       typedRoutes: true

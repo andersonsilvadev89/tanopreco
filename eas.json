@@ -28,7 +28,7 @@
   "submit": {
     "production": {
       "ios": {
-        "ascAppId": "0000000000" // substitua pelo App ID real do App Store Connect
+        "ascAppId": "0000000000"
       }
     }
   }

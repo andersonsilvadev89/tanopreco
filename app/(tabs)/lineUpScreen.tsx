@@ -13,7 +13,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Animated,
-  Linking, // Importar Linking para abrir URLs
+  Linking,
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import MapView, { Marker, Region, Callout } from 'react-native-maps';
@@ -23,15 +23,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
 import 'moment/locale/pt-br';
 
-// REMOVIDO: import { Audio, AVPlaybackStatus, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
+// === IMPORTAÇÃO DO COMPONENTE AdBanner ===
+import AdBanner from '../components/AdBanner'; // Importe o componente AdBanner
+
+// REMOVIDO: Importações e lógicas de áudio (expo-av)
 
 // --- Importar o gerenciador de imagens para o fundo ---
-// import { checkAndDownloadImages } from '../../utils/imageManager'; // Se estiver usando o imageManager
+// import { checkAndDownloadImages } from '../../utils/imageManager'; 
 
-// URL padrão de fallback para o fundo local
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
-// --- Interfaces (ATUALIZADAS) ---
+// --- Interfaces ---
 interface Evento {
   id: string;
   nomeBanda: string;
@@ -41,25 +43,19 @@ interface Evento {
   dataMomento: string;
 }
 
-interface BannerItem { // Mantido para o AdBanner inline
-  descricao: string;
-  id: string;
-  imagemUrl: string;
-  linkUrl: string;
-}
+// REMOVIDO: Interface BannerItem (pois o AdBanner agora é um componente separado)
 
-// === INTERFACE LOCAIS ATUALIZADA (agora inclui liveStreamLink) ===
+// Interface Locais (agora inclui liveStreamLink)
 interface Locais {
   id: string;
   descricao: string;
   latitude?: number;
   longitude?: number;
-  liveStreamLink?: string; // Campo para o link de live/rede social
+  liveStreamLink?: string; 
 }
 
 // --- Constantes ---
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
-// REMOVIDO: radiosListHeight
 const ITEM_PROGRAMACAO_HEIGHT = screenHeight * 0.13;
 
 const LineUpScreen = () => {
@@ -67,31 +63,23 @@ const LineUpScreen = () => {
   const [diaSelecionado, setDiaSelecionado] = useState<Date>(new Date());
   const [mapaVisivel, setMapaVisivel] = useState(false);
   const [mapRegion, setMapRegion] = useState<Region>({
-    latitude: -7.2345,
-    longitude: -39.4056,
+    latitude: -7.2345, 
+    longitude: -39.4056, 
     latitudeDelta: 0.02,
     longitudeDelta: 0.02,
   });
   const [eventoSelecionadoNoMapa, setEventoSelecionadoNoMapa] = useState<Evento | null>(null);
   const [dataTitulo, setDataTitulo] = useState('Programação do Dia');
-  const [locaisData, setLocaisData] = useState<Locais[]>([]); // Contém locais do mapa E os com links
+  const [locaisData, setLocaisData] = useState<Locais[]>([]);
 
-  // === NOVO ESTADO PARA OS LINKS DE LIVE/REDE SOCIAL (FILTRADOS DE locaisData) ===
   const [liveStreamLinksData, setLiveStreamLinksData] = useState<Locais[]>([]);
-
-  // REMOVIDO: selectedRadio, soundRef, isPlaying, isLoadingRadio, radioError - relacionados ao áudio
 
   const cratoLocation = { latitude: -7.2345, longitude: -39.4056 };
 
-  // --- Estados do AdBanner inline (mantidos) ---
-  const [allBanners, setAllBanners] = useState<string[]>([]);
-  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
+  // REMOVIDO: Estados do AdBanner inline (allBanners, currentBannerUrl, currentBannerIndex, fadeAnim)
 
-  // --- Estados para o carregamento da imagem de fundo dinâmica ---
   const [fundoAppReady, setFundoAppReady] = useState(false);
-  const [currentFundoSource, setCurrentFundoSource] = useState<any>(require('../../assets/images/fundo.png')); // Usar default local por enquanto
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
   // --- useEffect para carregar a imagem de fundo dinâmica ---
   useEffect(() => {
@@ -99,11 +87,11 @@ const LineUpScreen = () => {
       try {
         // Se você tiver a função checkAndDownloadImages, descomente e use aqui
         // const { fundoUrl } = await checkAndDownloadImages();
-        // setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : require('../../assets/images/fundo.png'));
-        setCurrentFundoSource(require('../../assets/images/fundo.png')); // Mantém o fallback local por simplicidade no Expo Go
+        // setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+        setCurrentFundoSource(defaultFundoLocal); // Mantém o fallback local por simplicidade no Expo Go
       } catch (error) {
         console.error("Erro ao carregar imagem de fundo na LineUpScreen:", error);
-        setCurrentFundoSource(require('../../assets/images/fundo.png'));
+        setCurrentFundoSource(defaultFundoLocal);
       } finally {
         setFundoAppReady(true);
       }
@@ -116,7 +104,7 @@ const LineUpScreen = () => {
     const locaisRef = ref(database, 'locais');
     const unsubscribeLocais = onValue(locaisRef, (snapshot) => {
       const locais: Locais[] = [];
-      const links: Locais[] = []; // Para armazenar apenas os locais com liveStreamLink
+      const links: Locais[] = []; 
       snapshot.forEach((childSnapshot) => {
         const localData = childSnapshot.val();
         const localItem: Locais = {
@@ -124,17 +112,16 @@ const LineUpScreen = () => {
           descricao: localData.descricao,
           latitude: localData.latitude,
           longitude: localData.longitude,
-          liveStreamLink: localData.liveStreamLink, // Pega o liveStreamLink
+          liveStreamLink: localData.liveStreamLink, 
         };
         locais.push(localItem);
         
-        // Se o local tiver um liveStreamLink, adicione-o à lista de links
         if (localData.liveStreamLink) {
           links.push(localItem);
         }
       });
       setLocaisData(locais);
-      setLiveStreamLinksData(links); // Define a nova lista de links
+      setLiveStreamLinksData(links); 
     });
     return () => unsubscribeLocais();
   }, []);
@@ -168,92 +155,10 @@ const LineUpScreen = () => {
     }
   }, [diaSelecionado]);
 
-  // Lógica do AdBanner inline (mantida)
-  useEffect(() => {
-    const fetchBanners = async () => {
-      try {
-        const sponsorsRef = ref(database, 'patrocinadores');
-        const snapshot = await get(sponsorsRef);
-        if (snapshot.exists()) {
-          const sponsorsData = snapshot.val();
-          const bannersList: string[] = [];
-          for (const sponsorId in sponsorsData) {
-            const sponsor = sponsorsData[sponsorId];
-            if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
-              const sponsorBannersArray: BannerItem[] = sponsor.banners;
-              sponsorBannersArray.forEach(bannerObject => {
-                if (typeof bannerObject === 'object' && bannerObject !== null && typeof bannerObject.imagemUrl === 'string') {
-                  bannersList.push(bannerObject.imagemUrl);
-                }
-              });
-            }
-          }
-          if (bannersList.length > 0) {
-            setAllBanners(bannersList);
-            setCurrentBannerUrl(bannersList[0]);
-            setCurrentBannerIndex(0);
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 200,
-              useNativeDriver: true,
-            }).start();
-          } else {
-            console.log('Nenhum banner de patrocinador encontrado com a estrutura esperada.');
-            setCurrentBannerUrl(null);
-            fadeAnim.setValue(0);
-          }
-        } else {
-          console.log('Nó "patrocinadores" não encontrado em database.');
-          setCurrentBannerUrl(null);
-          fadeAnim.setValue(0);
-        }
-      } catch (error) {
-        console.error('Erro ao buscar banners dos patrocinadores:', error);
-        Alert.alert("Erro", "Não foi possível carregar os banners dos patrocinadores.");
-        setCurrentBannerUrl(null);
-        fadeAnim.setValue(0);
-      }
-    };
-    fetchBanners();
-  }, [fadeAnim]); 
-
-  useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-      
-    if (allBanners.length > 1) {
-      intervalId = setInterval(() => {
-        Animated.timing(fadeAnim, { 
-          toValue: 0,
-          duration: 200, 
-          useNativeDriver: true,
-        }).start(() => {
-          setCurrentBannerIndex(prevIndex => {
-            const nextIndex = (prevIndex + 1) % allBanners.length;
-            setCurrentBannerUrl(allBanners[nextIndex]);
-              
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 200, 
-              useNativeDriver: true,
-            }).start();
-              
-            return nextIndex;
-          });
-        });
-      }, 6000); 
-    }
-      
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [allBanners, fadeAnim]);
-
+  // REMOVIDO: Lógica do AdBanner inline (useEffect de fetchBanners e de intervalo)
 
   const visualizarNoMapa = (evento: Evento) => {
     const nomeLocalEventoNormalizado = evento.local.toLowerCase().trim();
-    // Usa locaisData para encontrar as coordenadas
     const localEncontrado = locaisData.find((local) =>
       local.descricao.toLowerCase().trim() === nomeLocalEventoNormalizado
     );
@@ -320,8 +225,7 @@ const LineUpScreen = () => {
     }
   };
 
-  // === NOVO: Renderização dos itens da lista de Links de Live/Rede Social ===
-  const renderLiveStreamLinkItem = ({ item }: { item: Locais }) => { // Usamos Locais, pois o liveStreamLink está nela
+  const renderLiveStreamLinkItem = ({ item }: { item: Locais }) => { 
     const getPlatformIcon = (url: string) => {
       if (url.includes('instagram.com')) {
         return <Feather name="instagram" size={20} color="#E4405F" />;
@@ -330,7 +234,7 @@ const LineUpScreen = () => {
       } else if (url.includes('facebook.com')) {
         return <Feather name="facebook" size={20} color="#1877F2" />;
       }
-      return <Feather name="link" size={20} color="#007bff" />; // Ícone genérico
+      return <Feather name="link" size={20} color="#007bff" />; 
     };
 
     const handlePress = () => {
@@ -351,7 +255,7 @@ const LineUpScreen = () => {
 
   if (!fundoAppReady) {
     return (
-      <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.loadingContainer}>
+      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
         <Text style={styles.loadingText}>Carregando fundo...</Text>
       </ImageBackground>
@@ -360,21 +264,7 @@ const LineUpScreen = () => {
 
   return (
     <ImageBackground source={currentFundoSource} style={styles.background}>
-      <View style={styles.adBanner}>
-        {currentBannerUrl ? (
-          <Animated.Image 
-            source={{ uri: currentBannerUrl }}
-            style={[
-              styles.bannerImage,
-              { opacity: fadeAnim }
-            ]}
-            resizeMode="contain"
-            onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
-          />
-        ) : (
-          <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
-        )}
-      </View>
+      <AdBanner /> 
       
       <SafeAreaView style={styles.safeAreaContainer}>
         <View style={styles.container}>
@@ -397,14 +287,14 @@ const LineUpScreen = () => {
             contentContainerStyle={styles.programacaoListContent}
           />
 
-          {liveStreamLinksData.length > 0 && ( // Só renderiza se houver links
+          {liveStreamLinksData.length > 0 && ( 
             <View style={styles.liveStreamLinksSectionContainer}>
               <Text style={styles.liveStreamLinksSectionTitle}>Veja o que está acontecendo agora!</Text>
               <FlatList
                 data={liveStreamLinksData}
                 keyExtractor={(item) => item.id}
                 renderItem={renderLiveStreamLinkItem}
-                horizontal // Para exibir os links lado a lado se houver muitos
+                horizontal 
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.liveStreamLinksListContent}
               />
@@ -420,7 +310,6 @@ const LineUpScreen = () => {
                 <MapView style={styles.map} initialRegion={mapRegion} region={mapRegion}>
                     {programacaoDia
                         .filter(evento => {
-                            // Certifica-se de que o local tem coordenadas
                             const localDoEvento = locaisData.find((local) => local.descricao.toLowerCase().trim() === evento.local.toLowerCase().trim());
                             return localDoEvento && typeof localDoEvento.latitude === 'number' && typeof localDoEvento.longitude === 'number';
                         })
@@ -611,27 +500,26 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  // === NOVOS ESTILOS PARA A SEÇÃO DE LINKS DE LIVE/REDE SOCIAL ===
-  liveStreamLinksSectionContainer: { // Renomeado de radiosSectionContainer
+  liveStreamLinksSectionContainer: { 
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 12,
     paddingTop: 5,
     marginTop: 5,
     marginBottom: 5,
     paddingBottom: 5,
-    height: screenHeight * 0.15, // Altura ajustada para a lista de links
+    height: screenHeight * 0.15, 
   },
-  sectionTitle: { // Título genérico para seções
+  sectionTitle: { 
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FFFFFF', // Cor clara para fundo escuro
+    color: '#FFFFFF', 
     marginBottom: 10,
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  liveStreamLinksSectionTitle: { // Título específico para links de live/rede social
+  liveStreamLinksSectionTitle: { 
     fontSize: 18,
     fontWeight: 'bold',
     color: '#FFFFFF', 
@@ -645,7 +533,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 5,
   },
-  liveStreamLinkItem: { // Renomeado de instagramItem
+  liveStreamLinkItem: { 
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(255, 255, 255, 0.88)', 
@@ -660,7 +548,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 1.5,
   },
-  liveStreamLinkItemText: { // Renomeado de instagramItemText
+  liveStreamLinkItemText: { 
     marginLeft: 10,
     fontSize: 15,
     fontWeight: '500',
