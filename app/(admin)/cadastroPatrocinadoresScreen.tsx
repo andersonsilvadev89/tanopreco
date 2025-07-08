@@ -17,15 +17,23 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, push, set, onValue, remove, update, serverTimestamp } from 'firebase/database';
-import { auth, adminDatabase } from '../../firebaseConfig';
+import { auth, database } from '../../firebaseConfig';
 import AdBanner from '../components/AdBanner';
-// import { useNavigation } from '@react-navigation/native'; // Removido se não houver navegação para outras telas
 
-const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload'; // Substitua pelo seu Cloudinary URL
-const UPLOAD_PRESET = 'expocrato'; // Substitua pelo seu Upload Preset
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+
+const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
+const UPLOAD_PRESET = 'expocrato'; 
+
+const UPLOAD_PRESET_LOGO_PNG = 'expocrato_png';
+const UPLOAD_PRESET_BANNER_OTIMIZADO = 'expocrato';
 
 interface BannerItem {
-  id: string; // ID único para o banner (pode ser gerado localmente)
+  id: string;
   imagemUrl?: string;
   linkUrl?: string;
   descricao?: string;
@@ -36,45 +44,57 @@ interface PatrocinadorItem {
   logoUrl?: string;
   nomeEmpresa: string;
   banners: BannerItem[];
-  createdAt?: object; // Para ordenação, opcional
+  createdAt?: object;
 }
 
 export default function CadastroPatrocinadores() {
-  // const navigation = useNavigation(); // Removido se não for usado
-
-  // Estados do Patrocinador Principal
   const [logoUrl, setLogoUrl] = useState<string | undefined>();
-  const [logoUri, setLogoUri] = useState<string | undefined>(); // Para pré-visualização local da logo
+  const [logoUri, setLogoUri] = useState<string | undefined>();
   const [nomeEmpresa, setNomeEmpresa] = useState('');
   const [patrocinadores, setPatrocinadores] = useState<PatrocinadorItem[]>([]);
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
-  // Estados para o Banner Atual (em adição/edição no formulário)
   const [currentBanners, setCurrentBanners] = useState<BannerItem[]>([]);
   const [novoBannerImagemUri, setNovoBannerImagemUri] = useState<string | undefined>();
   const [novoBannerLinkUrl, setNovoBannerLinkUrl] = useState('');
   const [novoBannerDescricao, setNovoBannerDescricao] = useState('');
-  const [editandoBannerId, setEditandoBannerId] = useState<string | null>(null); // Para edição de banner específico
+  const [editandoBannerId, setEditandoBannerId] = useState<string | null>(null);
 
-  // Estados de Carregamento
   const [loadingUploadLogo, setLoadingUploadLogo] = useState(false);
   const [loadingUploadBanner, setLoadingUploadBanner] = useState(false);
-  const [loadingGeral, setLoadingGeral] = useState(false); // Para salvar patrocinador
+  const [loadingGeral, setLoadingGeral] = useState(false);
+
+  const [fundoAppReady, setFundoAppReady] = useState(false);
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
   const scrollRef = useRef<ScrollView>(null);
-  const userId = auth.currentUser?.uid; // Usado para verificar se o admin está logado
+  const userId = auth.currentUser?.uid;
+
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na CadastroPatrocinadores:", error);
+        setCurrentFundoSource(defaultFundoLocal);
+      } finally {
+        setFundoAppReady(true);
+      }
+    };
+    loadFundoImage();
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
 
-    const patrocinadoresRef = ref(adminDatabase, `patrocinadores`);
+    const patrocinadoresRef = ref(database, `patrocinadores`);
     const unsubscribePatrocinadores = onValue(patrocinadoresRef, (snapshot) => {
       const data = snapshot.val();
       const lista: PatrocinadorItem[] = data
         ? Object.entries(data).map(([id, valor]: any) => ({ id, ...valor }))
         : [];
-      // Ordenar por data de criação ou nome, se preferir
-      setPatrocinadores(lista.sort((a, b) => (a.nomeEmpresa > b.nomeEmpresa ? 1 : -1))); // Exemplo: ordena por nome
+      setPatrocinadores(lista.sort((a, b) => (a.nomeEmpresa > b.nomeEmpresa ? 1 : -1)));
     });
 
     return () => {
@@ -85,22 +105,32 @@ export default function CadastroPatrocinadores() {
   const enviarImagemParaCloudinary = async (uri: string, tipo: 'logo' | 'banner'): Promise<string | undefined> => {
     const uploader = tipo === 'logo' ? setLoadingUploadLogo : setLoadingUploadBanner;
     uploader(true);
+    
+    const presetToUse = tipo === 'logo' ? UPLOAD_PRESET_LOGO_PNG : UPLOAD_PRESET_BANNER_OTIMIZADO;
+
     try {
-      const data = new FormData();
-      data.append('file', {
+      // --- CORREÇÃO: Instanciando FormData corretamente ---
+      const formData = new FormData(); 
+      // --- FIM DA CORREÇÃO ---
+
+      const filename = uri.split('/').pop();
+      const fileType = filename?.split('.').pop()?.toLowerCase() || 'jpeg'; 
+
+      formData.append('file', {
         uri,
-        type: 'image/jpeg', // ou o tipo de imagem apropriado
-        name: `patrocinador_${tipo}_${Date.now()}.jpg`,
+        name: filename || `upload_${tipo}_${Date.now()}.${fileType}`,
+        type: `image/${fileType}`,
       } as any);
-      data.append('upload_preset', UPLOAD_PRESET);
+      formData.append('upload_preset', presetToUse);
 
       const res = await fetch(CLOUDINARY_URL, {
         method: 'POST',
-        body: data,
+        body: formData,
       });
 
       const file = await res.json();
-      if (file.secure_url) {
+      if (res.ok && file.secure_url) {
+        console.log(`Upload Cloudinary Sucesso (${tipo}, Preset: ${presetToUse}): Formato ${file.format}, URL ${file.secure_url}`);
         return file.secure_url;
       } else {
         console.error('Erro ao enviar imagem, URL segura não recebida:', file);
@@ -117,6 +147,46 @@ export default function CadastroPatrocinadores() {
   };
 
   const escolherImagem = async ( setImageUriCallback: (uri: string | undefined) => void, clearExistingUrlCallback?: () => void ) => {
+    Alert.alert('Selecionar imagem', 'Escolha uma opção', [
+      {
+        text: 'Galeria',
+        onPress: async () => {
+          const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            quality: 0.7,
+            allowsEditing: true,
+            aspect: [1, 1],
+          });
+          if (!result.canceled && result.assets && result.assets.length > 0) {
+            setImageUriCallback(result.assets[0].uri);
+            clearExistingUrlCallback?.();
+          }
+        },
+      },
+      {
+        text: 'Câmera',
+        onPress: async () => {
+          const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+          if (permissionResult.granted === false) {
+            Alert.alert("Permissão necessária", "Você precisa permitir o acesso à câmera para usar este recurso.");
+            return;
+          }
+          const result = await ImagePicker.launchCameraAsync({
+            quality: 0.7,
+            allowsEditing: true,
+            aspect: [1, 1],
+          });
+          if (!result.canceled && result.assets && result.assets.length > 0) {
+            setImageUriCallback(result.assets[0].uri);
+            clearExistingUrlCallback?.();
+          }
+        },
+      },
+      { text: 'Cancelar', style: 'cancel' },
+    ]);
+  };
+
+  const escolherImagemBanner = async ( setImageUriCallback: (uri: string | undefined) => void, clearExistingUrlCallback?: () => void ) => {
     Alert.alert('Selecionar imagem', 'Escolha uma opção', [
       {
         text: 'Galeria',
@@ -161,7 +231,7 @@ export default function CadastroPatrocinadores() {
   };
 
   const escolherImagemNovoBanner = () => {
-    escolherImagem(setNovoBannerImagemUri);
+    escolherImagemBanner(setNovoBannerImagemUri);
   };
 
   const adicionarOuAtualizarBanner = async () => {
@@ -172,7 +242,7 @@ export default function CadastroPatrocinadores() {
 
     let bannerImageUrlCloud: string | undefined = currentBanners.find(b => b.id === editandoBannerId)?.imagemUrl;
 
-    if (novoBannerImagemUri) { // Se uma nova imagem foi selecionada para o banner
+    if (novoBannerImagemUri) {
         setLoadingUploadBanner(true);
         bannerImageUrlCloud = await enviarImagemParaCloudinary(novoBannerImagemUri, 'banner');
         setLoadingUploadBanner(false);
@@ -196,7 +266,6 @@ export default function CadastroPatrocinadores() {
       setCurrentBanners([...currentBanners, bannerData]);
     }
 
-    // Limpar campos do formulário do banner
     setNovoBannerImagemUri(undefined);
     setNovoBannerLinkUrl('');
     setNovoBannerDescricao('');
@@ -205,12 +274,10 @@ export default function CadastroPatrocinadores() {
 
   const editarBannerNaLista = (banner: BannerItem) => {
     setEditandoBannerId(banner.id);
-    setNovoBannerImagemUri(undefined); // Limpa URI local, pois usaremos a URL existente para preview se não for alterada
-    // Para preview da imagem existente do banner ao editar:
-    // (O componente de imagem do formulário do banner precisaria mostrar novoBannerImagemUri OU banner.imagemUrl se editandoBannerId)
+    setNovoBannerImagemUri(undefined);
     setNovoBannerLinkUrl(banner.linkUrl || '');
     setNovoBannerDescricao(banner.descricao || '');
-    scrollRef.current?.scrollTo({ y: 250, animated: true }); // Ajuste o valor de Y conforme necessário
+    scrollRef.current?.scrollTo({ y: 250, animated: true });
   };
 
   const removerBannerDaLista = (bannerId: string) => {
@@ -243,11 +310,10 @@ export default function CadastroPatrocinadores() {
       Alert.alert('Erro', 'O nome da empresa é obrigatório.');
       return;
     }
-    if (!logoUri && !logoUrl && !editandoId) { // Obrigatório na criação, opcional na edição se já houver logo
+    if (!logoUri && !logoUrl && !editandoId) {
         Alert.alert('Erro', 'A logomarca da empresa é obrigatória.');
         return;
     }
-
 
     if (!userId) {
         Alert.alert('Erro', 'Usuário não autenticado.');
@@ -256,8 +322,8 @@ export default function CadastroPatrocinadores() {
 
     setLoadingGeral(true);
 
-    let finalLogoUrl = logoUrl; // Usa a URL existente se não houver nova URI
-    if (logoUri) { // Se uma nova logo foi selecionada
+    let finalLogoUrl = logoUrl;
+    if (logoUri) {
       const uploadedLogoUrl = await enviarImagemParaCloudinary(logoUri, 'logo');
       if (!uploadedLogoUrl) {
         setLoadingGeral(false);
@@ -267,7 +333,7 @@ export default function CadastroPatrocinadores() {
       finalLogoUrl = uploadedLogoUrl;
     }
 
-    if (!finalLogoUrl) { // Se mesmo após tentativa de upload, não há logo (importante para criação)
+    if (!finalLogoUrl) {
         setLoadingGeral(false);
         Alert.alert('Erro', 'A logomarca da empresa é essencial.');
         return;
@@ -277,17 +343,17 @@ export default function CadastroPatrocinadores() {
     const patrocinadorItemData: PatrocinadorItem = {
       nomeEmpresa: nomeEmpresa.trim(),
       logoUrl: finalLogoUrl,
-      banners: currentBanners, // Banners já devem ter suas URLs de imagem
-      ...(editandoId ? {} : { createdAt: serverTimestamp() }), // Adiciona createdAt apenas na criação
+      banners: currentBanners,
+      ...(editandoId ? {} : { createdAt: serverTimestamp() }),
     };
 
     try {
       if (editandoId) {
-        const itemEditarRef = ref(adminDatabase, `patrocinadores/${editandoId}`);
+        const itemEditarRef = ref(database, `patrocinadores/${editandoId}`);
         await update(itemEditarRef, patrocinadorItemData);
         Alert.alert('Sucesso', 'Patrocinador atualizado!');
       } else {
-        const novoRef = push(ref(adminDatabase, `patrocinadores`));
+        const novoRef = push(ref(database, `patrocinadores`));
         await set(novoRef, patrocinadorItemData);
         Alert.alert('Sucesso', 'Patrocinador salvo com sucesso!');
       }
@@ -304,9 +370,8 @@ export default function CadastroPatrocinadores() {
     setEditandoId(item.id || null);
     setNomeEmpresa(item.nomeEmpresa);
     setLogoUrl(item.logoUrl);
-    setLogoUri(undefined); // Limpa URI local, a logoUrl será usada para exibição
+    setLogoUri(undefined);
     setCurrentBanners(item.banners || []);
-    // Limpar campos de banner individual
     setNovoBannerImagemUri(undefined);
     setNovoBannerLinkUrl('');
     setNovoBannerDescricao('');
@@ -322,11 +387,10 @@ export default function CadastroPatrocinadores() {
         style: 'destructive',
         onPress: async () => {
           try {
-            // TODO: Idealmente, excluir imagens do Cloudinary aqui também (requer API backend ou funções Firebase)
-            const itemRef = ref(adminDatabase, `patrocinadores/${id}`);
+            const itemRef = ref(database, `patrocinadores/${id}`);
             await remove(itemRef);
             Alert.alert('Sucesso', 'Patrocinador excluído.');
-            if (editandoId === id) { // Se estava editando o item excluído
+            if (editandoId === id) {
                 limparFormularioPatrocinador();
             }
           } catch (error) {
@@ -338,9 +402,20 @@ export default function CadastroPatrocinadores() {
     ]);
   };
 
+  // --- Condição de carregamento da imagem de fundo ---
+  // A tela principal só é renderizada depois que o fundo está pronto.
+  if (!fundoAppReady) {
+    return (
+      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007BFF" />
+        <Text style={styles.loadingText}>Carregando fundo...</Text>
+      </ImageBackground>
+    );
+  }
+
   return (
     <ImageBackground
-      source={require('../../assets/images/fundo.png')} // Verifique se o caminho está correto
+      source={currentFundoSource}
       style={styles.backgroundImage}
     >
       <AdBanner />
@@ -435,15 +510,15 @@ export default function CadastroPatrocinadores() {
                 disabled={loadingUploadBanner}
               />
               {editandoBannerId && (
-                 <TouchableOpacity style={styles.cancelButtonSmall} onPress={() => {
-                    setEditandoBannerId(null);
-                    setNovoBannerImagemUri(undefined);
-                    setNovoBannerLinkUrl('');
-                    setNovoBannerDescricao('');
-                 }}>
-                    <Text style={styles.cancelButtonTextSmall}>Cancelar Edição do Banner</Text>
-                 </TouchableOpacity>
-              )}
+                   <TouchableOpacity style={styles.cancelButtonSmall} onPress={() => {
+                     setEditandoBannerId(null);
+                     setNovoBannerImagemUri(undefined);
+                     setNovoBannerLinkUrl('');
+                     setNovoBannerDescricao('');
+                   }}>
+                     <Text style={styles.cancelButtonTextSmall}>Cancelar Edição do Banner</Text>
+                   </TouchableOpacity>
+               )}
             </View>
 
             {/* Lista de Banners Adicionados */}
@@ -559,13 +634,13 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     width: '100%',
   },
-  imageInputTouchableBanner: { // Estilo similar, mas talvez menor
+  imageInputTouchableBanner: {
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 8,
     marginBottom: 10,
     backgroundColor: '#f0f0f0',
-    height: 60, // Altura menor para banners
+    height: 60,
     justifyContent: 'center',
     alignItems: 'center',
     overflow: 'hidden',
@@ -591,7 +666,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 8,
-    resizeMode: 'contain', // 'cover' pode cortar, 'contain' mostra tudo
+    resizeMode: 'contain',
   },
   input: {
     borderWidth: 1,
@@ -652,7 +727,7 @@ const styles = StyleSheet.create({
   },
   bannerListButtons: {
     marginLeft: 10,
-    justifyContent: 'space-between', // Para espaçar botões se houver mais
+    justifyContent: 'space-between',
   },
   actionsContainer: {
     flexDirection: 'row',
@@ -660,14 +735,14 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   cancelButton: {
-    backgroundColor: '#6c757d', // Cinza
+    backgroundColor: '#6c757d',
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
     marginTop: 10,
   },
   cancelButtonSmall: {
-    backgroundColor: '#ffc107', // Amarelo
+    backgroundColor: '#ffc107',
     paddingVertical: 8,
     borderRadius: 6,
     alignItems: 'center',
@@ -680,7 +755,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   cancelButtonTextSmall: {
-    color: '#212529', // Preto/Cinza escuro
+    color: '#212529',
     fontWeight: 'bold',
     fontSize: 13,
   },
@@ -732,6 +807,21 @@ const styles = StyleSheet.create({
   },
   listItemButtons: {
     marginLeft: 10,
-    justifyContent: 'center', // Centraliza verticalmente os botões
+    justifyContent: 'center',
+  },
+  // Estilos para o estado de carregamento do fundo
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // O fundo já será a imagem carregada dinamicamente, ou o fallback local
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#007BFF',
+    fontSize: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
 });

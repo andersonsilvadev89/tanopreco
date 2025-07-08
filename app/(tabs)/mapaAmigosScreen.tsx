@@ -1,6 +1,5 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator, ImageBackground, FlatList, TouchableOpacity, Dimensions, Linking, Platform, Image, Alert, TextInput, SafeAreaView, InteractionManager } from 'react-native';
-// REMOVIDO: Animated
 import MapView, { Marker, Region } from 'react-native-maps';
 import { ref, onValue, get, update, set } from 'firebase/database';
 import { auth, database } from '../../firebaseConfig';
@@ -12,6 +11,12 @@ import moment from 'moment';
 import 'moment/locale/pt-br';
 import { LinearGradient } from 'expo-linear-gradient';
 import AdBanner from '../components/AdBanner';
+
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
 
 // DEFINIÇÃO DA TAREFA DE BACKGROUND
 const BACKGROUND_LOCATION_TASK = 'background-location-task';
@@ -53,12 +58,10 @@ interface Amigo { id: string; nome: string; telefone?: string; imagem?: string; 
 interface EventoFirebase { id: string; nomeBanda: string; horaInicio: string; local: string; imagemUrl?: string; dataMomento: string; duracao: string; }
 interface LocalInfoFirebase { id: string; descricao: string; latitude: number; longitude: number; }
 interface EventoProcessado extends EventoFirebase { coordenadas: { latitude: number; longitude: number }; startTime: moment.Moment; endTime: moment.Moment; janelaStartTime: moment.Moment; janelaEndTime: moment.Moment; }
-// REMOVIDO: Interface BannerItem não é mais necessária
-// interface BannerItem { descricao: string; id: string; imagemUrl: string; linkUrl: string; }
 
 const { height: screenHeight } = Dimensions.get('window');
 
-// --- FUNÇÃO DE ABERTURA DO INSTAGRAM (VERSÃO SIMPLIFICADA) ---
+// --- FUNÇÃO DE ABERTURA DO INSTAGRAM (ORIGINAL) ---
 const handleInstagramPress = async (username: string | undefined) => {
   if (!username) {
     Alert.alert("Instagram não informado", "Este usuário não possui um Instagram cadastrado.");
@@ -105,7 +108,6 @@ const AmigoItem = React.memo(({ item, isSelected, amigoLocal, handleAmigoPress }
         <View style={styles.statusAndInstagramContainer}>
           {!amigoLocal && <Text style={styles.amigoOffline}>Offline</Text>}
           {item.instagram && (
-            // A chamada aqui permanece a mesma, pois a função externa foi atualizada
             <TouchableOpacity onPress={() => handleInstagramPress(item.instagram)} style={styles.instagramButtonWrapper}>
               <LinearGradient
                 colors={['#8a3ab9', '#bc2a8d', '#fbad50']}
@@ -141,8 +143,28 @@ const MapaAmigosScreen = () => {
   const [podeRastrearAmigos, setPodeRastrearAmigos] = useState(false);
   const [currentTimeTick, setCurrentTimeTick] = useState(0);
 
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false);
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
   const usuarioLogadoId = auth.currentUser?.uid;
   const locationSubscriptionRef = useRef<LocationSubscription | null>(null);
+
+  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na MapaAmigosScreen:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
+      }
+    };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
 
   const parseDuracao = useCallback((duracaoStr: string): moment.Duration => {
     let totalMinutos = 0;
@@ -196,20 +218,63 @@ const MapaAmigosScreen = () => {
   useEffect(() => {
     if (!usuarioLogadoId) { setAmigosLista([]); return; }
     const amigosRef = ref(database, `amigos/${usuarioLogadoId}`);
-    const unsubscribeAmigos = onValue(amigosRef, async (snapshot) => {
-      const amigosData = snapshot.val();
+    
+    // --- CORREÇÃO DE ESCOPO: Declarado aqui no escopo do useEffect ---
+    let activeLocationListeners: (() => void)[] = []; 
+
+    const unsubscribeAmigos = onValue(amigosRef, (snapshotAmigos) => {
+      // Limpa os listeners anteriores para evitar duplicação ou vazamentos de memória
+      // se a callback de onValue for disparada novamente por alguma razão.
+      activeLocationListeners.forEach(unsub => unsub());
+      activeLocationListeners = []; 
+
+      const amigosData = snapshotAmigos.val();
       const amigosIdsAceitos = amigosData ? Object.keys(amigosData).filter(key => amigosData[key] === 'aceito') : [];
-      if (amigosIdsAceitos.length === 0) { setAmigosLista([]); return; }
+      if (amigosIdsAceitos.length === 0) { setAmigosLista([]); setAmigosLocalizacao([]); setLoadingAmigosLoc(false); return; } // Limpa locs se não houver amigos
+
       const amigosPromises = amigosIdsAceitos.map(async (amigoId) => {
         const uRef = ref(database, `usuarios/${amigoId}`);
         const uSnap = await get(uRef);
         const uData = uSnap.val();
         return uData?.nome ? { id: amigoId, nome: uData.nome, telefone: uData.telefone, imagem: uData.imagem, instagram: uData.instagram } : null;
       });
-      const amigosCarregados = (await Promise.all(amigosPromises)).filter(Boolean) as Amigo[];
-      setAmigosLista(amigosCarregados);
+      Promise.all(amigosPromises).then(amigosCarregados => {
+        setAmigosLista(amigosCarregados.filter(Boolean) as Amigo[]);
+
+        let initialLocations: Localizacao[] = [];
+        const initialLoadPromises = amigosIdsAceitos.map(amigoId => {
+          const locRef = ref(database, `localizacoes/${amigoId}`);
+          return get(locRef).then(snapLoc => {
+            const dataLoc = snapLoc.val();
+            if (dataLoc?.compartilhando && dataLoc.latitude && dataLoc.longitude && dataLoc.nome) {
+              initialLocations.push({id: amigoId, nome: dataLoc.nome, latitude: dataLoc.latitude, longitude: dataLoc.longitude });
+            }
+          });
+        });
+        Promise.all(initialLoadPromises)
+          .then(() => {
+            setAmigosLocalizacao([...initialLocations]);
+            setLoadingAmigosLoc(false);
+            amigosIdsAceitos.forEach((amigoId) => {
+              const locRef = ref(database, `localizacoes/${amigoId}`);
+              const unsubLoc = onValue(locRef, (snapLoc) => {
+                const dataLoc = snapLoc.val();
+                setAmigosLocalizacao(prevLocs => {
+                  const newLocs = prevLocs.filter(l => l.id !== amigoId);
+                  if (dataLoc?.compartilhando && dataLoc.latitude && dataLoc.longitude && dataLoc.nome) {
+                    newLocs.push({ id: amigoId, nome: dataLoc.nome, latitude: dataLoc.latitude, longitude: dataLoc.longitude });
+                  }
+                  return newLocs;
+                });
+              });
+              activeLocationListeners.push(unsubLoc);
+            });
+          })
+          .catch(() => setLoadingAmigosLoc(false));
+      }).catch(() => setAmigosLista([]));
     });
-    return () => unsubscribeAmigos();
+    // A função de limpeza agora acessa corretamente activeLocationListeners
+    return () => { unsubscribeAmigos(); activeLocationListeners.forEach(unsub => unsub()); };
   }, [usuarioLogadoId]);
 
   useEffect(() => {
@@ -285,51 +350,6 @@ const MapaAmigosScreen = () => {
     }
     setPodeRastrearAmigos(condicaoAtendidaParaAlgumEvento);
   }, [compartilhando, minhaLocalizacao, eventosDoDiaProcessados, currentTimeTick, loadingStatus, loadingEventos, calcularDistancia]);
-
-  useEffect(() => {
-    if (!usuarioLogadoId || !podeRastrearAmigos) { setAmigosLocalizacao([]); setLoadingAmigosLoc(false); return () => {}; }
-    setLoadingAmigosLoc(true);
-    const amigosRef = ref(database, `amigos/${usuarioLogadoId}`);
-    let activeLocationListeners: (() => void)[] = [];
-    const unsubscribePrincipal = onValue(amigosRef, (snapshotAmigos) => {
-      activeLocationListeners.forEach(unsub => unsub());
-      activeLocationListeners = [];
-      const amigosData = snapshotAmigos.val();
-      const amigosIdsConfirmados = amigosData ? Object.keys(amigosData).filter(key => amigosData[key] === 'aceito') : [];
-      if (amigosIdsConfirmados.length === 0) { setAmigosLocalizacao([]); setLoadingAmigosLoc(false); return; }
-      let initialLocations: Localizacao[] = [];
-      const initialLoadPromises = amigosIdsConfirmados.map(amigoId => {
-        const locRef = ref(database, `localizacoes/${amigoId}`);
-        return get(locRef).then(snapLoc => {
-          const dataLoc = snapLoc.val();
-          if (dataLoc?.compartilhando && dataLoc.latitude && dataLoc.longitude && dataLoc.nome) {
-            initialLocations.push({id: amigoId, nome: dataLoc.nome, latitude: dataLoc.latitude, longitude: dataLoc.longitude });
-          }
-        });
-      });
-      Promise.all(initialLoadPromises)
-        .then(() => {
-          setAmigosLocalizacao([...initialLocations]);
-          setLoadingAmigosLoc(false);
-          amigosIdsConfirmados.forEach((amigoId) => {
-            const locRef = ref(database, `localizacoes/${amigoId}`);
-            const unsubLoc = onValue(locRef, (snapLoc) => {
-              const dataLoc = snapLoc.val();
-              setAmigosLocalizacao(prevLocs => {
-                const newLocs = prevLocs.filter(l => l.id !== amigoId);
-                if (dataLoc?.compartilhando && dataLoc.latitude && dataLoc.longitude && dataLoc.nome) {
-                  newLocs.push({ id: amigoId, nome: dataLoc.nome, latitude: dataLoc.latitude, longitude: dataLoc.longitude });
-                }
-                return newLocs;
-              });
-            });
-            activeLocationListeners.push(unsubLoc);
-          });
-        })
-        .catch(() => setLoadingAmigosLoc(false));
-    });
-    return () => { unsubscribePrincipal(); activeLocationListeners.forEach(unsub => unsub()); };
-  }, [usuarioLogadoId, podeRastrearAmigos]);
 
   useEffect(() => {
     const manageBackgroundTask = async () => {
@@ -423,25 +443,30 @@ const MapaAmigosScreen = () => {
     return ( <AmigoItem item={item} isSelected={isSelected} amigoLocal={amigoLocal} handleAmigoPress={handleAmigoPressInternal}/> );
   };
 
-  const isLoadingGeral = loadingStatus || loadingEventos;
+  // --- Condição de carregamento geral: Agora integra o fundo do app ---
+  const isLoadingGeral = loadingStatus || loadingEventos; // Mantenha a lógica de loading original
+  // Adicione !fundoAppReady à condição de retorno principal de loading
 
-  if (isLoadingGeral && usuarioLogadoId) {
+  // --- PRIMEIRO BLOCO DE CARREGAMENTO/AVISO ---
+  // A tela principal só é renderizada depois que o fundo E o status/eventos estão prontos.
+  if (isLoadingGeral || !fundoAppReady) { // <-- Inclui fundoAppReady aqui
     return (
-        <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+        <ImageBackground source={currentFundoSource} style={styles.background}> {/* Usa currentFundoSource */}
             <View style={styles.center}><ActivityIndicator size="large" color="#FFFFFF" /><Text style={styles.loadingText}>Carregando...</Text></View>
         </ImageBackground>
     );
   }
+  // --- As próximas condições também precisam usar o fundo dinâmico ---
   if (!usuarioLogadoId) {
     return (
-        <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+        <ImageBackground source={currentFundoSource} style={styles.background}>
             <View style={styles.center}><Text style={styles.warningText}>Usuário não identificado. Por favor, reinicie o aplicativo.</Text></View>
         </ImageBackground>
     );
   }
   if (locationPermissionStatus !== PermissionStatus.GRANTED) {
     return (
-        <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+        <ImageBackground source={currentFundoSource} style={styles.background}> {/* Usa currentFundoSource */}
             <View style={styles.center}>
                 <Text style={styles.warningText}>A permissão de localização é essencial para o mapa de amigos.</Text>
                 <Text style={styles.subWarningText}>Por favor, habilite o acesso nas configurações do seu dispositivo.</Text>
@@ -452,7 +477,7 @@ const MapaAmigosScreen = () => {
   }
   if (compartilhando === false) {
     return (
-        <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+        <ImageBackground source={currentFundoSource} style={styles.background}> {/* Usa currentFundoSource */}
             <View style={styles.center}>
                 <Text style={styles.warningText}>Para visualizar a localização dos seus amigos, ative o compartilhamento da sua localização.</Text>
                 <Text style={styles.subWarningText}>Você pode ativar o compartilhamento no seu perfil ou nas configurações do app.</Text>
@@ -460,16 +485,18 @@ const MapaAmigosScreen = () => {
         </ImageBackground>
     );
   }
+  // Esta condição de loadingAmigosLoc precisa vir *antes* do retorno principal
+  // se ele realmente precisa de um loading separado com a lista de amigos já carregada.
   if (podeRastrearAmigos && loadingAmigosLoc && amigosLista.length > 0) {
       return (
-        <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+        <ImageBackground source={currentFundoSource} style={styles.background}> {/* Usa currentFundoSource */}
             <View style={styles.center}><ActivityIndicator size="large" color="#FFFFFF" /><Text style={styles.loadingText}>Carregando localizações dos amigos...</Text></View>
         </ImageBackground>
     );
   }
 
   return (
-    <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+    <ImageBackground source={currentFundoSource} style={styles.background}> {/* Usa currentFundoSource */}
         <AdBanner />
         <SafeAreaView style={styles.container}>
             <TextInput

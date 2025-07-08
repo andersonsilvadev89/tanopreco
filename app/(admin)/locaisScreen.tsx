@@ -14,11 +14,18 @@ import {
   ActivityIndicator,
   ImageBackground,
 } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import MapView, { Marker, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { ref, push, set, onValue, remove, update } from 'firebase/database';
 import { auth, database } from '../../firebaseConfig';
 import AdBanner from '../components/AdBanner';
+
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
 interface Local {
   id?: string;
@@ -27,14 +34,12 @@ interface Local {
   longitude: number;
 }
 
-const fundo = require('../../assets/images/fundo.png');
-
 export default function LocaisScreen() {
   const [descricao, setDescricao] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [locais, setLocais] = useState<Local[]>([]);
-  const [carregandoLocais, setCarregandoLocais] = useState(true);
+  const [carregandoLocais, setCarregandoLocais] = useState(true); // Carrega dados dos locais
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [mapRegion, setMapRegion] = useState({
     latitude: -5.5398,
@@ -44,8 +49,28 @@ export default function LocaisScreen() {
   });
   const [userLocation, setUserLocation] = useState<Location.LocationObjectCoords | null>(null);
 
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false); // Controla o carregamento do FUNDO DO APP
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
   const locaisListScrollRef = useRef<ScrollView>(null);
   const userId = auth.currentUser?.uid;
+
+  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na LocaisScreen:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
+      }
+    };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
 
   useEffect(() => {
     (async () => {
@@ -82,7 +107,7 @@ export default function LocaisScreen() {
         ? Object.entries(data).map(([id, valor]: any) => ({ id, ...valor }))
         : [];
       setLocais(lista.reverse());
-      setCarregandoLocais(false);
+      setCarregandoLocais(false); // Finaliza o carregamento dos locais
     }, (error) => {
       console.error("Erro ao carregar locais:", error);
       Alert.alert("Erro", "Não foi possível carregar os locais.");
@@ -185,20 +210,22 @@ export default function LocaisScreen() {
       latitudeDelta: 0.0922,
       longitudeDelta: 0.0421,
     });
-    // Não é mais necessário rolar para o topo, pois o formulário já estará visível
   };
 
-  if (carregandoLocais && userId) {
+  // --- Condição de carregamento geral: Espera os locais E o fundo do app ---
+  if (carregandoLocais || !fundoAppReady) { // <-- Inclui fundoAppReady
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#0000ff" />
-        <Text>Carregando locais...</Text>
-      </View>
+      <ImageBackground source={currentFundoSource} style={styles.background}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#0000ff" />
+          <Text style={styles.loadingText}>Carregando locais...</Text>
+        </View>
+      </ImageBackground>
     );
   }
 
   return (
-    <ImageBackground source={fundo} style={styles.background}>
+    <ImageBackground source={currentFundoSource} style={styles.background}> {/* Usa currentFundoSource */}
       <AdBanner />
       <View style={styles.overlay}>
         <KeyboardAvoidingView
@@ -310,17 +337,29 @@ const styles = StyleSheet.create({
   formContent: { paddingBottom: 10 },
   locaisListScroll: { flex: 1 },
   locaisListContent: { paddingBottom: 10 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(255, 255, 255, 0.8)' },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    // O fundo já será a imagem carregada dinamicamente, ou o fallback local
+  },
+  loadingText: { 
+    marginTop: 10, 
+    fontSize: 16, 
+    color: '#007BFF', // Alterado para corresponder ao padrão do app
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
   title: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', color: '#2c3e50', marginBottom: 15 },
   label: { fontSize: 15, fontWeight: '600', marginBottom: 6, marginTop: 12, color: '#34495e' },
   input: { borderWidth: 1, borderColor: '#bdc3c7', borderRadius: 6, paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#fff', fontSize: 15, color: '#2c3e50', marginBottom: 5 },
   mapContainer: { height: 230, marginBottom: 15, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#ddd' },
   map: { ...StyleSheet.absoluteFillObject },
   coordsText: { position: 'absolute', bottom: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, color: '#fff', fontWeight: 'bold', fontSize: 11 },
-  // NOVO: Container para os botões de ação do formulário
   buttonContainer: {
-      paddingTop: 10, // Espaço entre a área de scroll e os botões
-      paddingBottom: 5,
+    paddingTop: 10,
+    paddingBottom: 5,
   },
   cancelButton: { backgroundColor: '#e74c3c', paddingVertical: 12, paddingHorizontal: 15, borderRadius: 6, alignItems: 'center', marginTop: 10 },
   cancelButtonText: { color: '#fff', fontWeight: 'bold', fontSize: 15 },

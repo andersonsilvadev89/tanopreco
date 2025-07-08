@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react'; // Adicionado useState, useEffect
 import {
   View,
   Text,
@@ -6,9 +6,10 @@ import {
   StyleSheet,
   ImageBackground,
   Alert,
-  Animated,
-  FlatList, // Adicionado para organizar os botões em grade
-  Dimensions // Adicionado para calcular a largura dos itens
+  Animated, // Mantido, embora não usado diretamente para banners agora
+  FlatList,
+  Dimensions,
+  ActivityIndicator // Adicionado para o loading do fundo
 } from 'react-native';
 import { router } from 'expo-router';
 import {
@@ -19,130 +20,48 @@ import {
   LogOut,
   CircleHelp,
   Sandwich,
-  Briefcase, // Ícone para Empresa
-  Shield // Ícone para Admin
+  Briefcase,
+  Shield
 } from 'lucide-react-native';
 import { signOut } from 'firebase/auth';
-import { auth, administrativoDatabase } from '../../firebaseConfig'; // 'administrativoDatabase' já estava sendo usado
-import { ref, get } from 'firebase/database';
+import { auth } from '../../firebaseConfig';
+import AdBanner from '../components/AdBanner'; // Importe o componente AdBanner
 
-const fundo = require('../../assets/images/fundo.png');
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
 
-// Interface para tipar os objetos de banner conforme a estrutura fornecida
-interface BannerItem {
-  descricao: string;
-  id: string;
-  imagemUrl: string;
-  linkUrl: string;
-}
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
 const { width: screenWidth } = Dimensions.get('window');
-const NUM_COLUMNS = 2; // Número de colunas para os botões
-const ITEM_MARGIN = 15; // Margem entre os itens
-const ITEM_PADDING = 20; // Padding interno do card
+const NUM_COLUMNS = 2;
+const ITEM_MARGIN = 15;
+const ITEM_PADDING = 20;
 
 const HomeScreen = () => {
   const navigate = (path: string) => router.push(path as any);
+  
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false);
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
-  const [allBanners, setAllBanners] = useState<string[]>([]);
-  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-
-  // Valor animado para a opacidade do banner
-  const fadeAnim = useRef(new Animated.Value(0)).current; // Começa invisível (opacidade 0)
-
+  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
   useEffect(() => {
-    const fetchBanners = async () => {
+    const loadFundoImage = async () => {
       try {
-        // Usando administrativoDatabase conforme seu código anterior
-        const sponsorsRef = ref(administrativoDatabase, 'patrocinadores');
-        
-        const snapshot = await get(sponsorsRef);
-
-        if (snapshot.exists()) {
-          const sponsorsData = snapshot.val();
-          const bannersList: string[] = [];
-
-          for (const sponsorId in sponsorsData) {
-            const sponsor = sponsorsData[sponsorId];
-            if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
-              const sponsorBannersArray: BannerItem[] = sponsor.banners;
-              sponsorBannersArray.forEach(bannerObject => {
-                if (typeof bannerObject === 'object' && bannerObject !== null && typeof bannerObject.imagemUrl === 'string') {
-                  bannersList.push(bannerObject.imagemUrl);
-                }
-              });
-            }
-          }
-
-          if (bannersList.length > 0) {
-            setAllBanners(bannersList);
-            setCurrentBannerUrl(bannersList[0]);
-            setCurrentBannerIndex(0);
-            // Animação de Fade-in para o primeiro banner
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 200, // Duração do fade-in
-              useNativeDriver: true, // Importante para performance
-            }).start();
-          } else {
-            console.log('Nenhum banner de patrocinador encontrado com a estrutura esperada.');
-            setCurrentBannerUrl(null);
-            fadeAnim.setValue(0); // Garante que a opacidade seja 0 se não houver banners
-          }
-        } else {
-          // Ajuste na mensagem de log para refletir o caminho usado
-          console.log('Nó "patrocinadores" não encontrado em administrativoDatabase.');
-          setCurrentBannerUrl(null);
-          fadeAnim.setValue(0);
-        }
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
       } catch (error) {
-        console.error('Erro ao buscar banners dos patrocinadores:', error);
-        Alert.alert("Erro", "Não foi possível carregar os banners dos patrocinadores.");
-        setCurrentBannerUrl(null);
-        fadeAnim.setValue(0);
+        console.error("Erro ao carregar imagem de fundo na HomeScreen:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
       }
     };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
 
-    fetchBanners();
-  }, [fadeAnim]); // fadeAnim adicionado como dependência, pois é usado no efeito
-
-  useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | null = null;
-    
-    if (allBanners.length > 1) {
-      intervalId = setInterval(() => {
-        Animated.timing(fadeAnim, { // 1. Fade-out do banner atual
-          toValue: 0,
-          duration: 200, // Duração do fade-out
-          useNativeDriver: true,
-        }).start(() => {
-          // 2. Atualiza o banner APÓS o fade-out
-          setCurrentBannerIndex(prevIndex => {
-            const nextIndex = (prevIndex + 1) % allBanners.length;
-            setCurrentBannerUrl(allBanners[nextIndex]); // Define a URL para o próximo banner
-            
-            // 3. Fade-in do novo banner
-            Animated.timing(fadeAnim, {
-              toValue: 1,
-              duration: 200, // Duração do fade-in
-              useNativeDriver: true,
-            }).start();
-            
-            return nextIndex; // Retorna o novo índice
-          });
-        });
-      }, 6000); // Tempo entre o início de cada transição
-    }
-
-    return () => { // Limpa o intervalo quando o componente é desmontado ou allBanners muda
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
-  }, [allBanners, fadeAnim]);
-
-  // ALTERAÇÃO: Adicionadas novas opções para Empresa e Admin
   const options = [
     { label: 'Localização de Usuários', icon: Users, path: '/localizacaoUsuariosScreen' },
     { label: 'Localização em Tempo Real', icon: MapPin, path: '/mapaAmigosScreen' },
@@ -150,8 +69,8 @@ const HomeScreen = () => {
     { label: 'LineUp', icon: Radio, path: '/lineUpScreen' },
     { label: 'Configurações', icon: Settings, path: '/configuracoesScreen' },
     { label: 'Sobre', icon: CircleHelp, path: '/sobreScreen' },
-    { label: 'Área da Empresa', icon: Briefcase, path: '/empresaScreen' }, // NOVO BOTÃO EMPRESA
-    { label: 'Área Admin', icon: Shield, path: '/adminScreen' }, // NOVO BOTÃO ADMIN
+    { label: 'Área da Empresa', icon: Briefcase, path: '/empresaScreen' },
+    { label: 'Área Admin', icon: Shield, path: '/adminScreen' },
   ];
 
   const confirmarLogout = () => {
@@ -177,7 +96,6 @@ const HomeScreen = () => {
     );
   };
 
-  // Renderização de cada item do grid
   const renderGridItem = ({ item }: { item: typeof options[0] }) => (
     <TouchableOpacity
       style={styles.card}
@@ -189,40 +107,34 @@ const HomeScreen = () => {
     </TouchableOpacity>
   );
 
+  // --- Condição de carregamento da imagem de fundo ---
+  // A tela principal só é renderizada depois que o fundo está pronto.
+  if (!fundoAppReady) {
+    return (
+      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007BFF" />
+        <Text style={styles.loadingText}>Carregando fundo...</Text>
+      </ImageBackground>
+    );
+  }
+
   return (
-    <ImageBackground source={fundo} style={styles.background} resizeMode="cover">
-      <View style={styles.adBanner}>
-        {currentBannerUrl ? (
-          <Animated.Image // Usando Animated.Image
-            source={{ uri: currentBannerUrl }}
-            style={[
-              styles.bannerImage,
-              { opacity: fadeAnim } // Aplicando a opacidade animada
-            ]}
-            resizeMode="contain"
-            onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
-          />
-        ) : (
-          // O texto de fallback não precisa ser animado da mesma forma,
-          // mas podemos envolvê-lo se quisermos um fade para ele também.
-          // Por ora, ele aparece quando não há currentBannerUrl e fadeAnim está em 0.
-          <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
-        )}
-      </View>
+    <ImageBackground source={currentFundoSource} style={styles.background} resizeMode="cover">
+      {/* O componente AdBanner substitui toda a lógica anterior de banner */}
+      <AdBanner /> 
 
       <View style={styles.content}>
         <FlatList
-          data={options} // Usando o array de opções para renderizar os botões
+          data={options}
           renderItem={renderGridItem}
           keyExtractor={(item, index) => item.label + index}
-          numColumns={NUM_COLUMNS} // Define 2 colunas para os botões
-          contentContainerStyle={styles.gridContainer} // Estilo para o container da FlatList
-          columnWrapperStyle={styles.row} // Estilo para cada linha (para espaçamento entre colunas)
+          numColumns={NUM_COLUMNS}
+          contentContainerStyle={styles.gridContainer}
+          columnWrapperStyle={styles.row}
         />
 
-        {/* Botão de Sair separado, no final */}
         <TouchableOpacity
-          style={[styles.card, styles.logoutButton]} // Adicionado estilo específico para logout
+          style={[styles.card, styles.logoutButton]}
           activeOpacity={0.8}
           onPress={confirmarLogout}
         >
@@ -238,43 +150,26 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
   },
-  adBanner: {
-    height: 60,
-    backgroundColor: 'rgba(220,220,220,0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    overflow: 'hidden',
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  adBannerText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#555',
-  },
   content: {
     flex: 1,
     paddingTop: 5,
-    paddingHorizontal: ITEM_MARGIN, // Ajustado para usar a margem dos itens
+    paddingHorizontal: ITEM_MARGIN,
     paddingBottom: 5,
-    // justifyContent: 'space-evenly', // Removido, pois a FlatList gerencia o espaçamento
   },
   gridContainer: {
     justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 10, // Padding vertical para a grade
+    paddingVertical: 10,
   },
   row: {
-    justifyContent: 'space-around', // Espaço entre as colunas
-    marginBottom: ITEM_MARGIN, // Margem inferior de cada linha
+    justifyContent: 'space-around',
+    marginBottom: ITEM_MARGIN,
   },
   card: {
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 20,
-    paddingVertical: ITEM_PADDING, // Padding vertical do card
-    paddingHorizontal: ITEM_PADDING, // Padding horizontal do card
+    paddingVertical: ITEM_PADDING,
+    paddingHorizontal: ITEM_PADDING,
     alignItems: 'center',
     flexDirection: 'column',
     shadowColor: '#000',
@@ -282,9 +177,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 3,
-    // Cálculo da largura para 2 colunas com margem
     width: (screenWidth - (ITEM_MARGIN * 2) - (ITEM_MARGIN * (NUM_COLUMNS - 1))) / NUM_COLUMNS,
-    marginHorizontal: ITEM_MARGIN / 2, // Metade da margem total para cada lado do item
+    marginHorizontal: ITEM_MARGIN / 2,
     minHeight: 125,
   },
   iconStyle: {
@@ -297,12 +191,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   logoutButton: {
-    marginTop: 20, // Margem superior para separar do grid
-    marginBottom: 10, // Margem inferior para o final da tela
-    width: (screenWidth - (ITEM_MARGIN * 2) - (ITEM_MARGIN * (NUM_COLUMNS - 1))) / NUM_COLUMNS, // Mesma largura dos outros cards
-    alignSelf: 'center', // Centralizar o botão de logout
-    backgroundColor: 'rgba(255,255,255,0.9)', // Pode manter o mesmo estilo do card
-  }
+    marginTop: 20,
+    marginBottom: 10,
+    width: (screenWidth - (ITEM_MARGIN * 2) - (ITEM_MARGIN * (NUM_COLUMNS - 1))) / NUM_COLUMNS,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(255,255,255,0.9)',
+  },
+  // Estilos para o estado de carregamento do fundo
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // O fundo já será a imagem carregada dinamicamente, ou o fallback local
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#007BFF',
+    fontSize: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)', // Adicionado sombra para melhor legibilidade no fundo dinâmico
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
 });
 
 export default HomeScreen;

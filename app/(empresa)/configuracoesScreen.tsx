@@ -10,7 +10,8 @@ import {
   ImageBackground,
   ActivityIndicator,
   SafeAreaView,
-  Linking
+  Linking,
+  Dimensions
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -21,11 +22,15 @@ import { ChevronLeft, Phone, Mail, Instagram } from 'lucide-react-native';
 import { router } from 'expo-router';
 import AdBanner from '../components/AdBanner';
 
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager';
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+
 // --- CONSTANTES ---
-// Removido: LOCATION_TASK_NAME, pois não usaremos mais a tarefa em segundo plano aqui.
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
 const UPLOAD_PRESET = 'expocrato';
-const fundo = require('../../assets/images/fundo.png');
 
 // --- INTERFACES ---
 interface CompanyProfile {
@@ -35,15 +40,13 @@ interface CompanyProfile {
   emailContato?: string;
   linkInstagram?: string;
   imagem?: string;
-  // Removido: compartilhando, pois não será mais usado.
-  localizacao?: { latitude: number; longitude: number }; // Adicionado: para armazenar a localização
+  localizacao?: { latitude: number; longitude: number };
 }
 
 // --- TELA DE CONFIGURAÇÕES DA EMPRESA ---
 const ConfiguracoesEmpresaScreen = () => {
   // --- ESTADOS (States) ---
-  // Removido: [compartilhando, setCompartilhando]
-  const [carregando, setCarregando] = useState(true);
+  const [carregando, setCarregando] = useState(true); // Controla o carregamento dos DADOS DA EMPRESA
   const [editando, setEditando] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [nomeEmpresa, setNomeEmpresa] = useState('');
@@ -53,15 +56,39 @@ const ConfiguracoesEmpresaScreen = () => {
   const [instagram, setInstagram] = useState('');
   const [imagem, setImagem] = useState('');
   const [novaImagemUri, setNovaImagemUri] = useState<string | null>(null);
-  const [localizacaoAtual, setLocalizacaoAtual] = useState<{ latitude: number; longitude: number } | null>(null); // Novo estado para a localização
+  const [localizacaoAtual, setLocalizacaoAtual] = useState<{ latitude: number; longitude: number } | null>(null);
+
+  // --- Estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false); // Controla o carregamento do FUNDO DO APP
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
   const usuarioId = auth.currentUser?.uid;
 
   // --- LÓGICA ---
+  // useEffect para carregar a imagem de fundo dinâmica
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na ConfiguracoesEmpresaScreen:", error);
+        setCurrentFundoSource(defaultFundoLocal);
+      } finally {
+        setFundoAppReady(true); // <--- IMPORTANTE: SEMPRE DEFINE COMO PRONTO AQUI
+      }
+    };
+    loadFundoImage();
+  }, []);
+
+  // useEffect para carregar os DADOS DA EMPRESA
   useEffect(() => {
     const loadCompanyData = async () => {
-      if (!usuarioId) { setCarregando(false); return; }
-      setCarregando(true);
+      if (!usuarioId) {
+        setCarregando(false); // Se não há usuário, para o carregamento e não tenta buscar dados.
+        return;
+      }
+      // setCarregando(true); // Já é true por padrão, ou pode ser setado aqui se necessário resetar
       try {
         const companyRef = ref(database, `solicitacoesEmpresas/${usuarioId}`);
         const snapshot = await get(companyRef);
@@ -73,82 +100,27 @@ const ConfiguracoesEmpresaScreen = () => {
           setEmail(data.emailContato || '');
           setInstagram(data.linkInstagram || '');
           setImagem(data.imagem || '');
-          setLocalizacaoAtual(data.localizacao || null); // Carrega a localização existente
+          setLocalizacaoAtual(data.localizacao || null);
         }
       } catch (error) {
         console.error("Erro ao carregar dados da empresa:", error);
         Alert.alert("Erro", "Não foi possível carregar as configurações da sua empresa.");
       } finally {
-        setCarregando(false);
+        setCarregando(false); // <--- CORREÇÃO: GARANTE QUE O LOADING DOS DADOS DA EMPRESA É ENCERRADO
       }
     };
     loadCompanyData();
   }, [usuarioId]);
 
-  const handleSalvarDadosEmpresa = async () => {
-    if (!usuarioId) return;
-    setIsSaving(true);
-    let finalImageUrl = imagem;
-    if (novaImagemUri) {
-      const uploadedUrl = await uploadImagem(novaImagemUri);
-      if (uploadedUrl) {
-        finalImageUrl = uploadedUrl;
-      } else {
-        setIsSaving(false);
-        return;
-      }
-    }
-
-    // --- LÓGICA DO INSTAGRAM PADRONIZADA (INÍCIO) ---
-    let processedInstagram: string | null = null;
-    const rawInstagramInput = instagram?.trim();
-
-    if (rawInstagramInput) {
-      const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)/;
-      const match = rawInstagramInput.match(instagramUrlRegex);
-
-      if (match && match[1]) {
-        processedInstagram = match[1];
-      } else {
-        processedInstagram = rawInstagramInput.startsWith('@') ? rawInstagramInput.substring(1) : rawInstagramInput;
-      }
-    }
-    // --- LÓGICA DO INSTAGRAM PADRONIZADA (FIM) ---
-
-    try {
-      const companyRef = ref(database, `solicitacoesEmpresas/${usuarioId}`);
-      await update(companyRef, {
-        nomeEmpresa,
-        descricao,
-        telefoneContato: telefone || null,
-        emailContato: email || null,
-        linkInstagram: processedInstagram, // ALTERADO: Salva o valor processado
-        imagem: finalImageUrl,
-        // Não precisamos mais do campo 'compartilhando' aqui
-        // O campo 'localizacao' será atualizado apenas pela função obterLocalizacaoAtualECadastrar
-      });
-      setImagem(finalImageUrl);
-      setInstagram(processedInstagram || ''); // Atualiza o estado local com o valor limpo
-      setNovaImagemUri(null);
-      setEditando(false);
-      Alert.alert('Sucesso', 'Dados da empresa atualizados!');
-    } catch (error) {
-      Alert.alert("Erro", "Não foi possível atualizar os dados da empresa.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const uploadImagem = async (uri: string): Promise<string | null> => {
-    // Implementação real do upload da imagem para o Cloudinary
-    // Por enquanto, retorna uma URL de exemplo
-    console.log("Simulando upload de imagem:", uri);
-
+  const uploadCompanyImage = async (uri: string): Promise<string | null> => {
     const formData = new FormData();
+    const filename = uri.split('/').pop();
+    const fileType = filename?.split('.').pop()?.toLowerCase() || 'jpeg';
+
     formData.append('file', {
       uri: uri,
-      type: 'image/jpeg', // Ou image/png, dependendo do formato
-      name: `upload_${Date.now()}.jpg`,
+      name: filename || `company_image_${Date.now()}.${fileType}`,
+      type: `image/${fileType}`,
     } as any);
     formData.append('upload_preset', UPLOAD_PRESET);
 
@@ -164,18 +136,69 @@ const ConfiguracoesEmpresaScreen = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('Erro no upload para Cloudinary:', errorData);
-        Alert.alert("Erro no Upload", `Não foi possível enviar a imagem: ${errorData.error.message || 'Erro desconhecido'}`);
+        console.error('Erro no upload para Cloudinary (imagem da empresa):', errorData);
+        Alert.alert("Erro no Upload", `Não foi possível enviar a imagem da empresa: ${errorData.error.message || 'Erro desconhecido'}`);
         return null;
       }
 
       const data = await response.json();
-      console.log('Upload Cloudinary Sucesso:', data);
+      console.log('Upload Cloudinary Sucesso (imagem da empresa):', data);
       return data.secure_url;
     } catch (error) {
-      console.error('Erro na requisição de upload:', error);
-      Alert.alert("Erro de Conexão", "Não foi possível conectar ao serviço de upload.");
+      console.error('Erro na requisição de upload (imagem da empresa):', error);
+      Alert.alert("Erro de Conexão", "Não foi possível conectar ao serviço de upload de imagem da empresa.");
       return null;
+    }
+  };
+
+  const handleSalvarDadosEmpresa = async () => {
+    if (!usuarioId) return;
+    setIsSaving(true);
+    let finalImageUrl = imagem;
+
+    if (novaImagemUri) {
+      const uploadedUrl = await uploadCompanyImage(novaImagemUri);
+      if (uploadedUrl) {
+        finalImageUrl = uploadedUrl;
+      } else {
+        setIsSaving(false);
+        return;
+      }
+    }
+
+    let processedInstagram: string | null = null;
+    const rawInstagramInput = instagram?.trim();
+
+    if (rawInstagramInput) {
+      const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)/;
+      const match = rawInstagramInput.match(instagramUrlRegex);
+
+      if (match && match[1]) {
+        processedInstagram = match[1];
+      } else {
+        processedInstagram = rawInstagramInput.startsWith('@') ? rawInstagramInput.substring(1) : rawInstagramInput;
+      }
+    }
+
+    try {
+      const companyRef = ref(database, `solicitacoesEmpresas/${usuarioId}`);
+      await update(companyRef, {
+        nomeEmpresa,
+        descricao,
+        telefoneContato: telefone || null,
+        emailContato: email || null,
+        linkInstagram: processedInstagram,
+        imagem: finalImageUrl,
+      });
+      setImagem(finalImageUrl);
+      setInstagram(processedInstagram || '');
+      setNovaImagemUri(null);
+      setEditando(false);
+      Alert.alert('Sucesso', 'Dados da empresa atualizados!');
+    } catch (error) {
+      Alert.alert("Erro", "Não foi possível atualizar os dados da empresa.");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -189,17 +212,14 @@ const ConfiguracoesEmpresaScreen = () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 3],
+      aspect: [4, 3], // Aspecto 4:3 para a imagem da empresa
       quality: 1,
     });
 
-    if (!result.canceled) {
+    if (!result.canceled && result.assets && result.assets.length > 0) {
       setNovaImagemUri(result.assets[0].uri);
     }
   };
-
-  // Removido: toggleCompartilhamento
-  // const toggleCompartilhamento = async (valor: boolean) => { ... };
 
   const obterLocalizacaoAtualECadastrar = async () => {
     if (!usuarioId) {
@@ -226,7 +246,7 @@ const ConfiguracoesEmpresaScreen = () => {
           longitude,
         }
       });
-      setLocalizacaoAtual({ latitude, longitude }); // Atualiza o estado local
+      setLocalizacaoAtual({ latitude, longitude });
       Alert.alert('Sucesso', `Localização atualizada para:\nLatitude: ${latitude.toFixed(5)}\nLongitude: ${longitude.toFixed(5)}`);
 
     } catch (error) {
@@ -235,20 +255,25 @@ const ConfiguracoesEmpresaScreen = () => {
     }
   };
 
-  // Removido: TaskManager.defineTask, pois não é mais necessário para essa tela.
-
-  if (carregando) {
+  // --- Condição de carregamento geral: Espera os dados da empresa E o fundo do app ---
+  // A variável 'carregando' controla o carregamento dos dados da empresa,
+  // enquanto 'fundoAppReady' controla o carregamento do fundo.
+  // Ambas precisam estar prontas para renderizar a tela principal.
+  if (carregando || !fundoAppReady) {
     return (
-      <ImageBackground source={fundo} style={styles.background}>
-        <View style={styles.centeredContainer}><ActivityIndicator size="large" color="#FFFFFF" /></View>
+      <ImageBackground source={currentFundoSource} style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FFFFFF" />
+        <Text style={styles.loadingText}>Carregando dados da empresa...</Text>
       </ImageBackground>
     );
   }
 
-  const displayImageUri = novaImagemUri || imagem;
+  // Define qual URI de imagem da empresa será exibida (nova imagem selecionada ou a imagem salva no Firebase)
+  // Se 'displayImageSource' for undefined (nenhuma URL), a Image não irá renderizar nada ou usará o espaço em branco.
+  const displayImageSource = novaImagemUri ? { uri: novaImagemUri } : (imagem ? { uri: imagem } : undefined);
 
   return (
-    <ImageBackground source={fundo} style={styles.background}>
+    <ImageBackground source={currentFundoSource} style={styles.background}>
       <AdBanner />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
@@ -261,7 +286,9 @@ const ConfiguracoesEmpresaScreen = () => {
           <View style={styles.card}>
             {!editando ? (
               <View style={styles.profileDisplayContainer}>
-                <Image source={{ uri: displayImageUri || undefined }} style={styles.profileImage} />
+                {/* Usa displayImageSource para exibir a imagem da empresa */}
+                {/* A imagem de placeholder é removida. Se displayImageSource for undefined, Image não mostrará nada. */}
+                <Image source={displayImageSource} style={styles.profileImage} />
                 <Text style={styles.profileName}>{nomeEmpresa}</Text>
                 <Text style={styles.profileDescription}>{descricao}</Text>
 
@@ -286,7 +313,7 @@ const ConfiguracoesEmpresaScreen = () => {
                       <Text style={[styles.profileDetail, styles.linkText]}>@{instagram}</Text>
                     </TouchableOpacity>
                   ) : null}
-                  {localizacaoAtual ? ( // Mostra a localização atual se estiver disponível
+                  {localizacaoAtual ? (
                     <View style={styles.detailRow}>
                       <Text style={styles.profileDetail}>Latitude: {localizacaoAtual.latitude.toFixed(5)}</Text>
                     </View>
@@ -296,7 +323,7 @@ const ConfiguracoesEmpresaScreen = () => {
                       <Text style={styles.profileDetail}>Longitude: {localizacaoAtual.longitude.toFixed(5)}</Text>
                     </View>
                   ) : null}
-                  {!localizacaoAtual && ( // Mensagem se não houver localização
+                  {!localizacaoAtual && (
                     <View style={styles.detailRow}>
                       <Text style={styles.profileDetail}>Nenhuma localização cadastrada.</Text>
                     </View>
@@ -310,7 +337,8 @@ const ConfiguracoesEmpresaScreen = () => {
             ) : (
               <View style={styles.profileEditContainer}>
                 <TouchableOpacity onPress={handleSelecionarFoto}>
-                  <Image source={{ uri: displayImageUri || undefined }} style={styles.profileImageEdit} />
+                  {/* Usa displayImageSource para exibir a imagem da empresa no modo edição */}
+                  <Image source={displayImageSource} style={styles.profileImageEdit} />
                   <Text style={styles.changePhotoText}>Alterar Imagem de Capa</Text>
                 </TouchableOpacity>
                 <TextInput style={styles.input} value={nomeEmpresa} onChangeText={setNomeEmpresa} placeholder="Nome da Empresa" />
@@ -332,7 +360,6 @@ const ConfiguracoesEmpresaScreen = () => {
 
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Localização da Empresa</Text>
-            {/* Removido o Switch de "Compartilhar localização" */}
             <Text style={styles.settingDescription}>Clique no botão abaixo para capturar sua localização atual e permitir que sua empresa apareça no mapa do evento.</Text>
             <TouchableOpacity style={styles.updateLocationButton} onPress={obterLocalizacaoAtualECadastrar}>
               <Text style={styles.updateLocationButtonText}>Atualizar Localização no Mapa</Text>
@@ -344,8 +371,6 @@ const ConfiguracoesEmpresaScreen = () => {
   );
 };
 
-// Removido TaskManager.defineTask(LOCATION_TASK_NAME, ...), pois não é mais necessário para essa tela.
-
 const styles = StyleSheet.create({
   background: { flex: 1 },
   safeArea: { flex: 1 },
@@ -353,6 +378,19 @@ const styles = StyleSheet.create({
   backButton: { padding: 5 },
   headerTitle: { flex: 1, fontSize: 20, fontWeight: 'bold', color: '#FFF', textAlign: 'center', marginRight: 34 },
   scrollContainer: { padding: 20 },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#FFFFFF',
+    fontSize: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
   centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   card: { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: 12, padding: 20, marginBottom: 20 },
   profileDisplayContainer: { alignItems: 'center' },

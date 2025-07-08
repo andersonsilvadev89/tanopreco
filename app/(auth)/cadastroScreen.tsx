@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Adicionado useEffect
 import {
   View,
   Alert,
@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
+  Dimensions, // Adicionado Dimensions, se já não estivesse
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth';
@@ -21,10 +22,10 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { Eye, EyeOff } from 'lucide-react-native';
 import { MaskedTextInput } from 'react-native-mask-text';
 import { router } from 'expo-router';
-import AdBanner from '../components/AdBanner';
+import AdBanner from '../components/AdBanner'; // AdBanner de volta
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
 
-const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
-const UPLOAD_PRESET = 'expocrato';
+const defaultFundoLocal = require('../../assets/images/fundo.png');
 
 export default function CadastroScreen() {
   const [nome, setNome] = useState('');
@@ -33,7 +34,7 @@ export default function CadastroScreen() {
   const [instagram, setInstagram] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
-  const [imagem, setImagem] = useState<string | null>(null);
+  const [imagem, setImagem] = useState<string | null>(null); // URI local da imagem de perfil
   const [loading, setLoading] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
@@ -41,7 +42,28 @@ export default function CadastroScreen() {
   const [termoAceito, setTermoAceito] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
 
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false);
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
   const camposPreenchidos = () => nome && email && senha && confirmarSenha;
+
+  // --- useEffect para carregar a imagem de fundo dinâmica ---
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        // Chamamos checkAndDownloadImages, mas só usaremos a URL de fundo (a logo não é relevante aqui)
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na CadastroScreen:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
+      }
+    };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
 
   const selecionarImagem = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -53,7 +75,7 @@ export default function CadastroScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [1, 1],
+        aspect: [1, 1], // Imagem de perfil geralmente quadrada
         quality: 0.7,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -67,8 +89,8 @@ export default function CadastroScreen() {
   const tirarFoto = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-        Alert.alert('Permissão necessária', 'Você precisa permitir o acesso à câmera para tirar uma foto.');
-        return;
+      Alert.alert('Permissão necessária', 'Você precisa permitir o acesso à câmera para tirar uma foto.');
+      return;
     }
     try {
       const result = await ImagePicker.launchCameraAsync({
@@ -95,17 +117,21 @@ export default function CadastroScreen() {
     );
   };
   
+  // --- A função uploadImagem ORIGINAL está de volta, sem relação com presets de Admin ---
   const uploadImagem = async () => {
     if (!imagem) return null;
     const formData = new FormData();
     formData.append('file', { uri: imagem, type: 'image/jpeg', name: 'perfil.jpg' } as any);
-    formData.append('upload_preset', UPLOAD_PRESET);
+    formData.append('upload_preset', 'expocrato'); // Usando o preset 'expocrato' padrão para perfil, como estava antes.
+                                                  // Ou crie um específico para perfil se quiser regras diferentes.
     try {
-      const response = await fetch(CLOUDINARY_URL, { method: 'POST', body: formData });
+      const response = await fetch('https://api.cloudinary.com/v1_1/dz37srew5/image/upload', { // URL Cloudinary original
+        method: 'POST', body: formData
+      });
       const data = await response.json();
       return data.secure_url || '';
     } catch (error: any) {
-      setErro('Erro ao enviar imagem. Tente novamente.');
+      Alert.alert('Erro', 'Erro ao enviar imagem de perfil. Tente novamente.');
       return '';
     }
   };
@@ -135,7 +161,7 @@ export default function CadastroScreen() {
       }
       const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
       const userId = userCredential.user.uid;
-      const imageUrl = await uploadImagem();
+      const imageUrl = await uploadImagem(); // Chama a função de upload de imagem de perfil
 
       // --- LÓGICA DO INSTAGRAM PADRONIZADA (INÍCIO) ---
       let processedInstagram: string | null = null;
@@ -157,7 +183,7 @@ export default function CadastroScreen() {
         nome,
         email,
         telefone: telefone || null,
-        instagram: processedInstagram, // ALTERADO: Salva o valor processado
+        instagram: processedInstagram,
         imagem: imageUrl,
       });
 
@@ -170,6 +196,7 @@ export default function CadastroScreen() {
       setConfirmarSenha('');
       setImagem(null);
       setTermoAceito(false);
+      router.replace('/(auth)/loginScreen');
     } catch (error: any) {
       setErro(error.message);
     } finally {
@@ -177,8 +204,18 @@ export default function CadastroScreen() {
     }
   };
 
+  // --- Condição de carregamento da imagem de fundo ---
+  if (!fundoAppReady) {
+    return (
+      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007BFF" />
+        <Text style={styles.loadingText}>Preparando tela de cadastro...</Text>
+      </ImageBackground>
+    );
+  }
+
   return (
-    <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+    <ImageBackground source={currentFundoSource} style={styles.background}>
       <AdBanner />
       
       <KeyboardAwareScrollView 
@@ -295,7 +332,45 @@ export default function CadastroScreen() {
             <View style={styles.modalContentWrapper}>
                 <ScrollView style={styles.modalContainer}>
                     <Text style={styles.modalTitle}>TERMO DE USO E CONSENTIMENTO...</Text>
-                    {/* ... O resto do texto do termo ... */}
+                    <Text style={styles.modalText}>
+                      Este aplicativo coleta e utiliza dados pessoais para proporcionar uma experiência personalizada. Ao prosseguir, você concorda com o tratamento de suas informações conforme descrito em nossa política.
+                    </Text>
+                    <Text style={styles.modalSectionTitle}>1. Coleta de Dados</Text>
+                    <Text style={styles.modalText}>
+                      Coletamos informações como nome, email, telefone, dados de perfil (como foto e Instagram), localização (para funcionalidades de mapa) e interações com o aplicativo.
+                    </Text>
+                    <Text style={styles.modalSectionTitle}>2. Uso dos Dados</Text>
+                    <Text style={styles.modalText}>
+                      Seus dados são usados para:
+                    </Text>
+                    <Text style={styles.modalListItem}>- Personalizar sua experiência no evento.</Text>
+                    <Text style={styles.modalListItem}>- Facilitar a localização de amigos e serviços.</Text>
+                    <Text style={styles.modalListItem}>- Fornecer informações sobre a programação.</Text>
+                    <Text style={styles.modalListItem}>- Melhorar nossos serviços.</Text>
+
+                    <Text style={styles.modalSectionTitle}>3. Compartilhamento de Dados</Text>
+                    <Text style={styles.modalText}>
+                      Não compartilhamos seus dados pessoais com terceiros sem seu consentimento explícito, exceto quando necessário para a prestação de serviços (ex: APIs de mapa) ou por exigência legal.
+                    </Text>
+
+                    <Text style={styles.modalSectionTitle}>4. Segurança</Text>
+                    <Text style={styles.modalText}>
+                      Empregamos medidas de segurança para proteger suas informações, mas nenhuma transmissão de dados pela internet é 100% segura.
+                    </Text>
+
+                    <Text style={styles.modalSectionTitle}>5. Seus Direitos</Text>
+                    <Text style={styles.modalText}>
+                      Você tem o direito de acessar, corrigir, excluir ou limitar o uso de seus dados. Para exercer esses direitos, entre em contato conosco.
+                    </Text>
+
+                    <Text style={styles.modalSectionTitle}>6. Alterações na Política</Text>
+                    <Text style={styles.modalText}>
+                      Esta política pode ser atualizada. Recomendamos revisá-la periodicamente.
+                    </Text>
+
+                    <Text style={styles.modalText}>
+                      Ao clicar em "Aceitar", você concorda com os termos acima.
+                    </Text>
                 </ScrollView>
                 <View style={styles.modalButtonContainer}>
                     <Button title="Fechar" onPress={() => setModalVisible(false)} />
@@ -338,4 +413,16 @@ const styles = StyleSheet.create({
   modalText: { fontSize: 14, lineHeight: 20, textAlign: 'justify', marginBottom: 10 },
   modalListItem: { fontSize: 14, lineHeight: 20, textAlign: 'justify', marginLeft: 10 },
   modalButtonContainer: { padding: 10, borderTopWidth: 1, borderTopColor: '#eee' },
+  // Estilos para o estado de carregamento do fundo
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF', // Pode ser uma cor sólida enquanto o fundo carrega
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#007BFF',
+    fontSize: 16,
+  },
 });

@@ -18,9 +18,9 @@ export default {
       config: {
         googleMaps: {
           apiKey: "AIzaSyDOY_dZzTNgjeMX2z7ssWi755eznnBO68o"
-        }
+        },
       },
-      versionCode: 16,
+      versionCode: 17,
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -36,9 +36,9 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.ae.stoantoniobarbalhacliente",
-      buildNumber: "1",
+      buildNumber: "2",
       config: {
-        googleMapsApiKey: "AIzaSyBY4ZBNVZ1VkyqJqY_M7u3LPdT6Ielcuw0"
+        googleMapsApiKey: "AIzaSyBY4ZBNVZ1VkyqJqY_M7u3LPdT6Ielcuw0",
       },
       googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
@@ -66,9 +66,14 @@ export default {
           isAndroidBackgroundLocationEnabled: true
         }
       ],
-      "expo-secure-store"
-      // Se você precisar de frameworks estáticos, descomente a linha abaixo e adicione a dependência expo-build-properties ao package.json
-      // ["expo-build-properties", { ios: { useFrameworks: "static" }}],
+      "expo-secure-store",
+      [
+        "react-native-google-mobile-ads",
+        {
+          android_app_id: "ca-app-pub-5241782827769638~2412388769",
+          ios_app_id: "ca-app-pub-5241782827769638~5322425461",
+        }
+      ]
     ],
     experiments: {
       typedRoutes: true

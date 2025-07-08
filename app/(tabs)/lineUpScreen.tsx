@@ -10,20 +10,24 @@ import {
   Image,
   ImageBackground,
   Dimensions,
-  ActivityIndicator,
+  ActivityIndicator, // Adicionado para o loading do fundo
   SafeAreaView,
-  // REMOVIDO: Animated
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import MapView, { Marker, Region, Callout } from 'react-native-maps';
-// REMOVIDO: get
 import { ref, onValue } from 'firebase/database';
-import { database, administrativoDatabase } from '../../firebaseConfig';
+import { database } from '../../firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
 import 'moment/locale/pt-br';
-// ADICIONADO: Importação do seu componente de banner
 import AdBanner from '../components/AdBanner'; 
+
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
 // --- Interfaces ---
 interface Evento {
@@ -34,9 +38,6 @@ interface Evento {
   imagemUrl?: string;
   dataMomento: string;
 }
-
-// REMOVIDO: Interface BannerItem não é mais necessária
-// interface BannerItem { ... }
 
 interface Locais {
   id: string;
@@ -63,15 +64,27 @@ const LineUpScreen = () => {
   const [dataTitulo, setDataTitulo] = useState('Programação do Dia');
   const [locaisData, setLocaisData] = useState<Locais[]>([]);
 
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false);
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
   const cratoLocation = { latitude: -7.2345, longitude: -39.4056 };
 
-  // REMOVIDO: Estados e Refs relacionados aos banners
-  // const [allBanners, setAllBanners] = useState<string[]>([]);
-  // const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-  // const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-  // const fadeAnim = useRef(new Animated.Value(0)).current;
-
-  // REMOVIDO: Os dois useEffects para buscar e animar os banners.
+  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na LineUpScreen:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
+      }
+    };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
 
   // Lógica principal da tela (inalterada)
   useEffect(() => {
@@ -188,13 +201,21 @@ const LineUpScreen = () => {
     }
   };
 
+  // --- Condição de carregamento da imagem de fundo ---
+  // A tela principal só é renderizada depois que o fundo está pronto.
+  if (!fundoAppReady) {
+    return (
+      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007BFF" />
+        <Text style={styles.loadingText}>Carregando fundo...</Text>
+      </ImageBackground>
+    );
+  }
+
   return (
-    <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
-      {/* ADICIONADO: Componente AdBanner */}
+    <ImageBackground source={currentFundoSource} style={styles.background}>
       <AdBanner />
       
-      {/* REMOVIDO: Antigo View do banner */}
-
       <SafeAreaView style={styles.safeAreaContainer}>
         <View style={styles.container}>
           <View style={styles.headerDate}>
@@ -259,7 +280,6 @@ const LineUpScreen = () => {
 // ESTILOS ATUALIZADOS
 const styles = StyleSheet.create({
   background: { flex: 1, resizeMode: 'cover' },
-  // REMOVIDO: Estilos 'adBanner', 'bannerImage' e 'adBannerText'
   safeAreaContainer: { flex: 1 }, 
   container: { flex: 1, paddingHorizontal: 10, paddingTop: 10 },
   headerDate: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, },
@@ -381,6 +401,21 @@ const styles = StyleSheet.create({
   calloutView: { width: 200, padding: 12, backgroundColor: 'white', borderRadius: 10, borderColor: '#ddd', borderWidth: 0.5, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1.5 },
   calloutTitle: { fontWeight: 'bold', fontSize: 15, color: '#333', marginBottom: 4 },
   calloutDescription: { fontSize: 13, color: '#555', marginBottom: 2 },
+  // Estilos para o estado de carregamento do fundo
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // O fundo já será a imagem carregada dinamicamente, ou o fallback local
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#007BFF',
+    fontSize: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)', // Adicionado sombra para melhor legibilidade no fundo dinâmico
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
 });
 
 export default LineUpScreen;

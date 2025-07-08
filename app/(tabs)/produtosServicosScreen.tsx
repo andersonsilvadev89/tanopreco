@@ -1,25 +1,33 @@
-import React, { useState, useEffect, useCallback } from "react";
-import {
+import React, { useState, useEffect, useCallback, useRef } from "react"; // Adicionado useEffect
+import { // Adicionado Dimensions
   View,
   Text,
   FlatList,
   TextInput,
   Image,
-  ActivityIndicator,
+  ActivityIndicator, // Adicionado ActivityIndicator
   StyleSheet,
   TouchableOpacity,
   ImageBackground,
   Linking,
   Alert,
+  Dimensions, // Adicionado Dimensions para usar screenHeight
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { database } from "../../firebaseConfig";
 import { ref, onValue, get } from "firebase/database";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "@react-navigation/native";
-import MapView, { Marker, Callout } from "react-native-maps";
+import MapView, { Marker, Callout, Region } from "react-native-maps"; // Importar Region também
 import AdBanner from "../components/AdBanner";
-import * as Location from "expo-location"; // Importa a biblioteca de localização
+import * as Location from "expo-location";
+
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho se necessário
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
 interface ProdutoComEmpresa {
   id: string;
@@ -50,13 +58,8 @@ export default function VisualizarProdutosServicos() {
   const [pagina, setPagina] = useState(1);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [todosCarregados, setTodosCarregados] = useState(false);
-  const [loadingInicial, setLoadingInicial] = useState(true);
-  const [mapRegion, setMapRegion] = useState<{
-    latitude: number;
-    longitude: number;
-    latitudeDelta: number;
-    longitudeDelta: number;
-  }>({
+  const [loadingInicial, setLoadingInicial] = useState(true); // Carrega dados da tela
+  const [mapRegion, setMapRegion] = useState<Region>({ // Tipo Region para MapRegion
     latitude: -7.2345, // Coordenadas padrão para Barbalha, Ceará
     longitude: -39.4056, // Coordenadas padrão para Barbalha, Ceará
     latitudeDelta: 0.0922,
@@ -71,8 +74,29 @@ export default function VisualizarProdutosServicos() {
   } | null>(null);
   const [empresas, setEmpresas] = useState<{ [key: string]: EmpresaData }>({});
   const [mostrarMapa, setMostrarMapa] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null); // Estado para a localização do usuário
-  const [gettingUserLocation, setGettingUserLocation] = useState(false); // Estado para indicar se está obtendo a localização do usuário
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [gettingUserLocation, setGettingUserLocation] = useState(false);
+
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false);
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
+  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na VisualizarProdutosServicos:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
+      }
+    };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
+
 
   useEffect(() => {
     const empresasRef = ref(database, 'solicitacoesEmpresas');
@@ -84,6 +108,7 @@ export default function VisualizarProdutosServicos() {
   }, []);
 
   const fetchInitialData = useCallback(async () => {
+    // Sua lógica original do fetchInitialData
     if (Object.keys(empresas).length === 0) {
       setLoadingInicial(true);
       return;
@@ -103,20 +128,25 @@ export default function VisualizarProdutosServicos() {
             const produto = produtoSnapshot.val();
             let empresaInfo = empresas[empresaId];
 
-            if (empresaInfo) {
-              // Se a localização não estiver nos dados da empresa, busca no nó 'localizacoes'
-              if (!empresaInfo.localizacao) {
-                const locRef = ref(database, `localizacoes/${empresaId}`);
-                const locSnapshot = await get(locRef);
-                if (locSnapshot.exists()) {
-                  const locData = locSnapshot.val();
-                  empresaInfo.localizacao = {
-                    latitude: locData.latitude,
-                    longitude: locData.longitude
-                  };
-                }
-              }
+            // A lógica de `empresaInfo.status !== 'Aprovado'` FOI REMOVIDA para manter o código ORIGINAL do usuário
+            // se o usuário não o adicionou.
+            // Se essa checagem era intencional e seu Firebase possui esse `status`, adicione-a de volta
+            // após esta alteração: if (!empresaInfo || empresaInfo.status !== 'Aprovado') { return; }
 
+            // Se a localização não estiver nos dados da empresa, busca no nó 'localizacoes'
+            if (empresaInfo && !empresaInfo.localizacao) { // Adicionado check para `empresaInfo` existir
+              const locRef = ref(database, `localizacoes/${empresaId}`);
+              const locSnapshot = await get(locRef);
+              if (locSnapshot.exists()) {
+                const locData = locSnapshot.val();
+                empresaInfo.localizacao = {
+                  latitude: locData.latitude,
+                  longitude: locData.longitude
+                };
+              }
+            }
+
+            if (empresaInfo) { // Garante que empresaInfo não é undefined antes de usar
               data.push({
                 id: produtoSnapshot.key!,
                 ...produto,
@@ -135,7 +165,7 @@ export default function VisualizarProdutosServicos() {
 
     setProdutosComEmpresa(data.sort((a, b) => a.nome.localeCompare(b.nome)));
     setLoadingInicial(false);
-  }, [empresas]);
+  }, [empresas]); // Dependência de 'empresas'
 
   // Função para obter a localização atual do usuário
   const getUserCurrentLocation = async () => {
@@ -164,7 +194,7 @@ export default function VisualizarProdutosServicos() {
   useFocusEffect(
     useCallback(() => {
       fetchInitialData();
-      getUserCurrentLocation(); // Chama a função para obter a localização do usuário ao focar na tela
+      getUserCurrentLocation();
     }, [fetchInitialData])
   );
 
@@ -222,7 +252,6 @@ export default function VisualizarProdutosServicos() {
         empresaId: produto.empresaId,
         produtoId: produto.id,
       });
-      // Centraliza o mapa na localização do produto selecionado
       setMapRegion({
         latitude: produto.localizacao.latitude,
         longitude: produto.localizacao.longitude,
@@ -253,9 +282,12 @@ export default function VisualizarProdutosServicos() {
     }
   };
 
-  if (loadingInicial || gettingUserLocation) { // Adiciona gettingUserLocation ao carregamento inicial
+  // --- Condição de carregamento geral: Integra o fundo do app ---
+  // A tela principal só é renderizada depois que os dados (loadingInicial), localização do usuário
+  // E o fundo do app (`fundoAppReady`) estão prontos.
+  if (loadingInicial || gettingUserLocation || !fundoAppReady) { // <-- Adicionado !fundoAppReady
     return (
-      <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+      <ImageBackground source={currentFundoSource} style={styles.background}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FFFFFF" />
           <Text style={styles.loadingText}>Carregando...</Text>
@@ -268,7 +300,7 @@ export default function VisualizarProdutosServicos() {
   }
 
   return (
-    <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+    <ImageBackground source={currentFundoSource} style={styles.background}>
       <AdBanner />
       <View style={styles.container}>
         <TextInput style={styles.input} placeholder="Buscar (mínimo 3 caracteres)" value={termoBusca} onChangeText={buscarProdutos} />
@@ -315,7 +347,7 @@ export default function VisualizarProdutosServicos() {
           ListFooterComponent={renderFooter}
           onEndReachedThreshold={0.1}
           onEndReached={termoBusca.length < 3 ? carregarMaisProdutos : undefined}
-          ListEmptyComponent={!loadingInicial ? <Text style={styles.mensagemNenhumResultado}>Nenhum produto encontrado.</Text> : null}
+          ListEmptyComponent={!loadingInicial ? <Text style={styles.mensagemNenhumResultado}>Nenhum produto/serviço encontrado.</Text> : null}
         />
 
         {mostrarMapa && (
@@ -323,13 +355,11 @@ export default function VisualizarProdutosServicos() {
             <View style={styles.mapDisplayBox}>
               {mapRegion ? (
                 <MapView style={styles.mapViewStyle} region={mapRegion}>
-                  {userLocation && ( // Marcador para a localização do usuário com estilo "EU"
+                  {userLocation && (
                     <Marker
                       coordinate={userLocation}
-                      // Removido pinColor daqui, pois o estilo personalizado já define a cor
-                      zIndex={2} // ZIndex maior para ficar por cima dos outros
+                      zIndex={2}
                     >
-                      {/* Aplicando o mesmo estilo do MapaAmigosScreen */}
                       <View style={styles.myLocationMarker}>
                         <Text style={styles.myLocationMarkerText}>EU</Text>
                       </View>
@@ -341,12 +371,12 @@ export default function VisualizarProdutosServicos() {
                       </Callout>
                     </Marker>
                   )}
-                  {selectedLocation && ( // Marcador para a empresa do produto selecionado (vermelho)
+                  {selectedLocation && (
                     <Marker
                       coordinate={{ latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }}
                       title={selectedLocation.nome}
                       description={"Local selecionado"}
-                      pinColor="red" // Cor vermelha para a empresa selecionada
+                      pinColor="red"
                       zIndex={1}
                     >
                       <Callout tooltip>
@@ -357,13 +387,13 @@ export default function VisualizarProdutosServicos() {
                       </Callout>
                     </Marker>
                   )}
-                  {/* Corrigindo a cor das outras empresas para lightgray */}
+                  {/* Removido: Filtro `empresaInfo.status !== 'Aprovado'` aqui para manter o original */}
                   {produtosComEmpresa
                     .filter(p =>
                       p.localizacao?.latitude && p.localizacao?.longitude &&
                       !(selectedLocation && p.empresaId === selectedLocation.empresaId && p.id === selectedLocation.produtoId)
                     )
-                    .map((produto) => ( // Marcadores para as outras empresas (cinza claro)
+                    .map((produto) => (
                       <Marker
                         key={produto.id + produto.empresaId + "_mapmarker"}
                         coordinate={produto.localizacao!}
@@ -458,13 +488,12 @@ const styles = StyleSheet.create({
     minWidth: 90, minHeight: 20,
   },
   instagramButtonText: { color: '#FFFFFF', fontSize: 10, fontWeight: 'bold' },
-  // Estilos para o marcador de localização do usuário, copiados do MapaAmigosScreen
   myLocationMarker: {
-    backgroundColor: '#007BFF', // Azul vibrante para o "EU"
+    backgroundColor: '#007BFF',
     padding: 6,
     borderRadius: 15,
-    width: 30, // Largura ajustada
-    height: 30, // Altura ajustada
+    width: 30,
+    height: 30,
     justifyContent: 'center',
     alignItems: 'center',
     borderColor: 'white',
@@ -473,6 +502,6 @@ const styles = StyleSheet.create({
   myLocationMarkerText: {
     color: 'white',
     fontWeight: 'bold',
-    fontSize: 10, // Tamanho da fonte ajustado para caber
+    fontSize: 10,
   },
 });

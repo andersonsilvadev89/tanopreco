@@ -14,12 +14,17 @@ import {
 import { router } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { onValue, ref, set } from 'firebase/database';
-import { onAuthStateChanged, Unsubscribe } from 'firebase/auth'; // Importando o onAuthStateChanged
+import { onAuthStateChanged, Unsubscribe } from 'firebase/auth';
 import { auth, database } from '../../firebaseConfig';
 import { MaskedTextInput } from 'react-native-mask-text';
 import AdBanner from '../components/AdBanner';
 
-const fundo = require('../../assets/images/fundo.png');
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
 // Interfaces
 interface UserProfile {
@@ -41,7 +46,7 @@ interface CompanyRegistrationData {
 }
 
 const EmpresaScreen = () => {
-  const [loadingUserStatus, setLoadingUserStatus] = useState(true);
+  const [loadingUserStatus, setLoadingUserStatus] = useState(true); // Carrega dados do usuário/status da empresa
   const [userCompanyStatus, setUserCompanyStatus] = useState<'Aguardando' | 'Aprovado' | 'Rejeitado' | null>(null);
   const [empresa, setEmpresa] = useState<Omit<CompanyRegistrationData, 'status' | 'timestamp' | 'userId'>>({
     nomeEmpresa: '',
@@ -55,20 +60,37 @@ const EmpresaScreen = () => {
   const [formError, setFormError] = useState('');
   const [submittingForm, setSubmittingForm] = useState(false);
 
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false); // Controla o carregamento do FUNDO DO APP
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
+  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na EmpresaScreen:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
+      }
+    };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
+
   // --- LÓGICA DE VERIFICAÇÃO DE STATUS ATUALIZADA ---
   useEffect(() => {
     let databaseListener: Unsubscribe | null = null;
 
-    // Usando onAuthStateChanged para reagir em tempo real ao login/logout
     const authListener = onAuthStateChanged(auth, (user) => {
-      // Se o listener do banco de dados já existir, remove-o para evitar duplicação
       if (databaseListener) {
         databaseListener();
       }
 
       if (user) {
-        // Se o usuário ESTÁ logado, anexa o listener de dados
-        setLoadingUserStatus(true);
+        setLoadingUserStatus(true); // Inicia o loading dos dados do usuário
         const userStatusRef = ref(database, `usuarios/${user.uid}`);
         
         databaseListener = onValue(userStatusRef, (snapshot) => {
@@ -77,30 +99,27 @@ const EmpresaScreen = () => {
           if (status === 'Aprovado') {
             router.replace('/(empresa)/homeScreen');
           }
-          setLoadingUserStatus(false);
+          setLoadingUserStatus(false); // <--- IMPORTANTE: Finaliza o loading dos DADOS DO USUÁRIO
         }, (error) => {
-          // Este erro não deve mais acontecer no logout
           console.error("Erro ao ler status da empresa:", error);
           setLoadingUserStatus(false);
         });
       } else {
-        // Se o usuário DESLOGOU, limpa os estados e não anexa listeners
         setUserCompanyStatus(null);
         setLoadingUserStatus(false);
       }
     });
 
-    // Função de limpeza para remover TODOS os listeners quando a tela for desmontada
     return () => {
-      authListener(); // Remove o listener de autenticação
+      authListener();
       if (databaseListener) {
-        databaseListener(); // Remove o listener do banco de dados, se ele existir
+        databaseListener();
       }
     };
-  }, []); // Array vazio garante que o efeito rode apenas na montagem/desmontagem
+  }, []);
 
   const handleRegisterCompany = async () => {
-    const userId = auth.currentUser?.uid; // Pega o userId atual no momento do clique
+    const userId = auth.currentUser?.uid;
     if (!userId) {
       Alert.alert("Erro de autenticação", "Sua sessão expirou. Por favor, faça login novamente.");
       return;
@@ -158,9 +177,10 @@ const EmpresaScreen = () => {
   };
 
   // --- RENDERIZAÇÃO ---
-  if (loadingUserStatus) {
+  // Condição de carregamento geral: Espera os dados do usuário/status E o fundo do app.
+  if (loadingUserStatus || !fundoAppReady) {
     return (
-      <ImageBackground source={fundo} style={styles.background}>
+      <ImageBackground source={currentFundoSource} style={styles.background}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FFF" />
           <Text style={styles.loadingText}>Verificando status...</Text>
@@ -169,10 +189,11 @@ const EmpresaScreen = () => {
     );
   }
 
+  // Se o status for 'Aprovado', a tela já redirecionou, então não renderiza nada aqui.
   if (userCompanyStatus === 'Aprovado') { return null; }
 
   return (
-    <ImageBackground source={fundo} style={styles.background} resizeMode="cover">
+    <ImageBackground source={currentFundoSource} style={styles.background} resizeMode="cover">
       <AdBanner />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
@@ -189,7 +210,7 @@ const EmpresaScreen = () => {
                 <Text style={styles.statusText}>Sua solicitação foi enviada e está aguardando aprovação.</Text>
             </View>
           ) : userCompanyStatus === 'Rejeitado' ? (
-             <View style={[styles.statusMessageContainer, styles.rejectedStatus]}>
+              <View style={[styles.statusMessageContainer, styles.rejectedStatus]}>
                 <Text style={styles.statusTitle}>Solicitação Rejeitada</Text>
                 <Text style={styles.statusText}>Sua solicitação foi rejeitada. Por favor, revise os dados e tente novamente.</Text>
                 <TouchableOpacity style={styles.retryButton} onPress={() => setUserCompanyStatus(null)}>
@@ -228,8 +249,20 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 10, backgroundColor: 'rgba(0,0,0,0.4)' },
   backButton: { padding: 5 },
   headerTitle: { flex: 1, fontSize: 20, fontWeight: 'bold', color: '#FFF', textAlign: 'center', marginRight: 34 },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-  loadingText: { marginTop: 10, fontSize: 16, color: '#FFF' },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    // O fundo já será a imagem carregada dinamicamente, ou o fallback local
+  },
+  loadingText: { 
+    marginTop: 10, 
+    fontSize: 16, 
+    color: '#FFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)', // Sombra para legibilidade
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
   scrollContent: { flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingVertical: 20 },
   contentContainer: { width: '90%', backgroundColor: 'rgba(255,255,255,0.9)', padding: 20, borderRadius: 15, alignItems: 'center' },
   messageText: { fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 10, textAlign: 'center' },

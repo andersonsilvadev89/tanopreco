@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
     View, 
     Text, 
@@ -20,6 +20,13 @@ import { ref, get, set, remove, onValue } from 'firebase/database';
 import { auth, database } from '../../firebaseConfig';
 import { useFocusEffect } from '@react-navigation/native';
 import AdBanner from '../components/AdBanner'; 
+
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
 // --- INTERFACES ---
 interface Usuario {
@@ -46,12 +53,32 @@ const LocalizacaoScreen = () => {
   const [pagina, setPagina] = useState(1);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [todosCarregados, setTodosCarregados] = useState(false);
-  const [loadingInicial, setLoadingInicial] = useState(true);
+  const [loadingInicial, setLoadingInicial] = useState(true); // Controla o carregamento dos DADOS da tela
   const usuarioLogadoId = auth.currentUser?.uid;
+
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false); // Controla o carregamento do FUNDO DO APP
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
+  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na LocalizacaoScreen:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
+      }
+    };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
 
   const buscarUsuarios = useCallback(async () => {
     if (!usuarioLogadoId) return;
-    setLoadingInicial(true);
+    setLoadingInicial(true); // Inicia o loading dos dados da tela
     const usuariosRef = ref(database, 'usuarios');
     const snapshotUsuarios = await get(usuariosRef);
     const todosUsuariosTemp: Usuario[] = [];
@@ -87,7 +114,7 @@ const LocalizacaoScreen = () => {
     }
     setPagina(1);
     setTodosCarregados(false);
-    setLoadingInicial(false);
+    setLoadingInicial(false); // <--- IMPORTANTE: Finaliza o loading dos DADOS DA TELA
   }, [usuarioLogadoId]);
 
   useEffect(() => {
@@ -151,7 +178,6 @@ const LocalizacaoScreen = () => {
     }
   };
   
-  // --- FUNÇÃO DE ABERTURA DO INSTAGRAM (VERSÃO SIMPLIFICADA) ---
   const openInstagramProfile = async (username: string | undefined) => {
     if (!username) {
       Alert.alert("Instagram não informado", "Este usuário não possui um Instagram cadastrado.");
@@ -244,9 +270,10 @@ const LocalizacaoScreen = () => {
     ]);
   };
 
-  if (loadingInicial) {
+  // --- Condição de carregamento geral: Espera os dados da tela E o fundo do app ---
+  if (loadingInicial || !fundoAppReady) {
     return (
-      <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+      <ImageBackground source={currentFundoSource} style={styles.background}>
         <View style={styles.loadingContainerCentral}>
           <ActivityIndicator size="large" color="#FFFFFF" />
           <Text style={styles.loadingText}>Carregando...</Text>
@@ -344,7 +371,7 @@ const LocalizacaoScreen = () => {
   };
 
   return (
-    <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+    <ImageBackground source={currentFundoSource} style={styles.background}>
       <AdBanner />
       <SafeAreaView style={styles.container}>
         <TextInput

@@ -14,21 +14,26 @@ import {
   Keyboard,
   StyleSheet,
   ImageBackground,
-  // REMOVIDO: Animated
 } from 'react-native';
 import { Masks } from 'react-native-mask-input';
 import MaskInput from 'react-native-mask-input';
 import * as ImagePicker from 'expo-image-picker';
-// REMOVIDO: get
 import { ref, push, set, onValue, remove, update } from 'firebase/database';
-// REMOVIDO: administrativoDatabase
 import { auth, database } from '../../firebaseConfig';
-// ADICIONADO: Importação do seu componente de banner
 import AdBanner from '../components/AdBanner';
 
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png'); // Usando defaultFundoLocal agora
+
+// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
+
+
+// --- CONSTANTES DE UPLOAD (MANTIDAS COMO ESTAVAM) ---
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
 const UPLOAD_PRESET = 'expocrato';
-const fundo = require('../../assets/images/fundo.png');
 
 interface Produto {
   id?: string;
@@ -37,9 +42,6 @@ interface Produto {
   imagemUrl?: string;
   palavrasChave?: string;
 }
-
-// REMOVIDO: Interface BannerItem não é mais necessária
-// interface BannerItem { ... }
 
 export default function CadastroProduto() {
   const [descricao, setDescricao] = useState('');
@@ -51,17 +53,29 @@ export default function CadastroProduto() {
   const [loadingUpload, setLoadingUpload] = useState(false);
   const [termoBusca, setTermoBusca] = useState('');
   const [editandoId, setEditandoId] = useState<string | null>(null);
-  
-  // REMOVIDO: Estados e Refs relacionados aos banners
-  // const [allBanners, setAllBanners] = useState<string[]>([]);
-  // const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
-  // const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-  // const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false);
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
   const scrollRef = useRef<ScrollView>(null);
   const userId = auth.currentUser?.uid;
 
-  // REMOVIDO: Os dois useEffects para buscar e animar os banners.
+  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na CadastroProduto:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
+      }
+    };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
 
   // Lógica principal da tela (inalterada)
   useEffect(() => {
@@ -165,7 +179,7 @@ export default function CadastroProduto() {
       Alert.alert("Permissão necessária", "Você precisa permitir o acesso à câmera.");
       return;
     }
-  
+    
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -189,7 +203,7 @@ export default function CadastroProduto() {
         type: 'image/jpeg',
         name: 'foto.jpg',
       } as any);
-      data.append('upload_preset', UPLOAD_PRESET);
+      data.append('upload_preset', UPLOAD_PRESET); // Este UPLOAD_PRESET é para a imagem do PRODUTO
 
       const res = await fetch(CLOUDINARY_URL, {
         method: 'POST',
@@ -197,10 +211,15 @@ export default function CadastroProduto() {
       });
 
       const file = await res.json();
-      setImagemUrl(file.secure_url);
+      if (res.ok && file.secure_url) {
+        setImagemUrl(file.secure_url);
+      } else {
+        console.error('Erro ao enviar imagem do produto:', file);
+        Alert.alert('Erro ao enviar imagem do produto. Tente novamente.');
+      }
     } catch (error) {
-      console.error('Erro ao enviar imagem:', error);
-      Alert.alert('Erro ao enviar imagem. Tente novamente.');
+      console.error('Erro ao enviar imagem do produto (conexão):', error);
+      Alert.alert('Erro de conexão ao enviar imagem. Tente novamente.');
     } finally {
       setLoadingUpload(false);
     }
@@ -215,12 +234,19 @@ export default function CadastroProduto() {
     );
   });
 
+  // --- Condição de carregamento da imagem de fundo ---
+  if (!fundoAppReady) {
+    return (
+      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007BFF" />
+        <Text style={styles.loadingText}>Carregando fundo...</Text>
+      </ImageBackground>
+    );
+  }
+
   return (
-    <ImageBackground source={fundo} style={styles.background} resizeMode="cover">
-      {/* ADICIONADO: Componente AdBanner */}
+    <ImageBackground source={currentFundoSource} style={styles.background} resizeMode="cover">
       <AdBanner />
-      
-      {/* REMOVIDO: Antigo View do banner */}
       
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
@@ -331,7 +357,6 @@ const styles = StyleSheet.create({
   background: {
     flex: 1,
   },
-  // REMOVIDO: Estilos 'adBanner', 'bannerImage' e 'adBannerText'
   keyboardAvoidingView: {
     flex: 1,
   },
@@ -422,5 +447,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
     elevation: 5,
+  },
+  // Estilos para o estado de carregamento do fundo
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF', // Cor de fundo para o estado de carregamento
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#007BFF', // Cor do texto de carregamento
+    fontSize: 16,
   },
 });

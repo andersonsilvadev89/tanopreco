@@ -52,6 +52,7 @@
     "react-firebase-hooks": "^5.1.1",
     "react-native": "0.76.9",
     "react-native-gesture-handler": "~2.20.2",
+    "react-native-google-mobile-ads": "^15.4.0",
     "react-native-keyboard-aware-scroll-view": "^0.9.5",
     "react-native-maps": "1.18.0",
     "react-native-mask-input": "^1.2.3",

@@ -19,11 +19,18 @@ import * as ImagePicker from 'expo-image-picker';
 import { ref, push, set, onValue, remove, update } from 'firebase/database';
 import { auth, database } from '../../firebaseConfig';
 import { Picker } from '@react-native-picker/picker';
-import moment from 'moment';
 import 'moment/locale/pt-br';
 import { TextInputMask } from 'react-native-masked-text';
 import { useNavigation } from '@react-navigation/native';
 import AdBanner from '../components/AdBanner';
+
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
+
 
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
 const UPLOAD_PRESET = 'expocrato';
@@ -48,7 +55,7 @@ interface Local {
 export default function CadastroLineUp() {
   const navigation = useNavigation();
   const [imagemUrl, setImagemUrl] = useState<string | undefined>();
-  const [imagemUri, setImagemUri] = useState<string | undefined>(); // Para pré-visualização local
+  const [imagemUri, setImagemUri] = useState<string | undefined>();
   const [nomeBanda, setNomeBanda] = useState('');
   const [dataMomento, setDataMomento] = useState('');
   const [horaInicio, setHoraInicio] = useState('');
@@ -57,11 +64,31 @@ export default function CadastroLineUp() {
   const [duracao, setDuracao] = useState('15 minutos');
   const [lineUpItens, setLineUpItens] = useState<LineUpItem[]>([]);
   const [loadingUpload, setLoadingUpload] = useState(false);
-  const [carregandoLocais, setCarregandoLocais] = useState(true);
+  const [carregandoLocais, setCarregandoLocais] = useState(true); // Carrega os locais da tela
   const [editandoId, setEditandoId] = useState<string | null>(null);
+
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false);
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
   const scrollRef = useRef<ScrollView>(null);
   const userId = auth.currentUser?.uid;
+
+  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na CadastroLineUp:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
+      }
+    };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
 
   useEffect(() => {
     if (!userId) {
@@ -85,7 +112,7 @@ export default function CadastroLineUp() {
         ? Object.entries(data).map(([id, valor]: any) => ({ id, ...valor }))
         : [];
       setLocaisDisponiveis(lista);
-      setCarregandoLocais(false);
+      setCarregandoLocais(false); // Finaliza o carregamento dos locais
     }, (error) => {
       console.error("Erro ao carregar locais:", error);
       Alert.alert("Erro", "Não foi possível carregar os locais disponíveis.");
@@ -148,20 +175,16 @@ export default function CadastroLineUp() {
     }
 
     setLoadingUpload(true);
-    // Prioriza a imagem local para upload se ela existir, caso contrário, usa a URL existente (em edição)
     const imageUrlToSave = imagemUri ? await enviarImagemParaCloudinary(imagemUri) : imagemUrl;
     setLoadingUpload(false);
 
-    // Se o upload falhar e não houver uma imagem URL anterior (caso de cadastro novo), avisar.
     if (!imageUrlToSave && imagemUri) {
         Alert.alert('Erro no Upload', 'Não foi possível enviar a imagem. Por favor, tente novamente.');
         return;
     }
 
-
     const lineUpRef = ref(database, `lineup`);
     const lineUpItem: LineUpItem = {
-      // Usa a URL de imagem que foi gerada pelo upload ou a que já existia
       imagemUrl: imageUrlToSave,
       nomeBanda,
       dataMomento,
@@ -185,7 +208,7 @@ export default function CadastroLineUp() {
 
   const limparFormulario = () => {
     setImagemUrl(undefined);
-    setImagemUri(undefined); // Limpa também a URI local
+    setImagemUri(undefined);
     setNomeBanda('');
     setDataMomento('');
     setHoraInicio('');
@@ -211,8 +234,8 @@ export default function CadastroLineUp() {
   };
 
   const editarLineUpItem = (item: LineUpItem) => {
-    setImagemUrl(item.imagemUrl); // Define a URL da imagem existente
-    setImagemUri(undefined); // Limpa a URI local para que a imagemUrl seja usada para exibição
+    setImagemUrl(item.imagemUrl);
+    setImagemUri(undefined);
     setNomeBanda(item.nomeBanda);
     setDataMomento(item.dataMomento);
     setHoraInicio(item.horaInicio);
@@ -238,8 +261,8 @@ export default function CadastroLineUp() {
 
     if (!result.canceled) {
       const uri = result.assets[0].uri;
-      setImagemUri(uri); // Define a URI para visualização instantânea
-      setImagemUrl(undefined); // Limpa a URL existente para que a nova imagem seja mostrada
+      setImagemUri(uri);
+      setImagemUrl(undefined);
     }
   };
 
@@ -251,8 +274,8 @@ export default function CadastroLineUp() {
 
     if (!result.canceled) {
       const uri = result.assets[0].uri;
-      setImagemUri(uri); // Define a URI para visualização instantânea
-      setImagemUrl(undefined); // Limpa a URL existente para que a nova imagem seja mostrada
+      setImagemUri(uri);
+      setImagemUrl(undefined);
     }
   };
 
@@ -339,9 +362,20 @@ export default function CadastroLineUp() {
     }
   };
 
+  // --- Condição de carregamento geral: Espera os locais e o fundo do app ---
+  // A tela principal só é renderizada depois que ambos estão prontos.
+  if (carregandoLocais || !fundoAppReady) { // <-- Inclui fundoAppReady
+    return (
+      <ImageBackground source={currentFundoSource} style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007BFF" />
+        <Text style={styles.loadingText}>Carregando locais...</Text>
+      </ImageBackground>
+    );
+  }
+
   return (
     <ImageBackground
-      source={require('../../assets/images/fundo.png')}
+      source={currentFundoSource} // USANDO O FUNDO DINÂMICO AQUI
       style={styles.backgroundImage}
     >
       <AdBanner />
@@ -357,7 +391,6 @@ export default function CadastroLineUp() {
             <View style={styles.formContainer}>
               <Text style={styles.title}>Cadastro da LineUp</Text>
               
-              {/* REMOVIDO O <View style={styles.imageContainer}> AO REDOR */}
               <TouchableOpacity
                 onPress={escolherImagem}
                 accessible
@@ -522,22 +555,21 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     borderRadius: 8,
   },
-  // NOVO ESTILO PARA O TOUCHABLEOPACITY DA IMAGEM
   imageInputTouchable: {
     borderWidth: 1,
     borderColor: '#ccc',
     borderRadius: 8,
     marginBottom: 15,
     backgroundColor: '#f0f0f0',
-    height: 120, // Altura fixa para a área da imagem
+    height: 120,
     justifyContent: 'center',
     alignItems: 'center',
-    overflow: 'hidden', // Importante para garantir que a imagem não transborde
-    width: '100%', // Adicionado para garantir que o TouchableOpacity ocupe a largura total
+    overflow: 'hidden',
+    width: '100%',
   },
   imagePlaceholder: {
-    width: '100%', // Preenche a largura total do TouchableOpacity
-    height: '100%', // Preenche a altura total do TouchableOpacity
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -548,14 +580,10 @@ const styles = StyleSheet.create({
   },
   fullWidthImage: {
     width: '100%',
-    height: '100%', // Preenche a altura total do TouchableOpacity
+    height: '100%',
     borderRadius: 8,
-    // marginBottom: 8, // REMOVIDO: O TouchableOpacity já tem o marginBottom
     resizeMode: 'cover',
   },
-  // O style imageContainer foi removido, pois não é mais necessário com a nova estrutura.
-  // Se ele for usado em outro lugar no seu projeto, você pode mantê-lo, mas ele não afeta mais o layout da imagem de upload.
-
   input: {
     borderWidth: 1,
     borderColor: '#ccc',
@@ -638,5 +666,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  // Estilos para o estado de carregamento do fundo
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    // O fundo já será a imagem carregada dinamicamente, ou o fallback local
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#007BFF',
+    fontSize: 16,
+    textShadowColor: 'rgba(0, 0, 0, 0.75)', // Adicionado sombra para melhor legibilidade no fundo dinâmico
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
 });

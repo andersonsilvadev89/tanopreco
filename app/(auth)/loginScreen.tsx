@@ -13,34 +13,36 @@ import {
   Dimensions,
   Platform,
 } from 'react-native';
-import { auth, database, administrativoDatabase } from '../../firebaseConfig';
+import { auth, database } from '../../firebaseConfig';
 import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
-  // REMOVIDO: GoogleAuthProvider, // Não é mais necessário
-  // REMOVIDO: signInWithCredential, // Não é mais necessário
 } from 'firebase/auth';
-// REMOVIDO: import * as WebBrowser from 'expo-web-browser'; // Não é mais necessário
-// REMOVIDO: import * as Google from 'expo-auth-session/providers/google'; // Não é mais necessário
 import { router } from 'expo-router';
 import { ref, get } from 'firebase/database';
 import { Eye, EyeOff } from 'lucide-react-native';
-// REMOVIDO: import * as AuthSession from 'expo-auth-session'; // Não é mais necessário
-// REMOVIDO: import { makeRedirectUri } from 'expo-auth-session'; // Não é mais necessário
-// REMOVIDO: import Constants from 'expo-constants'; // Não é mais necessário para este fim
 
-// REMOVIDO: WebBrowser.maybeCompleteAuthSession(); // Não é mais necessário
+// --- Importar o gerenciador de imagens ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho se seu utils estiver em outro lugar
+
+// --- URLs padrão de fallback para assets locais ---
+// Usados se as imagens do Firebase não puderem ser carregadas ou não existirem.
+const defaultLogoLocal = require('../../assets/images/logoEvento.png');
+const defaultFundoLocal = require('../../assets/images/fundo.png');
 
 const LoginScreen = ({ navigation }: any) => {
-
-  // REMOVIDO: const redirectUri = `https://auth.expo.io/@professor.anderson.a.silva/petrolina`; // Não é mais necessário
-
-  // REMOVIDO: const [accessToken, setAccessToken] = useState(); // Não é mais necessário
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
+
+  // --- Novos estados para o carregamento das imagens dinâmicas ---
+  // Inicializa com os assets locais para evitar `null` no início
+  const [appImagesReady, setAppImagesReady] = useState(false);
+  const [currentLogoSource, setCurrentLogoSource] = useState<any>(defaultLogoLocal);
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
   const [authLoading, setAuthLoading] = useState(true);
   const [mostrarSenha, setMostrarSenha] = useState(false);
 
@@ -49,36 +51,6 @@ const LoginScreen = ({ navigation }: any) => {
   const [sponsorsError, setSponsorsError] = useState<string | null>(null);
 
   const screenWidth = Dimensions.get('window').width;
-
-  // REMOVIDO: Lógica do Google Auth
-  // const [request, response, promptAsync] = Google.useAuthRequest({
-  //   androidClientId: '161717540109-7ifgbevmesdqvg6u973kcafht1d7mgkh.apps.googleusercontent.com',
-  //   iosClientId: '161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com',
-  //   webClientId: '161717540109-2lu2keq5r4ehkjjghmha0bckgktdflq5.apps.googleusercontent.com',
-  //   redirectUri: redirectUri,
-  // });
-
-  // REMOVIDO: useEffect para lidar com a resposta do Google Auth
-  // useEffect(() => {
-  //   if (response?.type === 'success' && response.authentication) {
-  //     const { idToken, accessToken } = response.authentication;
-  //     const credential = GoogleAuthProvider.credential(idToken, accessToken);
-  //     signInWithCredential(auth, credential)
-  //       .then(async (userCredential) => {
-  //         const loggedUser = userCredential.user;
-  //         if (loggedUser) {
-  //           router.replace('/(tabs)/homeScreen');
-  //         } else {
-  //           Alert.alert('Usuário não logado', 'Faça o login ou cadastre-se!');
-  //           await auth.signOut();
-  //         }
-  //       })
-  //       .catch((err) => {
-  //         const errorMessage = err.message || 'Erro ao fazer login com o Google.';
-  //         setError(errorMessage);
-  //       });
-  //   }
-  // }, [request, response]);
 
   const toggleMostrarSenha = () => {
     setMostrarSenha(!mostrarSenha);
@@ -94,11 +66,37 @@ const LoginScreen = ({ navigation }: any) => {
     return () => unsubscribe();
   }, [handleAuthStateChanged]);
 
+  // --- Novo useEffect para carregar as imagens dinâmicas ao iniciar a tela ---
+  useEffect(() => {
+    const initializeAppImages = async () => {
+      try {
+        const { logoUrl, fundoUrl } = await checkAndDownloadImages();
+
+        // Define as sources para os componentes Image/ImageBackground
+        // Se a URL retornada for uma string (URI local/remoto), usa { uri: string }
+        // Senão (se for vazia ou erro), usa o asset local (que é um número)
+        setCurrentLogoSource(logoUrl ? { uri: logoUrl } : defaultLogoLocal);
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+
+      } catch (error) {
+        console.error("Erro ao inicializar imagens do app na LoginScreen:", error);
+        Alert.alert("Erro de Carregamento", "Não foi possível carregar alguns recursos visuais do aplicativo.");
+        // Em caso de erro, garante que os fallbacks locais sejam usados
+        setCurrentLogoSource(defaultLogoLocal);
+        setCurrentFundoSource(defaultFundoLocal);
+      } finally {
+        setAppImagesReady(true); // Indica que as imagens foram processadas (baixadas/verificadas)
+      }
+    };
+
+    initializeAppImages();
+  }, []); // Executa apenas uma vez ao montar o componente
+
   const fetchSponsors = async () => {
     setSponsorsLoading(true);
     setSponsorsError(null);
     try {
-      const sponsorsRef = ref(administrativoDatabase, 'patrocinadores');
+      const sponsorsRef = ref(database, 'patrocinadores');
       const snapshot = await get(sponsorsRef);
       if (snapshot.exists()) {
         const sponsorsData = snapshot.val();
@@ -172,23 +170,21 @@ const LoginScreen = ({ navigation }: any) => {
       setLoading(false);
     }
   };
-  // --- Lógica do Carrossel de Patrocinadores ---
+
+  // --- Lógica do Carrossel de Patrocinadores (mantida, pois já estava funcional) ---
   const scrollViewRef = useRef<ScrollView>(null);
-  const scrollOffsetRef = useRef(0); // Guarda o offset atual da rolagem
-  const animationFrameIdRef = useRef<number | null>(null); // Guarda o ID do requestAnimationFrame
-  const [measuredContentWidth, setMeasuredContentWidth] = useState(0); // Largura do conteúdo da ScrollView
+  const scrollOffsetRef = useRef(0);
+  const animationFrameIdRef = useRef<number | null>(null);
+  const [measuredContentWidth, setMeasuredContentWidth] = useState(0);
   const [isUserInteractingWithSponsors, setIsUserInteractingWithSponsors] = useState(false);
 
   useEffect(() => {
-    // Cancela animação anterior se houver
     if (animationFrameIdRef.current) {
       cancelAnimationFrame(animationFrameIdRef.current);
       animationFrameIdRef.current = null;
     }
 
-    // Condições para não animar
     if (sponsors.length === 0 || !scrollViewRef.current || isUserInteractingWithSponsors || measuredContentWidth <= screenWidth) {
-      // Se o conteúdo couber na tela e não estiver no início, rola para o início.
       if (measuredContentWidth <= screenWidth && scrollOffsetRef.current !== 0 && scrollViewRef.current) {
         scrollViewRef.current.scrollTo({ x: 0, animated: false });
         scrollOffsetRef.current = 0;
@@ -197,7 +193,7 @@ const LoginScreen = ({ navigation }: any) => {
     }
 
     let lastTimestamp = 0;
-    const scrollSpeed = 20; // Pixels por segundo
+    const scrollSpeed = 20;
 
     const animate = (timestamp: number) => {
       if (!lastTimestamp) {
@@ -209,13 +205,7 @@ const LoginScreen = ({ navigation }: any) => {
       scrollOffsetRef.current += scrollSpeed * deltaTimeInSeconds;
 
       if (scrollOffsetRef.current >= measuredContentWidth) {
-        // Quando o scroll ultrapassa a largura total do conteúdo,
-        // significa que todo o conteúdo "original" já passou.
-        // Para um loop suave, idealmente teríamos itens duplicados.
-        // Com reset simples:
-        scrollOffsetRef.current = scrollOffsetRef.current % measuredContentWidth; // Mantém a posição relativa no loop
-        // Para um reset para o início absoluto:
-        // scrollOffsetRef.current = 0;
+        scrollOffsetRef.current = scrollOffsetRef.current % measuredContentWidth;
       }
 
       scrollViewRef.current?.scrollTo({ x: scrollOffsetRef.current, animated: false });
@@ -242,28 +232,38 @@ const LoginScreen = ({ navigation }: any) => {
   };
   const handleSponsorsMomentumScrollEnd = (event: any) => {
     scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
-    // Delay para retomar a animação e evitar conflito com possível onScrollEndDrag
     setTimeout(() => {
       setIsUserInteractingWithSponsors(false);
-    }, 100); // Pequeno delay
+    }, 100);
   };
 
-  if (authLoading) {
+  // --- Condição de carregamento inicial para as imagens e autenticação ---
+  // Mudado `defaultFundoLocal` para `currentFundoSource` no loading, para que a imagem do fundo
+  // já comece a ser baixada e mostrada o mais cedo possível.
+  if (!appImagesReady || authLoading) {
     return (
-      <View style={styles.loadingContainer}>
+      <ImageBackground source={currentFundoSource} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
-      </View>
+        <Text style={styles.loadingText}>Carregando recursos...</Text>
+      </ImageBackground>
     );
   }
 
   return (
-    <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+    <ImageBackground
+      // source agora é diretamente currentFundoSource, que já será { uri: string } ou o número do require
+      source={currentFundoSource}
+      style={styles.background}
+    >
       <View style={styles.overlay}>
         <View style={styles.logoContainer}>
+          {/* source agora é diretamente currentLogoSource */}
           <Image
-            source={require('../../assets/images/logomarcaMenor.png')}
+            source={currentLogoSource}
             style={styles.logo}
             resizeMode="contain"
+            // O onError não é mais necessário aqui pois currentLogoSource já trata o fallback
+            // onError={(e) => console.warn("Erro ao carregar logo dinâmica:", e.nativeEvent.error)}
           />
         </View>
 
@@ -307,17 +307,6 @@ const LoginScreen = ({ navigation }: any) => {
             )}
           </TouchableOpacity>
 
-          {/* REMOVIDO: Botão de Login com Google */}
-          {/*
-          <TouchableOpacity
-            onPress={() => promptAsync()}
-            style={[styles.googleButton, loading && styles.buttonDisabled]}
-            disabled={loading}
-          >
-            <Text style={styles.googleButtonText}>Entrar com Google</Text>
-          </TouchableOpacity>
-          */}
-
           <TouchableOpacity onPress={handlePasswordReset} style={[styles.forgotPassword, loading && styles.buttonDisabled]} disabled={loading}>
             <Text style={styles.forgotPasswordText}>Esqueceu a senha?</Text>
           </TouchableOpacity>
@@ -335,7 +324,7 @@ const LoginScreen = ({ navigation }: any) => {
             <Text style={styles.supporterErrorText}>{sponsorsError}</Text>
           ) : sponsors.length > 0 ? (
             <ScrollView
-            ref={scrollViewRef}
+              ref={scrollViewRef}
               horizontal
               showsHorizontalScrollIndicator={true}
               style={styles.supportersLogos}
@@ -384,7 +373,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFFFFF', // Cor de fundo para o estado de carregamento
+  },
+  loadingText: {
+    marginTop: 10,
+    color: '#007BFF', // Cor do texto de carregamento
+    fontSize: 16,
   },
   logoContainer: {
     flex: 0.8,
@@ -463,23 +457,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  googleButton: { // Este estilo pode ser removido se não for usado em outro lugar
-    marginTop: 12,
-    paddingVertical: 14,
-    backgroundColor: '#DB4437',
-    borderRadius: 8,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.5,
-  },
-  googleButtonText: { // Este estilo pode ser removido se não for usado em outro lugar
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
   forgotPassword: {
     marginTop: 18,
     alignItems: 'center',
@@ -498,49 +475,46 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
   },
   supportersContainer: {
-    flex: 0.7, // Proporção da altura para esta seção
-    justifyContent: 'center', // Centraliza o conteúdo (título + scrollview/texto) verticalmente
-    alignItems: 'center', // Centraliza o conteúdo horizontalmente
-    // paddingHorizontal: 15, // Removido ou ajustado, pois o ScrollView pode precisar de largura total
+    flex: 0.7,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   supportersTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#FFFFFF',
     marginTop: 10,
-    marginBottom: 5, // Espaçamento entre o título e a área das logos
+    marginBottom: 5,
     textShadowColor: 'rgba(0, 0, 0, 0.5)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 2,
   },
-  // Estilo para o componente ScrollView
   supportersLogos: {
-    width: '100%', // O ScrollView ocupa a largura total do seu container 
+    width: '100%',
   },
-  // Estilo para o contentContainerStyle do ScrollView (o conteúdo interno)
   supportersLogosContent: {
-    flexDirection: 'row',   // Organiza as logos horizontalmente, lado a lado
-    alignItems: 'center',   // Alinha as logos verticalmente ao centro dentro da faixa do ScrollView
-    paddingHorizontal: 5,   // Espaçamento nas extremidades da lista de logos (antes da primeira e depois da última)
-    paddingVertical: 5,     // Espaçamento vertical acima e abaixo das logos dentro da área de scroll
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 5,
+    paddingVertical: 5,
   },
   supporterText: {
     color: '#E0E0E0',
     fontSize: 14,
     textAlign: 'center',
-    marginTop: 10, // Espaçamento do título se esta mensagem aparecer
+    marginTop: 10,
   },
   supporterErrorText: {
     color: '#FFD700',
     fontSize: 14,
     textAlign: 'center',
-    marginHorizontal: 15, // Para não colar nas bordas
-    marginTop: 10, // Espaçamento do título se esta mensagem aparecer
+    marginHorizontal: 15,
+    marginTop: 10,
   },
   supporterLogo: {
     width: 120,
-    height: 120, // Altura fixa para as logos. Ajuste conforme o design desejado.
-    resizeMode: 'contain', // Garante que a logo inteira seja visível e não distorcida
+    height: 120,
+    resizeMode: 'contain',
     borderRadius: 10,
     backgroundColor: '#fff',
     marginLeft: 10,

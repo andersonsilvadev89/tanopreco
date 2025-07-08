@@ -1,5 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ImageBackground, ActivityIndicator, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react'; // Adicionado useEffect
+import { // Adicionado ActivityIndicator
+    View, Text, TouchableOpacity, StyleSheet, ImageBackground, ActivityIndicator, SafeAreaView
+} from 'react-native';
 import { router } from 'expo-router';
 import { 
     LogOut, 
@@ -13,15 +15,38 @@ import { auth, database } from '../../firebaseConfig';
 import { onValue, ref } from 'firebase/database';
 import AdBanner from '../components/AdBanner';
 
-const fundo = require('../../assets/images/fundo.png');
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
 const HomeScreen = () => {
     const [userType, setUserType] = useState<string | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true); // Carrega o tipo de usuário
 
-    // --- CORREÇÃO APLICADA AQUI ---
-    // A função agora passa o caminho diretamente e usa 'as any' para satisfazer o TypeScript.
-    // O Expo Router resolverá o caminho relativo ao grupo (admin) automaticamente.
+    // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+    const [fundoAppReady, setFundoAppReady] = useState(false); // Controla o carregamento do FUNDO DO APP
+    const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
+    // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+    useEffect(() => {
+        const loadFundoImage = async () => {
+            try {
+                const { fundoUrl } = await checkAndDownloadImages();
+                setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+            } catch (error) {
+                console.error("Erro ao carregar imagem de fundo na Admin HomeScreen:", error);
+                setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+            } finally {
+                setFundoAppReady(true); // Indica que o fundo foi processado
+            }
+        };
+        loadFundoImage();
+    }, []); // Executa apenas uma vez ao montar o componente
+
+
     const navigate = (path: string) => router.push(path as any);
 
     useEffect(() => {
@@ -30,7 +55,7 @@ const HomeScreen = () => {
             const userRef = ref(database, `usuarios/${user.uid}/tipoUsuario`);
             const unsubscribe = onValue(userRef, (snapshot) => {
                 setUserType(snapshot.val() || null);
-                setLoading(false);
+                setLoading(false); // Finaliza o loading do tipo de usuário
             }, (error) => {
                 console.error("Erro ao buscar tipo de usuário:", error);
                 setLoading(false);
@@ -44,10 +69,9 @@ const HomeScreen = () => {
     const allOptions = [
         { name: 'cadastroUsuariosScreen', label: 'Aprovar Usuários', icon: Users, adminOnly: true },
         { name: 'listaEmpresasParaAprovacaoScreen', label: 'Aprovar Empresas', icon: Building2, adminOnly: false },
-        { name: 'locaisScreen', label: 'Gerenciar Locais', icon: MapPin, adminOnly: true },{ name: 'cadastroLineUpScreen', label: 'Gerenciar LineUp', icon: CalendarPlus, adminOnly: false },
+        { name: 'locaisScreen', label: 'Gerenciar Locais', icon: MapPin, adminOnly: true },
+        { name: 'cadastroLineUpScreen', label: 'Gerenciar LineUp', icon: CalendarPlus, adminOnly: false },
         { name: 'cadastroPatrocinadoresScreen', label: 'Gerenciar Patrocínio', icon: Handshake, adminOnly: false },
-        
-        
     ];
 
     const options = allOptions.filter(option => {
@@ -57,9 +81,10 @@ const HomeScreen = () => {
         return !option.adminOnly;
     });
 
-    if (loading) {
+    // --- Condição de carregamento geral: Espera o tipo de usuário E o fundo do app ---
+    if (loading || !fundoAppReady) {
         return (
-            <ImageBackground source={fundo} style={styles.background} resizeMode="cover">
+            <ImageBackground source={currentFundoSource} style={styles.background} resizeMode="cover">
                 <View style={styles.loadingContainer}>
                     <ActivityIndicator size="large" color="#FFF" />
                     <Text style={styles.loadingText}>Carregando permissões...</Text>
@@ -69,7 +94,7 @@ const HomeScreen = () => {
     }
 
     return (
-        <ImageBackground source={fundo} style={styles.background} resizeMode="cover">
+        <ImageBackground source={currentFundoSource} style={styles.background} resizeMode="cover">
             <AdBanner />
             <SafeAreaView style={styles.safeArea}>
                 <Text style={styles.title}>Área Administrativa</Text>
@@ -164,12 +189,15 @@ const styles = StyleSheet.create({
         flex: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: 'rgba(0,0,0,0.5)'
+        // O fundo já será a imagem carregada dinamicamente, ou o fallback local
     },
     loadingText: {
         fontSize: 18,
         color: '#FFF',
-        marginTop: 10
+        marginTop: 10,
+        textShadowColor: 'rgba(0, 0, 0, 0.75)', // Adicionado sombra para melhor legibilidade no fundo dinâmico
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
     },
 });
 

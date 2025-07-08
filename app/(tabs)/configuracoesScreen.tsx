@@ -23,6 +23,12 @@ import { auth, database } from '../../firebaseConfig';
 import { deleteUser } from 'firebase/auth';
 import AdBanner from '../components/AdBanner'; 
 
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho se necessário
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+
 const LOCATION_TASK_NAME = 'background-location-task';
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
 const UPLOAD_PRESET = 'expocrato';
@@ -38,7 +44,7 @@ interface UserProfile {
 
 const ConfiguracoesScreen = () => {
   const [compartilhando, setCompartilhando] = useState(false);
-  const [carregando, setCarregando] = useState(true);
+  const [carregando, setCarregando] = useState(true); // Carrega dados do usuário
   const [editandoPerfil, setEditandoPerfil] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -49,21 +55,40 @@ const ConfiguracoesScreen = () => {
   const [novaImagemUri, setNovaImagemUri] = useState<string | null>(null);
   const [instagram, setInstagram] = useState('');
 
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false); // Controla o carregamento do FUNDO DO APP
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
   const usuarioId = auth.currentUser?.uid;
 
+  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
   useEffect(() => {
-    if (!usuarioId) {
-        setCarregando(false);
-        setCompartilhando(false);
-        return;
-    }
-    const userRef = ref(database, `usuarios/${usuarioId}`);
-    let isMounted = true;
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na ConfiguracoesScreen:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
+      }
+    };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
 
+  useEffect(() => {
+    let isMounted = true;
     const checkStatusAndProfile = async () => {
       if(!isMounted) return;
-      setCarregando(true);
+      setCarregando(true); // Inicia o loading dos dados do usuário
+      if (!usuarioId) {
+          setCarregando(false); // Garante que o loading é falso se não houver usuário
+          setCompartilhando(false);
+          return;
+      }
       try {
+        const userRef = ref(database, `usuarios/${usuarioId}`);
         const userSnapshot = await get(userRef);
         if (isMounted && userSnapshot.exists()) {
           const profileData = userSnapshot.val() as UserProfile;
@@ -103,7 +128,7 @@ const ConfiguracoesScreen = () => {
             setNovaImagemUri(null);
           }
       } finally {
-          if(isMounted) setCarregando(false);
+          if(isMounted) setCarregando(false); // <--- IMPORTANTE: Finaliza o loading dos DADOS DO USUÁRIO
       }
     };
 
@@ -202,28 +227,23 @@ const ConfiguracoesScreen = () => {
             finalImageUrl = uploadedUrl;
         } else {
             setUploadingImage(false);
-            // Se o upload falhar, não continuamos para não salvar o perfil incompleto
             return; 
         }
     }
 
-    // --- LÓGICA DO INSTAGRAM PADRONIZADA (INÍCIO) ---
     let processedInstagram: string | null = null;
-    const rawInstagramInput = instagram?.trim(); // Pega o valor do estado 'instagram'
+    const rawInstagramInput = instagram?.trim();
 
     if (rawInstagramInput) {
       const instagramUrlRegex = /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)/;
       const match = rawInstagramInput.match(instagramUrlRegex);
 
       if (match && match[1]) {
-        // Se encontrou uma URL, usa o grupo capturado (o nome de usuário)
         processedInstagram = match[1];
       } else {
-        // Se não for uma URL, remove o '@' se houver
         processedInstagram = rawInstagramInput.startsWith('@') ? rawInstagramInput.substring(1) : rawInstagramInput;
       }
     }
-    // --- LÓGICA DO INSTAGRAM PADRONIZADA (FIM) ---
 
     const userRef = ref(database, `usuarios/${usuarioId}`);
     try {
@@ -236,11 +256,9 @@ const ConfiguracoesScreen = () => {
             telefone: telefone || null,
             imagem: finalImageUrl,
             compartilhando: compartilhandoDB,
-            // ALTERADO: Salva a variável processada
             instagram: processedInstagram, 
         });
 
-        // Atualiza os estados locais com os valores limpos/finais
         setImagem(finalImageUrl);
         setInstagram(processedInstagram || ''); 
         setNovaImagemUri(null);
@@ -364,9 +382,11 @@ const ConfiguracoesScreen = () => {
     );
   };
 
-  if (carregando) {
+  // --- Condição de carregamento geral: Espera os dados do usuário E o fundo do app ---
+  // Se 'carregando' está true ou 'fundoAppReady' está false, exibe o loading.
+  if (carregando || !fundoAppReady) {
     return (
-      <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+      <ImageBackground source={currentFundoSource} style={styles.background}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FFFFFF" />
           <Text style={styles.loadingText}>Carregando...</Text>
@@ -375,10 +395,11 @@ const ConfiguracoesScreen = () => {
     );
   }
 
-  const displayImageUri = novaImagemUri || imagem;
+  // Define qual URI de imagem de perfil será exibida (nova imagem selecionada ou a imagem salva no Firebase)
+  const displayImageUri = novaImagemUri || imagem; // Esta variável é uma string ou null
 
   return (
-    <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>
+    <ImageBackground source={currentFundoSource} style={styles.background}>
       <AdBanner />
 
       <KeyboardAwareScrollView
@@ -507,8 +528,20 @@ const styles = StyleSheet.create({
   background: { flex: 1 },
   scrollContainer: { flexGrow: 1, justifyContent: 'center' },
   innerContainer: { paddingHorizontal: 20, paddingVertical: 20, },
-  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-  loadingText: { marginTop: 10, fontSize: 16, color: 'white' },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    // O fundo já é o ImageBackground pai, então não precisa de backgroundColor aqui
+  },
+  loadingText: { 
+    marginTop: 10, 
+    fontSize: 16, 
+    color: 'white',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)', // Sombra para legibilidade
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
   card: { backgroundColor: 'rgba(255, 255, 255, 0.92)', borderRadius: 12, padding: 20, marginBottom: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, elevation: 3 },
   profileDisplayContainer: { alignItems: 'center' },
   profileImageTouchable: { marginBottom: 15, borderRadius: 60, overflow: 'hidden' }, 

@@ -1,22 +1,31 @@
-import React, { useState, useEffect } from 'react';
-import {
+import React, { useState, useEffect } from 'react'; // Adicionado useEffect
+import { // Adicionado ActivityIndicator
     View, Text, StyleSheet, Alert, TouchableOpacity,
-    ImageBackground, ActivityIndicator, SectionList, Linking // 1. Adicionar Linking
+    ImageBackground, ActivityIndicator, SectionList, Linking
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { database } from '../../firebaseConfig';
 import { ref, onValue, update } from 'firebase/database';
+import { onAuthStateChanged, Unsubscribe } from 'firebase/auth';
+import { auth } from '../../firebaseConfig';
 import AdBanner from '../components/AdBanner';
-import { Instagram } from 'lucide-react-native'; // 2. Adicionar o ícone
+import { Instagram } from 'lucide-react-native';
 
-// --- INTERFACES ---
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
+
+// Interfaces
 interface UserProfile {
     id: string;
     nome: string;
     email: string;
     tipoUsuario?: 'Administrador' | 'Gerente'; 
     statusAdmin?: 'Aguardando' | 'Aprovado' | 'Rejeitado';
-    instagram?: string; // 3. Adicionar o campo Instagram
+    instagram?: string;
 }
 
 type UserRole = 'Administrador' | 'Gerente';
@@ -25,40 +34,78 @@ const AprovacaoUsuarioScreen = () => {
     const [loading, setLoading] = useState(true);
     const [sections, setSections] = useState<{ title: string; data: UserProfile[] }[]>([]);
     const [rolesSelecionadas, setRolesSelecionadas] = useState<Record<string, UserRole | null>>({});
+    // REMOVIDO: const [isSubmitting, setIsSubmitting] = useState(false); -- Não estava na versão original que me enviou para esta alteração.
 
+    // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+    const [fundoAppReady, setFundoAppReady] = useState(false);
+    const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
+    // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
     useEffect(() => {
-        const usuariosRef = ref(database, 'usuarios');
-        
-        const unsubscribe = onValue(usuariosRef, (snapshot) => {
-            setLoading(true);
-            const data = snapshot.val();
-            const listaCompleta: UserProfile[] = data 
-                ? Object.keys(data).map(key => ({ id: key, ...data[key] })) 
-                : [];
-            
-            const listaSolicitacoes = listaCompleta
-                .filter(user => user.statusAdmin === 'Aguardando');
-            
-            const listaAprovados = listaCompleta
-                .filter(user => user.statusAdmin === 'Aprovado')
-                .sort((a, b) => a.nome.localeCompare(b.nome));
-
-            setSections([
-                { title: 'Solicitações Pendentes', data: listaSolicitacoes },
-                { title: 'Usuários com Acesso', data: listaAprovados }
-            ]);
-            
-            setLoading(false);
-        }, (error) => {
-            console.error("Erro ao buscar usuários:", error);
-            setLoading(false);
-            Alert.alert("Erro", "Não foi possível carregar os dados.");
-        });
-
-        return () => unsubscribe();
+        const loadFundoImage = async () => {
+            try {
+                const { fundoUrl } = await checkAndDownloadImages();
+                setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+            } catch (error) {
+                console.error("Erro ao carregar imagem de fundo na AprovacaoUsuarioScreen:", error);
+                setCurrentFundoSource(defaultFundoLocal);
+            } finally {
+                setFundoAppReady(true);
+            }
+        };
+        loadFundoImage();
     }, []);
 
-    // 4. Adicionar a função padrão para abrir o Instagram
+    useEffect(() => {
+        let databaseListener: Unsubscribe | null = null;
+
+        const authListener = onAuthStateChanged(auth, (user) => {
+            if (databaseListener) {
+                databaseListener();
+            }
+
+            if (user) {
+                setLoading(true);
+                const usuariosRef = ref(database, 'usuarios');
+                
+                databaseListener = onValue(usuariosRef, (snapshot) => {
+                    const data = snapshot.val();
+                    const listaCompleta: UserProfile[] = data 
+                        ? Object.keys(data).map(key => ({ id: key, ...data[key] })) 
+                        : [];
+                    
+                    const listaSolicitacoes = listaCompleta
+                        .filter(user => user.statusAdmin === 'Aguardando');
+                    
+                    const listaAprovados = listaCompleta
+                        .filter(user => user.statusAdmin === 'Aprovado')
+                        .sort((a, b) => a.nome.localeCompare(b.nome));
+                    
+                    setSections([
+                        { title: 'Solicitações Pendentes', data: listaSolicitacoes },
+                        { title: 'Usuários com Acesso', data: listaAprovados }
+                    ]);
+                    
+                    setLoading(false);
+                }, (error) => {
+                    console.error("Erro ao buscar usuários:", error);
+                    setLoading(false);
+                    Alert.alert("Erro", "Não foi possível carregar os dados.");
+                });
+            } else {
+                setLoading(false);
+                setSections([]);
+            }
+        });
+
+        return () => {
+            authListener();
+            if (databaseListener) {
+                databaseListener();
+            }
+        };
+    }, []);
+
     const openInstagramProfile = async (username: string | undefined) => {
         if (!username) {
             Alert.alert("Instagram não informado", "Este usuário não possui um Instagram cadastrado.");
@@ -84,6 +131,7 @@ const AprovacaoUsuarioScreen = () => {
             return;
         }
 
+        // REMOVIDO: setIsSubmitting(true);
         const userRef = ref(database, `usuarios/${userId}`);
         try {
             await update(userRef, {
@@ -93,10 +141,12 @@ const AprovacaoUsuarioScreen = () => {
             Alert.alert('Sucesso', 'Usuário aprovado!');
         } catch (error) {
             Alert.alert('Erro', 'Não foi possível aprovar o usuário.');
-        }
+        } 
+        // REMOVIDO: finally { setIsSubmitting(false); }
     };
 
     const handleRejeitar = async (userId: string) => {
+        // REMOVIDO: setIsSubmitting(true);
         const userRef = ref(database, `usuarios/${userId}`);
         try {
             await update(userRef, {
@@ -106,7 +156,8 @@ const AprovacaoUsuarioScreen = () => {
             Alert.alert('Sucesso', 'Solicitação rejeitada.');
         } catch (error) {
             Alert.alert('Erro', 'Não foi possível rejeitar a solicitação.');
-        }
+        } 
+        // REMOVIDO: finally { setIsSubmitting(false); }
     };
 
     const handleRevogarAcesso = async (user: UserProfile) => {
@@ -119,6 +170,7 @@ const AprovacaoUsuarioScreen = () => {
                     text: 'Revogar',
                     style: 'destructive',
                     onPress: async () => {
+                        // REMOVIDO: setIsSubmitting(true);
                         const userRef = ref(database, `usuarios/${user.id}`);
                         try {
                             await update(userRef, {
@@ -128,7 +180,8 @@ const AprovacaoUsuarioScreen = () => {
                             Alert.alert('Sucesso', `Acesso de ${user.nome} foi revogado.`);
                         } catch (error) {
                             Alert.alert('Erro', 'Não foi possível revogar o acesso.');
-                        }
+                        } 
+                        // REMOVIDO: finally { setIsSubmitting(false); }
                     }
                 }
             ]
@@ -141,7 +194,6 @@ const AprovacaoUsuarioScreen = () => {
                 <Text style={styles.userName}>{item.nome}</Text>
                 <Text style={styles.userEmail}>{item.email}</Text>
                 
-                {/* 5. Adicionar o link do Instagram clicável */}
                 {item.instagram && (
                     <TouchableOpacity style={styles.infoRow} onPress={() => openInstagramProfile(item.instagram)}>
                         <Instagram size={16} color="#c13584"/>
@@ -171,11 +223,19 @@ const AprovacaoUsuarioScreen = () => {
             </View>
 
             <View style={styles.actionsContainer}>
-                <TouchableOpacity style={[styles.button, styles.approveButton]} onPress={() => handleAprovar(item.id)}>
-                    <Text style={styles.buttonText}>Aprovar</Text>
+                <TouchableOpacity 
+                    style={[styles.button, styles.approveButton]} 
+                    onPress={() => handleAprovar(item.id)}
+                    // REMOVIDO: disabled={isSubmitting}
+                >
+                    {/* REMOVIDO: isSubmitting ? <ActivityIndicator ... /> : */} <Text style={styles.buttonText}>Aprovar</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={[styles.button, styles.rejectButton]} onPress={() => handleRejeitar(item.id)}>
-                    <Text style={styles.buttonText}>Rejeitar</Text>
+                <TouchableOpacity 
+                    style={[styles.button, styles.rejectButton]} 
+                    onPress={() => handleRejeitar(item.id)}
+                    // REMOVIDO: disabled={isSubmitting}
+                >
+                    {/* REMOVIDO: isSubmitting ? <ActivityIndicator ... /> : */} <Text style={styles.buttonText}>Rejeitar</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -187,7 +247,6 @@ const AprovacaoUsuarioScreen = () => {
                 <Text style={styles.userName}>{item.nome}</Text>
                 <Text style={styles.userEmail}>{item.email}</Text>
                 
-                {/* 5. Adicionar o link do Instagram clicável também na lista de aprovados */}
                 {item.instagram && (
                     <TouchableOpacity style={styles.infoRow} onPress={() => openInstagramProfile(item.instagram)}>
                         <Instagram size={16} color="#c13584"/>
@@ -202,49 +261,58 @@ const AprovacaoUsuarioScreen = () => {
             <TouchableOpacity 
                 style={[styles.button, styles.revokeButton]}
                 onPress={() => handleRevogarAcesso(item)}
+                // REMOVIDO: disabled={isSubmitting}
             >
                 <Text style={styles.buttonText}>Revogar Acesso</Text>
             </TouchableOpacity>
         </View>
     );
 
+    // --- Condição de carregamento geral: Espera os dados dos usuários E o fundo do app ---
+    if (loading || !fundoAppReady) {
+        return (
+            <ImageBackground source={currentFundoSource} style={styles.background}>
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#FFF" />
+                    <Text style={styles.loadingText}>Carregando...</Text>
+                </View>
+            </ImageBackground>
+        );
+    }
+
     return (
-        <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.background}>   
+        <ImageBackground source={currentFundoSource} style={styles.background}>
             <AdBanner />
             <View style={styles.container}>
                 <Text style={styles.titulo}>Gerenciamento de Acessos</Text>
-                {loading ? (
-                    <ActivityIndicator size="large" color="#FFF" />
-                ) : (
-                    <SectionList
-                        sections={sections}
-                        keyExtractor={(item) => item.id}
-                        renderItem={({ item, section }) => {
-                            if (section.title === 'Solicitações Pendentes') {
-                                return renderItemSolicitacao({ item });
-                            }
-                            if (section.title === 'Usuários com Acesso') {
-                                return renderUsuarioAprovadoItem({ item });
-                            }
-                            return null;
-                        }}
-                        renderSectionHeader={({ section: { title, data } }) => (
-                            data.length > 0 ? <Text style={styles.sectionHeader}>{title}</Text> : null
-                        )}
-                        ListEmptyComponent={
-                            <View style={styles.emptyContainer}>
-                                <Text style={styles.emptyText}>Nenhuma solicitação ou usuário para gerenciar.</Text>
-                            </View>
+                <SectionList
+                    sections={sections}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item, section }) => {
+                        if (section.title === 'Solicitações Pendentes') {
+                            return renderItemSolicitacao({ item });
                         }
-                        contentContainerStyle={{ paddingBottom: 20 }}
-                    />
-                )}
+                        if (section.title === 'Usuários com Acesso') {
+                            return renderUsuarioAprovadoItem({ item });
+                        }
+                        return null;
+                    }}
+                    renderSectionHeader={({ section: { title, data } }) => (
+                        data.length > 0 ? <Text style={styles.sectionHeader}>{title}</Text> : null
+                    )}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Text style={styles.emptyText}>Nenhuma solicitação ou usuário para gerenciar.</Text>
+                        </View>
+                    }
+                    contentContainerStyle={{ paddingBottom: 20 }}
+                />
             </View>
         </ImageBackground>
     );
 };
 
-// 6. Adicionar os novos estilos
+// Estilos
 const styles = StyleSheet.create({
     background: { flex: 1 },
     container: { flex: 1, paddingHorizontal: 15, paddingTop: 15 },
@@ -254,8 +322,8 @@ const styles = StyleSheet.create({
     cardAprovado: { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: 12, padding: 15, marginBottom: 15, },
     userInfo: { marginBottom: 15, },
     userName: { fontSize: 18, fontWeight: 'bold', color: '#333', },
-    userEmail: { fontSize: 14, color: '#666', marginBottom: 8, }, // Aumentada a margem
-    userRoleSolicitada: { fontSize: 14, color: '#666', fontStyle: 'italic', marginTop: 8 }, // Adicionada margem superior
+    userEmail: { fontSize: 14, color: '#666', marginBottom: 8, },
+    userRoleSolicitada: { fontSize: 14, color: '#666', fontStyle: 'italic', marginTop: 8 },
     pickerContainer: { borderColor: '#ccc', borderWidth: 1, borderRadius: 8, marginBottom: 15, backgroundColor: '#FFF' },
     picker: { height: 50, width: '100%', },
     actionsContainer: { flexDirection: 'row', justifyContent: 'space-between', },
@@ -269,10 +337,22 @@ const styles = StyleSheet.create({
     userRole: { fontSize: 15, fontWeight: 'bold', marginTop: 8, paddingVertical: 3, paddingHorizontal: 8, borderRadius: 5, alignSelf: 'flex-start', overflow: 'hidden' },
     roleAdmin: { backgroundColor: '#dc3545', color: 'white' },
     roleGerente: { backgroundColor: '#007bff', color: 'white' },
-    // Estilos para o link do Instagram
     infoRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 8 },
     infoText: { marginLeft: 8, fontSize: 14, color: '#555' },
-    linkText: { color: '#007bff', textDecorationLine: 'underline' }
+    linkText: { color: '#007bff', textDecorationLine: 'underline' },
+    loadingContainer: { 
+        flex: 1, 
+        justifyContent: 'center', 
+        alignItems: 'center', 
+    },
+    loadingText: { 
+        marginTop: 10, 
+        fontSize: 16, 
+        color: '#FFF',
+        textShadowColor: 'rgba(0, 0, 0, 0.75)',
+        textShadowOffset: { width: 1, height: 1 },
+        textShadowRadius: 2,
+    },
 });
 
 export default AprovacaoUsuarioScreen;

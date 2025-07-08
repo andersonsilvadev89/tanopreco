@@ -2,9 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  TouchableOpacity,
   StyleSheet,
   ImageBackground,
-  TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
   Alert,
@@ -16,7 +16,12 @@ import { onAuthStateChanged, Unsubscribe } from 'firebase/auth';
 import { auth, database } from '../../firebaseConfig';
 import AdBanner from '../components/AdBanner';
 
-const fundo = require('../../assets/images/fundo.png');
+// --- Importar o gerenciador de imagens para o fundo ---
+import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+
+// --- URL padrão de fallback para o fundo local ---
+const defaultFundoLocal = require('../../assets/images/fundo.png');
+// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
 // Tipos (sem alterações)
 type UserRole = "Administrador" | "Gerente";
@@ -30,12 +35,30 @@ interface UserProfile {
 }
 
 const AdminScreen = () => {
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Controla o carregamento dos DADOS do usuário/status
   const [adminStatus, setAdminStatus] = useState<AdminStatus | null>(null);
-  const [userRole, setUserRole] = useState<UserRole | null>(null); // Mantido para exibir na tela de 'Aguardando' se já existir
+  const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // REMOVIDO: O estado para o cargo selecionado não é mais necessário.
-  // const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+
+  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false); // Controla o carregamento do FUNDO DO APP
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
+  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  useEffect(() => {
+    const loadFundoImage = async () => {
+      try {
+        const { fundoUrl } = await checkAndDownloadImages();
+        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+      } catch (error) {
+        console.error("Erro ao carregar imagem de fundo na AdminScreen:", error);
+        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+      } finally {
+        setFundoAppReady(true); // Indica que o fundo foi processado
+      }
+    };
+    loadFundoImage();
+  }, []); // Executa apenas uma vez ao montar o componente
 
   useEffect(() => {
     let databaseListener: Unsubscribe | null = null;
@@ -45,7 +68,7 @@ const AdminScreen = () => {
       }
 
       if (user) {
-        setLoading(true);
+        setLoading(true); // Inicia o loading dos dados do usuário
         const userRef = ref(database, `usuarios/${user.uid}`);
         
         databaseListener = onValue(userRef, (snapshot) => {
@@ -54,15 +77,15 @@ const AdminScreen = () => {
           const role = userData?.tipoUsuario || null;
           
           setAdminStatus(status);
-          setUserRole(role); // Ainda pode ser útil para mostrar o cargo se já foi definido
+          setUserRole(role);
 
           if (status === 'Aprovado') {
             router.replace('/(admin)/homeScreen');
           }
-          setLoading(false);
+          setLoading(false); // <--- IMPORTANTE: Finaliza o loading dos DADOS DO USUÁRIO
         }, (error) => {
           console.error("Erro ao ler status de admin:", error);
-          setLoading(false);
+          setLoading(false); // Em caso de erro, também finaliza o loading
         });
       } else {
         setLoading(false);
@@ -79,12 +102,8 @@ const AdminScreen = () => {
     };
   }, []);
 
-  // --- LÓGICA DE SOLICITAÇÃO ALTERADA ---
   const handleRequestAccess = async () => {
     const userId = auth.currentUser?.uid;
-
-    // REMOVIDA: Verificação do cargo selecionado
-    // if (!selectedRole) { ... }
 
     if (!userId) {
       Alert.alert('Erro', 'Usuário não autenticado. Por favor, faça login.');
@@ -93,16 +112,12 @@ const AdminScreen = () => {
 
     setIsSubmitting(true);
     try {
-      // ALTERADO: O objeto 'updates' agora só envia o status.
-      // O 'tipoUsuario' não é mais definido nesta tela.
       const updates: { [key: string]: any } = {};
       updates[`/usuarios/${userId}/statusAdmin`] = 'Aguardando';
       
       await update(ref(database), updates);
       
       setAdminStatus('Aguardando');
-      // REMOVIDO: setUserRole não é mais chamado com o cargo selecionado.
-      // setUserRole(selectedRole); 
       Alert.alert('Sucesso', 'Sua solicitação de acesso foi enviada.');
     } catch (error) {
       console.error('Erro ao solicitar acesso:', error);
@@ -112,14 +127,15 @@ const AdminScreen = () => {
     }
   };
 
-  // --- RENDERIZAÇÃO ALTERADA ---
   const renderContent = () => {
-    if (loading) {
+    // --- Condição de carregamento geral: Espera os dados do usuário E o fundo do app ---
+    if (loading || !fundoAppReady) {
       return (
-        <View style={styles.loadingContainer}>
+        // O fundo desta tela de loading agora também é o fundo dinâmico
+        <ImageBackground source={currentFundoSource} style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#FFF" />
           <Text style={styles.loadingText}>Verificando permissões...</Text>
-        </View>
+        </ImageBackground>
       );
     }
 
@@ -128,7 +144,6 @@ const AdminScreen = () => {
         return (
           <View style={styles.statusMessageContainer}>
             <Text style={styles.statusTitle}>Solicitação Pendente</Text>
-            {/* ALTERADO: Mensagem simplificada */}
             <Text style={styles.statusText}>
               Sua solicitação de acesso foi enviada e está aguardando a aprovação.
             </Text>
@@ -146,8 +161,6 @@ const AdminScreen = () => {
               style={styles.retryButton}
               onPress={() => {
                 setAdminStatus(null);
-                // REMOVIDO: Não precisa mais resetar o cargo selecionado
-                // setSelectedRole(null);
               }}
             >
               <Text style={styles.retryButtonText}>Tentar Novamente</Text>
@@ -159,15 +172,9 @@ const AdminScreen = () => {
         return (
           <View style={styles.contentContainer}>
             <Text style={styles.messageText}>Acesso Administrativo</Text>
-            {/* ALTERADO: Texto de instrução simplificado */}
             <Text style={styles.subMessageText}>
               Clique no botão abaixo para solicitar acesso à área restrita.
             </Text>
-
-            {/* REMOVIDO: Container com os botões de seleção de cargo */}
-            {/* <View style={styles.roleSelectionContainer}> ... </View> */}
-
-            {/* ALTERADO: Botão de envio agora não depende mais do 'selectedRole' */}
             <TouchableOpacity
               style={styles.submitButton}
               onPress={handleRequestAccess}
@@ -185,7 +192,7 @@ const AdminScreen = () => {
   };
 
   return (
-    <ImageBackground source={fundo} style={styles.background} resizeMode="cover">
+    <ImageBackground source={currentFundoSource} style={styles.background} resizeMode="cover">
       <AdBanner />
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.header}>
@@ -204,7 +211,7 @@ const AdminScreen = () => {
   );
 };
 
-// Estilos (sem alterações, mas o botão desabilitado foi simplificado para referência)
+// Estilos
 const styles = StyleSheet.create({
   background: { flex: 1 },
   safeArea: { flex: 1 },
@@ -212,19 +219,24 @@ const styles = StyleSheet.create({
   backButton: { padding: 5 },
   headerTitle: { flex: 1, fontSize: 20, fontWeight: 'bold', color: '#FFF', textAlign: 'center', marginRight: 34 },
   contentWrapper: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  loadingContainer: { justifyContent: 'center', alignItems: 'center' },
-  loadingText: { marginTop: 10, fontSize: 16, color: '#FFF' },
+  loadingContainer: { 
+    flex: 1, // Ocupa todo o espaço
+    justifyContent: 'center', 
+    alignItems: 'center',
+    // O fundo já é o ImageBackground pai, então não precisa de backgroundColor aqui
+  },
+  loadingText: { 
+    marginTop: 10, 
+    fontSize: 16, 
+    color: '#FFF',
+    textShadowColor: 'rgba(0, 0, 0, 0.75)', // Sombra para legibilidade
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
   contentContainer: { width: '100%', maxWidth: 400, backgroundColor: 'rgba(255,255,255,0.85)', padding: 25, borderRadius: 15, alignItems: 'center' },
   messageText: { fontSize: 24, fontWeight: 'bold', color: '#333', marginBottom: 10, textAlign: 'center' },
-  subMessageText: { fontSize: 16, color: '#666', marginBottom: 25, textAlign: 'center', lineHeight: 24 }, // Aumentei o marginBottom
-  // Estilos de 'role' foram removidos da lógica, mas podem ser mantidos no StyleSheet sem problemas
-  roleSelectionContainer: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', marginBottom: 25 },
-  roleButton: { paddingVertical: 10, paddingHorizontal: 20, borderRadius: 20, borderWidth: 1.5, borderColor: '#007BFF' },
-  roleButtonSelected: { backgroundColor: '#007BFF' },
-  roleButtonText: { color: '#007BFF', fontSize: 15, fontWeight: 'bold' },
-  roleButtonTextSelected: { color: '#FFF' },
+  subMessageText: { fontSize: 16, color: '#666', marginBottom: 25, textAlign: 'center', lineHeight: 24 },
   submitButton: { backgroundColor: '#007BFF', paddingVertical: 12, paddingHorizontal: 30, borderRadius: 25, alignItems: 'center', justifyContent: 'center', width: '100%' },
-  // O estilo 'submitButtonDisabled' ainda pode ser útil se você desabilitar o botão enquanto 'isSubmitting' for true.
   submitButtonDisabled: { backgroundColor: '#A9A9A9' },
   submitButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   statusMessageContainer: { width: '100%', maxWidth: 400, backgroundColor: 'rgba(255,255,255,0.9)', padding: 30, borderRadius: 15, alignItems: 'center' },
