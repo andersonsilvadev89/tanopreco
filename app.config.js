@@ -3,7 +3,7 @@ export default {
     name: "Assistente de Eventos",
     slug: "petrolina",
     platforms: ["android", "ios"],
-    version: "1.0.7",
+    version: "1.0.8",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     splash: {
@@ -20,7 +20,7 @@ export default {
           apiKey: "AIzaSyDOY_dZzTNgjeMX2z7ssWi755eznnBO68o"
         },
       },
-      versionCode: 17,
+      versionCode: 18,
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -36,7 +36,7 @@ export default {
     },
     ios: {
       bundleIdentifier: "com.ae.stoantoniobarbalhacliente",
-      buildNumber: "2",
+      buildNumber: "1",
       config: {
         googleMapsApiKey: "AIzaSyBY4ZBNVZ1VkyqJqY_M7u3LPdT6Ielcuw0",
       },
@@ -72,6 +72,7 @@ export default {
         {
           android_app_id: "ca-app-pub-5241782827769638~2412388769",
           ios_app_id: "ca-app-pub-5241782827769638~5322425461",
+          "android_kotlin_version": "1.9.0",
         }
       ]
     ],
