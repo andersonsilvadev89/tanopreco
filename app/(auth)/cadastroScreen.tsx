@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'; // Adicionado useEffect
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Alert,
@@ -10,20 +10,20 @@ import {
   ActivityIndicator,
   ImageBackground,
   TouchableOpacity,
-  Modal,
+  Linking, // Importado para abrir URLs
   ScrollView,
-  Dimensions, // Adicionado Dimensions, se já não estivesse
+  Dimensions, 
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { createUserWithEmailAndPassword, fetchSignInMethodsForEmail } from 'firebase/auth';
-import { auth, database } from '../../firebaseConfig';
-import { ref, set } from 'firebase/database';
+import { auth, database, adminDatabase } from '../../firebaseConfig'; // database para app_settings
+import { ref, set, onValue } from 'firebase/database'; // Importar onValue para buscar configurações
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { Eye, EyeOff } from 'lucide-react-native';
 import { MaskedTextInput } from 'react-native-mask-text';
 import { router } from 'expo-router';
 import AdBanner from '../components/AdBanner'; // AdBanner de volta
-import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+import { checkAndDownloadImages } from '../../utils/imageManager'; 
 
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
@@ -34,15 +34,19 @@ export default function CadastroScreen() {
   const [instagram, setInstagram] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
-  const [imagem, setImagem] = useState<string | null>(null); // URI local da imagem de perfil
+  const [imagem, setImagem] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [mostrarConfirmarSenha, setMostrarConfirmarSenha] = useState(false);
   const [erro, setErro] = useState('');
   const [termoAceito, setTermoAceito] = useState(false);
-  const [modalVisible, setModalVisible] = useState(false);
+  // REMOVIDO: modalVisible
 
-  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
+  // === NOVO ESTADO PARA A URL DA POLÍTICA DE PRIVACIDADE ===
+  const [privacyPolicyUrl, setPrivacyPolicyUrl] = useState<string | null>(null);
+  // === NOVO ESTADO PARA O CARREGAMENTO DA URL DA POLÍTICA ===
+  const [loadingPrivacyPolicyUrl, setLoadingPrivacyPolicyUrl] = useState(true);
+
   const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
@@ -52,18 +56,54 @@ export default function CadastroScreen() {
   useEffect(() => {
     const loadFundoImage = async () => {
       try {
-        // Chamamos checkAndDownloadImages, mas só usaremos a URL de fundo (a logo não é relevante aqui)
         const { fundoUrl } = await checkAndDownloadImages();
         setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
       } catch (error) {
         console.error("Erro ao carregar imagem de fundo na CadastroScreen:", error);
-        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+        setCurrentFundoSource(defaultFundoLocal); 
       } finally {
-        setFundoAppReady(true); // Indica que o fundo foi processado
+        setFundoAppReady(true); 
       }
     };
     loadFundoImage();
+  }, []);
+
+  // === NOVO useEffect para buscar a URL da Política de Privacidade do Firebase ===
+  useEffect(() => {
+    const appSettingsRef = ref(adminDatabase, 'configuracoes_app');
+    const unsubscribe = onValue(appSettingsRef, (snapshot) => {
+      const settings = snapshot.val();
+      if (settings && settings.privacyPolicyUrl) {
+        setPrivacyPolicyUrl(settings.privacyPolicyUrl);
+      } else {
+        console.warn("URL da política de privacidade não encontrada no Firebase em app_settings/privacyPolicyUrl.");
+        Alert.alert("Atenção", "A URL da Política de Privacidade não foi encontrada. Por favor, contate o suporte.");
+        setPrivacyPolicyUrl(null); // Define como nulo se não encontrar
+      }
+      setLoadingPrivacyPolicyUrl(false); // Finaliza o loading
+    }, (error) => {
+      console.error("Erro ao carregar URL da política de privacidade:", error);
+      Alert.alert("Erro", "Não foi possível carregar a URL da Política de Privacidade. Verifique sua conexão.");
+      setLoadingPrivacyPolicyUrl(false);
+      setPrivacyPolicyUrl(null);
+    });
+
+    return () => unsubscribe(); // Limpa o listener ao desmontar
   }, []); // Executa apenas uma vez ao montar o componente
+
+  // === Nova função para abrir o link da Política de Privacidade ===
+  const handleOpenPrivacyPolicy = () => {
+    if (privacyPolicyUrl) {
+      Linking.openURL(privacyPolicyUrl).catch(err => {
+        console.error("Erro ao abrir link da política de privacidade:", err);
+        Alert.alert("Erro", "Não foi possível abrir a Política de Privacidade. Verifique sua conexão e a validade da URL.");
+      });
+    } else if (!loadingPrivacyPolicyUrl) {
+      // Só mostra este alerta se já terminou de carregar e a URL não foi encontrada
+      Alert.alert("Erro", "A URL da Política de Privacidade não está disponível. Tente novamente mais tarde.");
+    }
+  };
+
 
   const selecionarImagem = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -75,7 +115,7 @@ export default function CadastroScreen() {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
-        aspect: [1, 1], // Imagem de perfil geralmente quadrada
+        aspect: [1, 1],
         quality: 0.7,
       });
       if (!result.canceled && result.assets && result.assets.length > 0) {
@@ -117,15 +157,13 @@ export default function CadastroScreen() {
     );
   };
   
-  // --- A função uploadImagem ORIGINAL está de volta, sem relação com presets de Admin ---
   const uploadImagem = async () => {
     if (!imagem) return null;
     const formData = new FormData();
     formData.append('file', { uri: imagem, type: 'image/jpeg', name: 'perfil.jpg' } as any);
-    formData.append('upload_preset', 'expocrato'); // Usando o preset 'expocrato' padrão para perfil, como estava antes.
-                                                  // Ou crie um específico para perfil se quiser regras diferentes.
+    formData.append('upload_preset', 'expocrato'); 
     try {
-      const response = await fetch('https://api.cloudinary.com/v1_1/dz37srew5/image/upload', { // URL Cloudinary original
+      const response = await fetch('https://api.cloudinary.com/v1_1/dz37srew5/image/upload', { 
         method: 'POST', body: formData
       });
       const data = await response.json();
@@ -148,6 +186,7 @@ export default function CadastroScreen() {
     if (senha !== confirmarSenha) {
       setErro('As senhas não coincidem!');
       return;
+      // Adicionar validação de URL do Instagram aqui, se quiser garantir um formato
     }
     setLoading(true);
     setErro('');
@@ -161,9 +200,8 @@ export default function CadastroScreen() {
       }
       const userCredential = await createUserWithEmailAndPassword(auth, email, senha);
       const userId = userCredential.user.uid;
-      const imageUrl = await uploadImagem(); // Chama a função de upload de imagem de perfil
+      const imageUrl = await uploadImagem(); 
 
-      // --- LÓGICA DO INSTAGRAM PADRONIZADA (INÍCIO) ---
       let processedInstagram: string | null = null;
       const rawInstagramInput = instagram?.trim();
 
@@ -177,7 +215,6 @@ export default function CadastroScreen() {
           processedInstagram = rawInstagramInput.startsWith('@') ? rawInstagramInput.substring(1) : rawInstagramInput;
         }
       }
-      // --- LÓGICA DO INSTAGRAM PADRONIZADA (FIM) ---
 
       await set(ref(database, 'usuarios/' + userId), {
         nome,
@@ -204,8 +241,8 @@ export default function CadastroScreen() {
     }
   };
 
-  // --- Condição de carregamento da imagem de fundo ---
-  if (!fundoAppReady) {
+  // --- Condição de carregamento geral: Espera os locais E o fundo do app E a URL da política ---
+  if (!fundoAppReady || loadingPrivacyPolicyUrl) { // Inclui loadingPrivacyPolicyUrl
     return (
       <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
@@ -303,7 +340,11 @@ export default function CadastroScreen() {
             </TouchableOpacity>
             <Text style={styles.termoTexto}>
               Eu concordo com os{' '}
-              <Text style={styles.link} onPress={() => setModalVisible(true)}>
+              <Text 
+                style={[styles.link, loadingPrivacyPolicyUrl && { opacity: 0.5 }]} // Opacidade enquanto carrega
+                onPress={handleOpenPrivacyPolicy} // Chama a nova função
+                disabled={loadingPrivacyPolicyUrl || !privacyPolicyUrl} // Desabilita se estiver carregando ou não tiver URL
+              >
                 Termos de uso e política de privacidade
               </Text>
               .
@@ -322,62 +363,6 @@ export default function CadastroScreen() {
           </TouchableOpacity>
         </View>
 
-        <Modal
-          visible={modalVisible}
-          transparent={true}
-          animationType="slide"
-          onRequestClose={() => setModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContentWrapper}>
-                <ScrollView style={styles.modalContainer}>
-                    <Text style={styles.modalTitle}>TERMO DE USO E CONSENTIMENTO...</Text>
-                    <Text style={styles.modalText}>
-                      Este aplicativo coleta e utiliza dados pessoais para proporcionar uma experiência personalizada. Ao prosseguir, você concorda com o tratamento de suas informações conforme descrito em nossa política.
-                    </Text>
-                    <Text style={styles.modalSectionTitle}>1. Coleta de Dados</Text>
-                    <Text style={styles.modalText}>
-                      Coletamos informações como nome, email, telefone, dados de perfil (como foto e Instagram), localização (para funcionalidades de mapa) e interações com o aplicativo.
-                    </Text>
-                    <Text style={styles.modalSectionTitle}>2. Uso dos Dados</Text>
-                    <Text style={styles.modalText}>
-                      Seus dados são usados para:
-                    </Text>
-                    <Text style={styles.modalListItem}>- Personalizar sua experiência no evento.</Text>
-                    <Text style={styles.modalListItem}>- Facilitar a localização de amigos e serviços.</Text>
-                    <Text style={styles.modalListItem}>- Fornecer informações sobre a programação.</Text>
-                    <Text style={styles.modalListItem}>- Melhorar nossos serviços.</Text>
-
-                    <Text style={styles.modalSectionTitle}>3. Compartilhamento de Dados</Text>
-                    <Text style={styles.modalText}>
-                      Não compartilhamos seus dados pessoais com terceiros sem seu consentimento explícito, exceto quando necessário para a prestação de serviços (ex: APIs de mapa) ou por exigência legal.
-                    </Text>
-
-                    <Text style={styles.modalSectionTitle}>4. Segurança</Text>
-                    <Text style={styles.modalText}>
-                      Empregamos medidas de segurança para proteger suas informações, mas nenhuma transmissão de dados pela internet é 100% segura.
-                    </Text>
-
-                    <Text style={styles.modalSectionTitle}>5. Seus Direitos</Text>
-                    <Text style={styles.modalText}>
-                      Você tem o direito de acessar, corrigir, excluir ou limitar o uso de seus dados. Para exercer esses direitos, entre em contato conosco.
-                    </Text>
-
-                    <Text style={styles.modalSectionTitle}>6. Alterações na Política</Text>
-                    <Text style={styles.modalText}>
-                      Esta política pode ser atualizada. Recomendamos revisá-la periodicamente.
-                    </Text>
-
-                    <Text style={styles.modalText}>
-                      Ao clicar em "Aceitar", você concorda com os termos acima.
-                    </Text>
-                </ScrollView>
-                <View style={styles.modalButtonContainer}>
-                    <Button title="Fechar" onPress={() => setModalVisible(false)} />
-                </View>
-            </View>
-          </View>
-        </Modal>
       </KeyboardAwareScrollView>
     </ImageBackground>
   );
@@ -405,20 +390,12 @@ const styles = StyleSheet.create({
   link: { color: '#007BFF', textDecorationLine: 'underline' },
   loginLink: { marginTop: 15, alignItems: 'center' },
   loginText: { color: '#007BFF', fontSize: 14 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContentWrapper: { width: '100%', maxHeight: '85%', backgroundColor: '#fff', borderRadius: 8, overflow: 'hidden' },
-  modalContainer: { padding: 20 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 15, textAlign: 'center' },
-  modalSectionTitle: { fontWeight: 'bold', fontSize: 16, marginTop: 15, marginBottom: 5 },
-  modalText: { fontSize: 14, lineHeight: 20, textAlign: 'justify', marginBottom: 10 },
-  modalListItem: { fontSize: 14, lineHeight: 20, textAlign: 'justify', marginLeft: 10 },
-  modalButtonContainer: { padding: 10, borderTopWidth: 1, borderTopColor: '#eee' },
-  // Estilos para o estado de carregamento do fundo
+  // REMOVIDO: Estilos do Modal (modalOverlay, modalContentWrapper, modalContainer, etc.)
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF', // Pode ser uma cor sólida enquanto o fundo carrega
+    backgroundColor: '#FFFFFF', 
   },
   loadingText: {
     marginTop: 10,

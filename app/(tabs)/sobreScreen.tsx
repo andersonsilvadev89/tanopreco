@@ -5,23 +5,21 @@ import {
   ImageBackground,
   ScrollView,
   Alert,
-  ActivityIndicator, // Adicionado para o loading do fundo
+  ActivityIndicator, 
   TextInput,
   TouchableOpacity,
   Dimensions,
   Image,
 } from 'react-native';
 import React, { useEffect, useState, useRef } from 'react';
-import { auth, database, adminDatabase } from '../../firebaseConfig'; // Verifique se o caminho está correto
-import { ref, get, push, serverTimestamp } from 'firebase/database';
-import AdBanner from '../components/AdBanner'; // Importe o componente AdBanner
+import { auth, database, adminDatabase } from '../../firebaseConfig'; 
+import { ref, get, push, serverTimestamp, onValue } from 'firebase/database'; // Adicionado onValue
+import AdBanner from '../components/AdBanner'; 
 
 // --- Importar o gerenciador de imagens para o fundo ---
-import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+// import { checkAndDownloadImages } from '../../utils/imageManager'; 
 
-// --- URL padrão de fallback para o fundo local ---
 const defaultFundoLocal = require('../../assets/images/fundo.png');
-// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
 export default function Sobre() {
   const [sugestao, setSugestao] = useState('');
@@ -30,6 +28,11 @@ export default function Sobre() {
   const [sponsorsLoading, setSponsorsLoading] = useState(true);
   const [sponsorsError, setSponsorsError] = useState<string | null>(null);
 
+  // === NOVO ESTADO PARA O TEXTO "SOBRE O APP" ===
+  const [sobreAppTexto, setSobreAppTexto] = useState('');
+  // === NOVO ESTADO PARA O LOADING DO TEXTO "SOBRE O APP" ===
+  const [loadingSobreAppTexto, setLoadingSobreAppTexto] = useState(true);
+
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollOffsetRef = useRef(0);
   const animationFrameIdRef = useRef<number | null>(null);
@@ -37,25 +40,48 @@ export default function Sobre() {
   const [isUserInteractingWithSponsors, setIsUserInteractingWithSponsors] = useState(false);
   const screenWidth = Dimensions.get('window').width;
 
-  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
   const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
-  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  // --- useEffect para carregar a imagem de fundo dinâmica ---
   useEffect(() => {
     const loadFundoImage = async () => {
       try {
-        const { fundoUrl } = await checkAndDownloadImages();
-        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+        // Se você estiver usando checkAndDownloadImages, descomente a linha abaixo
+        // const { fundoUrl } = await checkAndDownloadImages();
+        // setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+        setCurrentFundoSource(defaultFundoLocal); // Usando fallback local para compatibilidade com Expo Go
       } catch (error) {
         console.error("Erro ao carregar imagem de fundo na Sobre:", error);
-        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+        setCurrentFundoSource(defaultFundoLocal); 
       } finally {
-        setFundoAppReady(true); // Indica que o fundo foi processado
+        setFundoAppReady(true); 
       }
     };
     loadFundoImage();
-  }, []); // Executa apenas uma vez ao montar o componente
+  }, []); 
+
+  // === NOVO useEffect para buscar o texto "Sobre o App" do Firebase ===
+  useEffect(() => {
+    const configRef = ref(adminDatabase, 'configuracoes_app'); // Nó onde o texto está salvo
+    const unsubscribe = onValue(configRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data && data.sobreEsteApp) {
+        setSobreAppTexto(data.sobreEsteApp);
+      } else {
+        console.warn("Texto 'sobreEsteApp' não encontrado no Firebase em 'configuracoes_app/sobreEsteApp'.");
+        setSobreAppTexto("Informações sobre o app não disponíveis no momento."); // Texto de fallback
+      }
+      setLoadingSobreAppTexto(false); // Finaliza o loading do texto
+    }, (error) => {
+      console.error("Erro ao buscar texto 'Sobre o App' do Firebase:", error);
+      Alert.alert("Erro", "Não foi possível carregar as informações sobre o app.");
+      setSobreAppTexto("Erro ao carregar informações."); // Texto de fallback em caso de erro
+      setLoadingSobreAppTexto(false);
+    });
+
+    return () => unsubscribe(); // Limpa o listener ao desmontar o componente
+  }, []);
 
   const fetchSponsors = async () => {
     setSponsorsLoading(true);
@@ -85,6 +111,7 @@ export default function Sobre() {
     fetchSponsors();
   }, []);
 
+  // Lógica de animação de scroll dos patrocinadores (inalterada)
   useEffect(() => {
     if (animationFrameIdRef.current) {
       cancelAnimationFrame(animationFrameIdRef.current);
@@ -148,7 +175,7 @@ export default function Sobre() {
 
     setEnviandoFeedback(true);
     try {
-      const feedbackRef = ref(adminDatabase, 'sugestoesReclamacoes');
+      const feedbackRef = ref(adminDatabase, 'sugestoesReclamacoes'); // adminDatabase para dados de admin
       await push(feedbackRef, {
         texto: sugestao.trim(),
         uidUsuario: user ? user.uid : 'anonimo',
@@ -165,64 +192,36 @@ export default function Sobre() {
     }
   };
 
-  // --- Condição de carregamento da imagem de fundo ---
-  // A tela principal só é renderizada depois que o fundo está pronto.
-  if (!fundoAppReady) {
+  // --- Condição de carregamento geral: Espera o fundo E o texto "Sobre o App" estarem prontos ---
+  if (!fundoAppReady || loadingSobreAppTexto) { 
     return (
       <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
-        <Text style={styles.loadingText}>Carregando fundo...</Text>
+        <Text style={styles.loadingText}>Carregando informações do app...</Text>
       </ImageBackground>
     );
   }
 
   return (
     <ImageBackground
-      source={currentFundoSource} // USANDO O FUNDO DINÂMICO AQUI
+      source={currentFundoSource} 
       style={styles.container}
       resizeMode="cover"
     >
       <AdBanner />
 
       <View style={styles.contentArea}>
-        {/* Seção "Sobre este App" */}
         <View style={styles.sectionWrapper}>
           <ScrollView contentContainerStyle={styles.scrollContentContainer}>
             <Text style={styles.title}>🎉 Sobre o Assistente de Eventos 🎉</Text>
 
             <Text style={styles.paragraphText}>
-              Cansado(a) de perrengues em eventos?
+              {sobreAppTexto}
             </Text>
-            <Text style={styles.paragraphText}>
-              O Assistente de Eventos nasceu para revolucionar a forma como você curte cada momento! ✨
-            </Text>
-            <Text style={styles.paragraphText}>
-              Nossa missão é garantir que você aproveite ao máximo, sem estresse. Veja como: 👇
-            </Text>
-
-            <View style={styles.featureItem}>
-              <Text style={styles.emojiBulletPoint}>📍</Text>
-              <Text style={styles.featureText}>
-                <Text style={styles.boldText}>Localize Tudo e Todos:</Text>
-                {' '}Com a geolocalização em tempo real, encontre facilmente seus amigos, aquele lanche especial ou o serviço que você precisa, sem dar voltas desnecessárias.
-              </Text>
-            </View>
-
-            <View style={styles.featureItem}>
-              <Text style={styles.emojiBulletPoint}>🎧</Text>
-              <Text style={styles.featureText}>
-                <Text style={styles.boldText}>Não Perca Nada:</Text>
-                {' '}Fique por dentro de toda a programação com o lineup sempre atualizado e sinta a vibe de cada palco com nossa transmissão de áudio ao vivo.
-              </Text>
-            </View>
-
-            <Text style={styles.paragraphText}>
-              Com o Assistente de Eventos, você gasta seu tempo e energia com o que realmente importa: a diversão! 🥳 Explore, conecte-se e viva a melhor experiência possível no seu evento. 🚀
-            </Text>
+            
           </ScrollView>
         </View>
 
-        {/* Seção "Patrocinadores" */}
         <View style={styles.supportersContainer}>
           <Text style={styles.supportersTitle}>Apoio:</Text>
           {sponsorsLoading ? (
@@ -236,7 +235,6 @@ export default function Sobre() {
           ) : (<Text style={styles.supporterText}>Seja nosso apoiador!</Text>)}
         </View>
 
-        {/* Seção "Sugestões e Reclamações" */}
         <View style={[styles.sectionWrapper, { flex: 0.9 }]}>
           <ScrollView contentContainerStyle={styles.scrollContentContainer}>
             <Text style={styles.title}>💡 Sugestões e Reclamações</Text>
@@ -263,11 +261,8 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#2c3e50', textAlign: 'center' },
 
   paragraphText: { fontSize: 16, color: '#34495e', textAlign: 'justify', lineHeight: 25, marginBottom: 15 },
-  featureItem: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 18, paddingLeft: 5 },
-  emojiBulletPoint: { fontSize: 20, color: '#34495e', marginRight: 10, lineHeight: 25 },
-  featureText: { flex: 1, fontSize: 16, color: '#34495e', textAlign: 'justify', lineHeight: 25 },
-  boldText: { fontWeight: 'bold', color: '#2c3e50' },
-
+  // REMOVIDO: featureItem, emojiBulletPoint, featureText, boldText styles
+  
   supportersContainer: { flex: 0.7, justifyContent: 'center', alignItems: 'center', marginTop: 5 },
   supportersTitle: { fontSize: 19, fontWeight: 'bold', color: '#FFFFFF', marginTop: 10, marginBottom: 8, textShadowColor: 'rgba(0, 0, 0, 0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   supportersLogos: { width: '100%' },
@@ -280,18 +275,16 @@ const styles = StyleSheet.create({
   botaoEnviar: { backgroundColor: '#3498db', paddingVertical: 10, paddingHorizontal: 35, borderRadius: 30, alignItems: 'center', justifyContent: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, alignSelf: 'center', minWidth: 150 },
   botaoDesabilitado: { backgroundColor: '#95a5a6' },
   botaoEnviarTexto: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  // Estilos para o estado de carregamento do fundo
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    // O fundo já será a imagem carregada dinamicamente, ou o fallback local
   },
   loadingText: {
     marginTop: 10,
     color: '#007BFF',
     fontSize: 16,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)', // Adicionado sombra para melhor legibilidade no fundo dinâmico
+    textShadowColor: 'rgba(0, 0, 0, 0.75)', 
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },

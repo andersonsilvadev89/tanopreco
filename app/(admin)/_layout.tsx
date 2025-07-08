@@ -68,6 +68,7 @@ export default function AdminTabsLayout() {
         { name: 'cadastroUsuariosScreen', label: 'Usuários', icon: Users },
         { name: 'listaEmpresasParaAprovacaoScreen', label: 'Empresas', icon: Building2 },
         { name: 'locaisScreen', label: 'Locais', icon: MapPin },
+        { name: 'locaisEssenciaisScreen', label: 'Essencial', icon: MapPin },
         { name: 'cadastroLineUpScreen', label: 'LineUp', icon: CalendarPlus },
         { name: 'cadastroPatrocinadoresScreen', label: 'Patrocínio', icon: Handshake },
         

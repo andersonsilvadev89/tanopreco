@@ -286,8 +286,6 @@ const ConfiguracoesEmpresaScreen = () => {
           <View style={styles.card}>
             {!editando ? (
               <View style={styles.profileDisplayContainer}>
-                {/* Usa displayImageSource para exibir a imagem da empresa */}
-                {/* A imagem de placeholder é removida. Se displayImageSource for undefined, Image não mostrará nada. */}
                 <Image source={displayImageSource} style={styles.profileImage} />
                 <Text style={styles.profileName}>{nomeEmpresa}</Text>
                 <Text style={styles.profileDescription}>{descricao}</Text>
@@ -337,7 +335,6 @@ const ConfiguracoesEmpresaScreen = () => {
             ) : (
               <View style={styles.profileEditContainer}>
                 <TouchableOpacity onPress={handleSelecionarFoto}>
-                  {/* Usa displayImageSource para exibir a imagem da empresa no modo edição */}
                   <Image source={displayImageSource} style={styles.profileImageEdit} />
                   <Text style={styles.changePhotoText}>Alterar Imagem de Capa</Text>
                 </TouchableOpacity>

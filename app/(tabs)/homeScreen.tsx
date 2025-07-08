@@ -120,7 +120,6 @@ const HomeScreen = () => {
 
   return (
     <ImageBackground source={currentFundoSource} style={styles.background} resizeMode="cover">
-      {/* O componente AdBanner substitui toda a lógica anterior de banner */}
       <AdBanner /> 
 
       <View style={styles.content}>

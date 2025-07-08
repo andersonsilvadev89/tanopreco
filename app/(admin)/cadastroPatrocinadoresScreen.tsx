@@ -431,7 +431,6 @@ export default function CadastroPatrocinadores() {
           <View style={styles.formContainer}>
             <Text style={styles.title}>{editandoId ? 'Editar Patrocinador' : 'Cadastrar Novo Patrocinador'}</Text>
 
-            {/* Logomarca da Empresa */}
             <Text style={styles.label}>Logomarca da Empresa *</Text>
             <TouchableOpacity
               onPress={escolherLogoPatrocinador}
@@ -452,7 +451,6 @@ export default function CadastroPatrocinadores() {
               )}
             </TouchableOpacity>
 
-            {/* Nome da Empresa */}
             <Text style={styles.label}>Nome da Empresa *</Text>
             <TextInput
               value={nomeEmpresa}
@@ -461,7 +459,6 @@ export default function CadastroPatrocinadores() {
               style={styles.input}
             />
 
-            {/* Seção de Cadastro de Banners */}
             <View style={styles.bannerSection}>
               <Text style={styles.sectionTitle}>Banners Publicitários</Text>
 
@@ -521,7 +518,6 @@ export default function CadastroPatrocinadores() {
                )}
             </View>
 
-            {/* Lista de Banners Adicionados */}
             {currentBanners.length > 0 && (
               <View style={styles.addedBannersList}>
                 <Text style={styles.subSectionTitle}>Banners na lista para este patrocinador:</Text>
@@ -564,7 +560,6 @@ export default function CadastroPatrocinadores() {
 
           <View style={styles.separator} />
 
-          {/* Lista de Patrocinadores Cadastrados */}
           <View style={styles.listContainer}>
             <Text style={styles.title}>Patrocinadores Cadastrados</Text>
             {patrocinadores.length === 0 ? (

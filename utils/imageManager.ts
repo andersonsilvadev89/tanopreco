@@ -24,8 +24,7 @@ const localFundoUri = `${FileSystem.documentDirectory}${LOCAL_FUNDO_FILENAME}`;
  * @returns Um objeto contendo a URL da logo (local) e a URL do fundo (local).
  */
 export const checkAndDownloadImages = async (): Promise<{ logoUrl: string; fundoUrl: string }> => {
-  console.log("Iniciando verificação e sincronização de imagens...");
-
+  
   let currentLogoUrl = '';
   let currentFundoUrl = '';
 
@@ -37,7 +36,7 @@ export const checkAndDownloadImages = async (): Promise<{ logoUrl: string; fundo
     const firebaseLogoUrl = firebaseData.logoEventoUrl || '';
     const firebaseFundoUrl = firebaseData.fundoAppUrl || '';
 
-    console.log("URLs do Firebase:", { firebaseLogoUrl, firebaseFundoUrl });
+    //console.log("URLs do Firebase:", { firebaseLogoUrl, firebaseFundoUrl });
 
     // --- Processamento da LOGO ---
     const lastDownloadedLogoUrl = await AsyncStorage.getItem(LAST_DOWNLOADED_LOGO_URL_KEY);
@@ -47,24 +46,24 @@ export const checkAndDownloadImages = async (): Promise<{ logoUrl: string; fundo
       // Caso 1: A URL do Firebase existe, o arquivo local existe e a URL corresponde à última baixada.
       // Usa a versão em cache localmente.
       currentLogoUrl = localLogoUri;
-      console.log('Logo: Usando versão em cache (URL no Firebase não mudou).');
+      //console.log('Logo: Usando versão em cache (URL no Firebase não mudou).');
     } else if (firebaseLogoUrl) {
       // Caso 2: A URL do Firebase existe, mas o arquivo local não existe, ou a URL no Firebase mudou.
       // Precisa baixar ou atualizar.
-      console.log('Logo: Baixando ou atualizando (arquivo não encontrado ou URL do Firebase mudou)...');
+      //console.log('Logo: Baixando ou atualizando (arquivo não encontrado ou URL do Firebase mudou)...');
       try {
         await FileSystem.downloadAsync(firebaseLogoUrl, localLogoUri);
         await AsyncStorage.setItem(LAST_DOWNLOADED_LOGO_URL_KEY, firebaseLogoUrl);
         currentLogoUrl = localLogoUri;
-        console.log('Logo: Download concluído e URL salva em cache.');
+        //console.log('Logo: Download concluído e URL salva em cache.');
       } catch (downloadError) {
-        console.error("Erro ao baixar a logo:", downloadError);
+        //console.error("Erro ao baixar a logo:", downloadError);
         Alert.alert("Erro de Download", "Não foi possível baixar a logo do evento. Usando fallback.");
         currentLogoUrl = ''; // Retorna vazio para que a tela use o asset local
       }
     } else {
       // Caso 3: Não há URL de logo válida no Firebase. Limpa o cache local e retorna vazio.
-      console.log('Logo: Nenhuma URL no Firebase, limpando cache local e usando fallback.');
+      //console.log('Logo: Nenhuma URL no Firebase, limpando cache local e usando fallback.');
       await FileSystem.deleteAsync(localLogoUri, { idempotent: true }).catch(() => {}); // Tenta apagar, ignora erro se não existir
       await AsyncStorage.removeItem(LAST_DOWNLOADED_LOGO_URL_KEY);
       currentLogoUrl = ''; // Retorna vazio para que a tela use o asset local
@@ -78,35 +77,35 @@ export const checkAndDownloadImages = async (): Promise<{ logoUrl: string; fundo
       // Caso 1: A URL do Firebase existe, o arquivo local existe e a URL corresponde à última baixada.
       // Usa a versão em cache localmente.
       currentFundoUrl = localFundoUri;
-      console.log('Fundo: Usando versão em cache (URL no Firebase não mudou).');
+      //console.log('Fundo: Usando versão em cache (URL no Firebase não mudou).');
     } else if (firebaseFundoUrl) {
       // Caso 2: A URL do Firebase existe, mas o arquivo local não existe, ou a URL no Firebase mudou.
       // Precisa baixar ou atualizar.
-      console.log('Fundo: Baixando ou atualizando fundo (arquivo não encontrado ou URL do Firebase mudou)...');
+      //console.log('Fundo: Baixando ou atualizando fundo (arquivo não encontrado ou URL do Firebase mudou)...');
       try {
         await FileSystem.downloadAsync(firebaseFundoUrl, localFundoUri);
         await AsyncStorage.setItem(LAST_DOWNLOADED_FUNDO_URL_KEY, firebaseFundoUrl);
         currentFundoUrl = localFundoUri;
-        console.log('Fundo: Download concluído e URL salva em cache.');
+        //console.log('Fundo: Download concluído e URL salva em cache.');
       } catch (downloadError) {
-        console.error("Erro ao baixar o fundo:", downloadError);
+        //console.error("Erro ao baixar o fundo:", downloadError);
         Alert.alert("Erro de Download", "Não foi possível baixar a imagem de fundo. Usando fallback.");
         currentFundoUrl = ''; // Retorna vazio para que a tela use o asset local
       }
     } else {
       // Caso 3: Não há URL de fundo válida no Firebase. Limpa o cache local e retorna vazio.
-      console.log('Fundo: Nenhuma URL no Firebase, limpando cache local e usando fallback.');
+      //console.log('Fundo: Nenhuma URL no Firebase, limpando cache local e usando fallback.');
       await FileSystem.deleteAsync(localFundoUri, { idempotent: true }).catch(() => {}); // Tenta apagar, ignora erro se não existir
       await AsyncStorage.removeItem(LAST_DOWNLOADED_FUNDO_URL_KEY);
       currentFundoUrl = ''; // Retorna vazio para que a tela use o asset local
     }
 
-    console.log("Verificação de imagens concluída.");
+    //console.log("Verificação de imagens concluída.");
     // Retorna as URIs locais que devem ser usadas pelo app (ou vazias se houver erro ou não existir URL no Firebase)
     return { logoUrl: currentLogoUrl, fundoUrl: currentFundoUrl };
 
   } catch (error) {
-    console.error("Erro geral na verificação/download de imagens:", error);
+    //console.error("Erro geral na verificação/download de imagens:", error);
     Alert.alert("Erro de Sincronização", "Não foi possível sincronizar as imagens do aplicativo. Verifique sua conexão.");
     // Em caso de erro geral, retorna vazio para que a tela use os assets locais
     return { logoUrl: '', fundoUrl: '' };

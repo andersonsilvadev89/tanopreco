@@ -70,6 +70,7 @@ const HomeScreen = () => {
         { name: 'cadastroUsuariosScreen', label: 'Aprovar Usuários', icon: Users, adminOnly: true },
         { name: 'listaEmpresasParaAprovacaoScreen', label: 'Aprovar Empresas', icon: Building2, adminOnly: false },
         { name: 'locaisScreen', label: 'Gerenciar Locais', icon: MapPin, adminOnly: true },
+        { name: 'locaisEssenciaisScreen', label: 'Cadastrar Locais Essenciais', icon: MapPin, adminOnly: true },
         { name: 'cadastroLineUpScreen', label: 'Gerenciar LineUp', icon: CalendarPlus, adminOnly: false },
         { name: 'cadastroPatrocinadoresScreen', label: 'Gerenciar Patrocínio', icon: Handshake, adminOnly: false },
     ];

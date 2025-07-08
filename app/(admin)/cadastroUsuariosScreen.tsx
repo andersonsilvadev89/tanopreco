@@ -228,14 +228,14 @@ const AprovacaoUsuarioScreen = () => {
                     onPress={() => handleAprovar(item.id)}
                     // REMOVIDO: disabled={isSubmitting}
                 >
-                    {/* REMOVIDO: isSubmitting ? <ActivityIndicator ... /> : */} <Text style={styles.buttonText}>Aprovar</Text>
+                    <Text style={styles.buttonText}>Aprovar</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                     style={[styles.button, styles.rejectButton]} 
                     onPress={() => handleRejeitar(item.id)}
                     // REMOVIDO: disabled={isSubmitting}
                 >
-                    {/* REMOVIDO: isSubmitting ? <ActivityIndicator ... /> : */} <Text style={styles.buttonText}>Rejeitar</Text>
+                    <Text style={styles.buttonText}>Rejeitar</Text>
                 </TouchableOpacity>
             </View>
         </View>

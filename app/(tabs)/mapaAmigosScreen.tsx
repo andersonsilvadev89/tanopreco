@@ -451,7 +451,7 @@ const MapaAmigosScreen = () => {
   // A tela principal só é renderizada depois que o fundo E o status/eventos estão prontos.
   if (isLoadingGeral || !fundoAppReady) { // <-- Inclui fundoAppReady aqui
     return (
-        <ImageBackground source={currentFundoSource} style={styles.background}> {/* Usa currentFundoSource */}
+        <ImageBackground source={currentFundoSource} style={styles.background}> 
             <View style={styles.center}><ActivityIndicator size="large" color="#FFFFFF" /><Text style={styles.loadingText}>Carregando...</Text></View>
         </ImageBackground>
     );
@@ -466,7 +466,7 @@ const MapaAmigosScreen = () => {
   }
   if (locationPermissionStatus !== PermissionStatus.GRANTED) {
     return (
-        <ImageBackground source={currentFundoSource} style={styles.background}> {/* Usa currentFundoSource */}
+        <ImageBackground source={currentFundoSource} style={styles.background}> 
             <View style={styles.center}>
                 <Text style={styles.warningText}>A permissão de localização é essencial para o mapa de amigos.</Text>
                 <Text style={styles.subWarningText}>Por favor, habilite o acesso nas configurações do seu dispositivo.</Text>
@@ -477,7 +477,7 @@ const MapaAmigosScreen = () => {
   }
   if (compartilhando === false) {
     return (
-        <ImageBackground source={currentFundoSource} style={styles.background}> {/* Usa currentFundoSource */}
+        <ImageBackground source={currentFundoSource} style={styles.background}> 
             <View style={styles.center}>
                 <Text style={styles.warningText}>Para visualizar a localização dos seus amigos, ative o compartilhamento da sua localização.</Text>
                 <Text style={styles.subWarningText}>Você pode ativar o compartilhamento no seu perfil ou nas configurações do app.</Text>
@@ -489,14 +489,14 @@ const MapaAmigosScreen = () => {
   // se ele realmente precisa de um loading separado com a lista de amigos já carregada.
   if (podeRastrearAmigos && loadingAmigosLoc && amigosLista.length > 0) {
       return (
-        <ImageBackground source={currentFundoSource} style={styles.background}> {/* Usa currentFundoSource */}
+        <ImageBackground source={currentFundoSource} style={styles.background}> 
             <View style={styles.center}><ActivityIndicator size="large" color="#FFFFFF" /><Text style={styles.loadingText}>Carregando localizações dos amigos...</Text></View>
         </ImageBackground>
     );
   }
 
   return (
-    <ImageBackground source={currentFundoSource} style={styles.background}> {/* Usa currentFundoSource */}
+    <ImageBackground source={currentFundoSource} style={styles.background}> 
         <AdBanner />
         <SafeAreaView style={styles.container}>
             <TextInput

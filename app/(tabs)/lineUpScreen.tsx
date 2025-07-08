@@ -10,26 +10,28 @@ import {
   Image,
   ImageBackground,
   Dimensions,
-  ActivityIndicator, // Adicionado para o loading do fundo
+  ActivityIndicator,
   SafeAreaView,
+  Animated,
+  Linking, // Importar Linking para abrir URLs
 } from 'react-native';
 import { Feather } from '@expo/vector-icons';
 import MapView, { Marker, Region, Callout } from 'react-native-maps';
-import { ref, onValue } from 'firebase/database';
+import { ref, onValue, get } from 'firebase/database';
 import { database } from '../../firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
 import 'moment/locale/pt-br';
-import AdBanner from '../components/AdBanner'; 
+
+// REMOVIDO: import { Audio, AVPlaybackStatus, InterruptionModeIOS, InterruptionModeAndroid } from 'expo-av';
 
 // --- Importar o gerenciador de imagens para o fundo ---
-import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+// import { checkAndDownloadImages } from '../../utils/imageManager'; // Se estiver usando o imageManager
 
-// --- URL padrão de fallback para o fundo local ---
+// URL padrão de fallback para o fundo local
 const defaultFundoLocal = require('../../assets/images/fundo.png');
-// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
-// --- Interfaces ---
+// --- Interfaces (ATUALIZADAS) ---
 interface Evento {
   id: string;
   nomeBanda: string;
@@ -39,15 +41,25 @@ interface Evento {
   dataMomento: string;
 }
 
+interface BannerItem { // Mantido para o AdBanner inline
+  descricao: string;
+  id: string;
+  imagemUrl: string;
+  linkUrl: string;
+}
+
+// === INTERFACE LOCAIS ATUALIZADA (agora inclui liveStreamLink) ===
 interface Locais {
   id: string;
   descricao: string;
   latitude?: number;
   longitude?: number;
+  liveStreamLink?: string; // Campo para o link de live/rede social
 }
 
 // --- Constantes ---
-const { height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
+// REMOVIDO: radiosListHeight
 const ITEM_PROGRAMACAO_HEIGHT = screenHeight * 0.13;
 
 const LineUpScreen = () => {
@@ -62,49 +74,72 @@ const LineUpScreen = () => {
   });
   const [eventoSelecionadoNoMapa, setEventoSelecionadoNoMapa] = useState<Evento | null>(null);
   const [dataTitulo, setDataTitulo] = useState('Programação do Dia');
-  const [locaisData, setLocaisData] = useState<Locais[]>([]);
+  const [locaisData, setLocaisData] = useState<Locais[]>([]); // Contém locais do mapa E os com links
 
-  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
-  const [fundoAppReady, setFundoAppReady] = useState(false);
-  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+  // === NOVO ESTADO PARA OS LINKS DE LIVE/REDE SOCIAL (FILTRADOS DE locaisData) ===
+  const [liveStreamLinksData, setLiveStreamLinksData] = useState<Locais[]>([]);
+
+  // REMOVIDO: selectedRadio, soundRef, isPlaying, isLoadingRadio, radioError - relacionados ao áudio
 
   const cratoLocation = { latitude: -7.2345, longitude: -39.4056 };
 
-  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  // --- Estados do AdBanner inline (mantidos) ---
+  const [allBanners, setAllBanners] = useState<string[]>([]);
+  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
+  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+
+  // --- Estados para o carregamento da imagem de fundo dinâmica ---
+  const [fundoAppReady, setFundoAppReady] = useState(false);
+  const [currentFundoSource, setCurrentFundoSource] = useState<any>(require('../../assets/images/fundo.png')); // Usar default local por enquanto
+
+  // --- useEffect para carregar a imagem de fundo dinâmica ---
   useEffect(() => {
     const loadFundoImage = async () => {
       try {
-        const { fundoUrl } = await checkAndDownloadImages();
-        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+        // Se você tiver a função checkAndDownloadImages, descomente e use aqui
+        // const { fundoUrl } = await checkAndDownloadImages();
+        // setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : require('../../assets/images/fundo.png'));
+        setCurrentFundoSource(require('../../assets/images/fundo.png')); // Mantém o fallback local por simplicidade no Expo Go
       } catch (error) {
         console.error("Erro ao carregar imagem de fundo na LineUpScreen:", error);
-        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+        setCurrentFundoSource(require('../../assets/images/fundo.png'));
       } finally {
-        setFundoAppReady(true); // Indica que o fundo foi processado
+        setFundoAppReady(true);
       }
     };
     loadFundoImage();
-  }, []); // Executa apenas uma vez ao montar o componente
+  }, []);
 
-  // Lógica principal da tela (inalterada)
+  // Lógica para buscar locais (agora incluindo liveStreamLink)
   useEffect(() => {
     const locaisRef = ref(database, 'locais');
     const unsubscribeLocais = onValue(locaisRef, (snapshot) => {
       const locais: Locais[] = [];
+      const links: Locais[] = []; // Para armazenar apenas os locais com liveStreamLink
       snapshot.forEach((childSnapshot) => {
         const localData = childSnapshot.val();
-        locais.push({
+        const localItem: Locais = {
           id: childSnapshot.key!,
           descricao: localData.descricao,
           latitude: localData.latitude,
           longitude: localData.longitude,
-        });
+          liveStreamLink: localData.liveStreamLink, // Pega o liveStreamLink
+        };
+        locais.push(localItem);
+        
+        // Se o local tiver um liveStreamLink, adicione-o à lista de links
+        if (localData.liveStreamLink) {
+          links.push(localItem);
+        }
       });
       setLocaisData(locais);
+      setLiveStreamLinksData(links); // Define a nova lista de links
     });
     return () => unsubscribeLocais();
   }, []);
 
+  // Lógica para buscar a programação do dia (inalterada)
   useEffect(() => {
     const lineupRef = ref(database, 'lineup');
     const unsubscribeLineup = onValue(lineupRef, (snapshot) => {
@@ -133,8 +168,92 @@ const LineUpScreen = () => {
     }
   }, [diaSelecionado]);
 
+  // Lógica do AdBanner inline (mantida)
+  useEffect(() => {
+    const fetchBanners = async () => {
+      try {
+        const sponsorsRef = ref(database, 'patrocinadores');
+        const snapshot = await get(sponsorsRef);
+        if (snapshot.exists()) {
+          const sponsorsData = snapshot.val();
+          const bannersList: string[] = [];
+          for (const sponsorId in sponsorsData) {
+            const sponsor = sponsorsData[sponsorId];
+            if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
+              const sponsorBannersArray: BannerItem[] = sponsor.banners;
+              sponsorBannersArray.forEach(bannerObject => {
+                if (typeof bannerObject === 'object' && bannerObject !== null && typeof bannerObject.imagemUrl === 'string') {
+                  bannersList.push(bannerObject.imagemUrl);
+                }
+              });
+            }
+          }
+          if (bannersList.length > 0) {
+            setAllBanners(bannersList);
+            setCurrentBannerUrl(bannersList[0]);
+            setCurrentBannerIndex(0);
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 200,
+              useNativeDriver: true,
+            }).start();
+          } else {
+            console.log('Nenhum banner de patrocinador encontrado com a estrutura esperada.');
+            setCurrentBannerUrl(null);
+            fadeAnim.setValue(0);
+          }
+        } else {
+          console.log('Nó "patrocinadores" não encontrado em database.');
+          setCurrentBannerUrl(null);
+          fadeAnim.setValue(0);
+        }
+      } catch (error) {
+        console.error('Erro ao buscar banners dos patrocinadores:', error);
+        Alert.alert("Erro", "Não foi possível carregar os banners dos patrocinadores.");
+        setCurrentBannerUrl(null);
+        fadeAnim.setValue(0);
+      }
+    };
+    fetchBanners();
+  }, [fadeAnim]); 
+
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+      
+    if (allBanners.length > 1) {
+      intervalId = setInterval(() => {
+        Animated.timing(fadeAnim, { 
+          toValue: 0,
+          duration: 200, 
+          useNativeDriver: true,
+        }).start(() => {
+          setCurrentBannerIndex(prevIndex => {
+            const nextIndex = (prevIndex + 1) % allBanners.length;
+            setCurrentBannerUrl(allBanners[nextIndex]);
+              
+            Animated.timing(fadeAnim, {
+              toValue: 1,
+              duration: 200, 
+              useNativeDriver: true,
+            }).start();
+              
+            return nextIndex;
+          });
+        });
+      }, 6000); 
+    }
+      
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [allBanners, fadeAnim]);
+
+
   const visualizarNoMapa = (evento: Evento) => {
     const nomeLocalEventoNormalizado = evento.local.toLowerCase().trim();
+    // Usa locaisData para encontrar as coordenadas
     const localEncontrado = locaisData.find((local) =>
       local.descricao.toLowerCase().trim() === nomeLocalEventoNormalizado
     );
@@ -156,10 +275,10 @@ const LineUpScreen = () => {
   const voltarDia = () => { setDiaSelecionado(moment(diaSelecionado).subtract(1, 'day').toDate()); };
 
   const renderProgramacaoItem = ({ item }: { item: Evento }) => {
-    const handlePressVerNoMapa = () => {
+    const handlePressVerNoMapa = () => { 
       visualizarNoMapa(item);
     };
-  
+    
     if (item.imagemUrl) {
       return (
         <View style={styles.programacaoItemWrapper}> 
@@ -201,11 +320,38 @@ const LineUpScreen = () => {
     }
   };
 
-  // --- Condição de carregamento da imagem de fundo ---
-  // A tela principal só é renderizada depois que o fundo está pronto.
+  // === NOVO: Renderização dos itens da lista de Links de Live/Rede Social ===
+  const renderLiveStreamLinkItem = ({ item }: { item: Locais }) => { // Usamos Locais, pois o liveStreamLink está nela
+    const getPlatformIcon = (url: string) => {
+      if (url.includes('instagram.com')) {
+        return <Feather name="instagram" size={20} color="#E4405F" />;
+      } else if (url.includes('youtube.com')) {
+        return <Feather name="youtube" size={20} color="#FF0000" />;
+      } else if (url.includes('facebook.com')) {
+        return <Feather name="facebook" size={20} color="#1877F2" />;
+      }
+      return <Feather name="link" size={20} color="#007bff" />; // Ícone genérico
+    };
+
+    const handlePress = () => {
+      Linking.openURL(item.liveStreamLink!).catch(err => {
+        console.error("Não foi possível abrir o link:", err);
+        Alert.alert("Erro", "Não foi possível abrir o link da live/rede social.");
+      });
+    };
+
+    return (
+      <TouchableOpacity onPress={handlePress} style={styles.liveStreamLinkItem}>
+        {getPlatformIcon(item.liveStreamLink || '')}
+        <Text style={styles.liveStreamLinkItemText}>{item.descricao}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+
   if (!fundoAppReady) {
     return (
-      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
+      <ImageBackground source={require('../../assets/images/fundo.png')} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
         <Text style={styles.loadingText}>Carregando fundo...</Text>
       </ImageBackground>
@@ -214,7 +360,21 @@ const LineUpScreen = () => {
 
   return (
     <ImageBackground source={currentFundoSource} style={styles.background}>
-      <AdBanner />
+      <View style={styles.adBanner}>
+        {currentBannerUrl ? (
+          <Animated.Image 
+            source={{ uri: currentBannerUrl }}
+            style={[
+              styles.bannerImage,
+              { opacity: fadeAnim }
+            ]}
+            resizeMode="contain"
+            onError={(e) => console.warn("Erro ao carregar imagem do banner:", e.nativeEvent.error)}
+          />
+        ) : (
+          <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
+        )}
+      </View>
       
       <SafeAreaView style={styles.safeAreaContainer}>
         <View style={styles.container}>
@@ -228,6 +388,7 @@ const LineUpScreen = () => {
             </TouchableOpacity>
           </View>
 
+          <Text style={styles.sectionTitle}>Programação do Dia</Text>
           <FlatList
             data={programacaoDia}
             keyExtractor={(item) => item.id}
@@ -235,6 +396,21 @@ const LineUpScreen = () => {
             ListEmptyComponent={<Text style={styles.mensagemVazio}>Nenhum evento programado para este dia.</Text>}
             contentContainerStyle={styles.programacaoListContent}
           />
+
+          {liveStreamLinksData.length > 0 && ( // Só renderiza se houver links
+            <View style={styles.liveStreamLinksSectionContainer}>
+              <Text style={styles.liveStreamLinksSectionTitle}>Veja o que está acontecendo agora!</Text>
+              <FlatList
+                data={liveStreamLinksData}
+                keyExtractor={(item) => item.id}
+                renderItem={renderLiveStreamLinkItem}
+                horizontal // Para exibir os links lado a lado se houver muitos
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.liveStreamLinksListContent}
+              />
+            </View>
+          )}
+
         </View>
       </SafeAreaView>
 
@@ -244,6 +420,7 @@ const LineUpScreen = () => {
                 <MapView style={styles.map} initialRegion={mapRegion} region={mapRegion}>
                     {programacaoDia
                         .filter(evento => {
+                            // Certifica-se de que o local tem coordenadas
                             const localDoEvento = locaisData.find((local) => local.descricao.toLowerCase().trim() === evento.local.toLowerCase().trim());
                             return localDoEvento && typeof localDoEvento.latitude === 'number' && typeof localDoEvento.longitude === 'number';
                         })
@@ -280,6 +457,23 @@ const LineUpScreen = () => {
 // ESTILOS ATUALIZADOS
 const styles = StyleSheet.create({
   background: { flex: 1, resizeMode: 'cover' },
+  adBanner: { // Estilos para o AdBanner INLINE
+    height: 60,
+    backgroundColor: 'rgba(220,220,220,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    width: '100%',
+  },
+  bannerImage: {
+    width: '100%',
+    height: '100%',
+  },
+  adBannerText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#555',
+  },
   safeAreaContainer: { flex: 1 }, 
   container: { flex: 1, paddingHorizontal: 10, paddingTop: 10 },
   headerDate: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, },
@@ -287,6 +481,7 @@ const styles = StyleSheet.create({
   iconeBotao: { backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 25, padding: 5, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1.5 },
   titulo: { fontSize: 20, fontWeight: 'bold', color: '#2c3e50', textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 15, flex: 1, marginHorizontal: 5, elevation: 2 },
   programacaoListContent: { paddingBottom: 10, marginRight: 0, },
+  
   programacaoItemWrapper: { 
     height: ITEM_PROGRAMACAO_HEIGHT,
     overflow: 'hidden',
@@ -339,7 +534,7 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
     marginTop: 2,
-    marginBottom: 8,
+    marginBottom: 8, 
     textAlign: 'right',
   },
   programacaoItemSemImagem: { 
@@ -355,16 +550,17 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 5,
   },
-  detalhesEventoSemImagem: {
+  detalhesEventoSemImagem: { 
     fontSize: 14,
     color: '#555',
     marginBottom: 8, 
   },
-  detalhesEventoSemImagemLocal: {
+  detalhesEventoSemImagemLocal: { 
     fontSize: 14,
     color: '#555',
     marginTop: 8,
   },
+
   verNoMapaButtonBase: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -396,25 +592,79 @@ const styles = StyleSheet.create({
   mapContainer: { width: '90%', height: '70%', borderRadius: 15, overflow: 'hidden', backgroundColor: 'white', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2}, shadowOpacity: 0.3, shadowRadius: 5 },
   map: { ...StyleSheet.absoluteFillObject },
   fecharMapa: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(255, 255, 255, 0.95)', padding: 8, borderRadius: 20, elevation: 6, zIndex:1 },
+  
   markerImageBase: { width: 28, height: 28 },
   selectedMarkerImage: { width: 38, height: 38 },
   calloutView: { width: 200, padding: 12, backgroundColor: 'white', borderRadius: 10, borderColor: '#ddd', borderWidth: 0.5, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1.5 },
   calloutTitle: { fontWeight: 'bold', fontSize: 15, color: '#333', marginBottom: 4 },
   calloutDescription: { fontSize: 13, color: '#555', marginBottom: 2 },
-  // Estilos para o estado de carregamento do fundo
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    // O fundo já será a imagem carregada dinamicamente, ou o fallback local
   },
   loadingText: {
     marginTop: 10,
     color: '#007BFF',
     fontSize: 16,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)', // Adicionado sombra para melhor legibilidade no fundo dinâmico
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
+  },
+  // === NOVOS ESTILOS PARA A SEÇÃO DE LINKS DE LIVE/REDE SOCIAL ===
+  liveStreamLinksSectionContainer: { // Renomeado de radiosSectionContainer
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 12,
+    paddingTop: 5,
+    marginTop: 5,
+    marginBottom: 5,
+    paddingBottom: 5,
+    height: screenHeight * 0.15, // Altura ajustada para a lista de links
+  },
+  sectionTitle: { // Título genérico para seções
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF', // Cor clara para fundo escuro
+    marginBottom: 10,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  liveStreamLinksSectionTitle: { // Título específico para links de live/rede social
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#FFFFFF', 
+    marginBottom: 10,
+    textAlign: 'center',
+    textShadowColor: 'rgba(0, 0, 0, 0.6)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 3,
+  },
+  liveStreamLinksListContent: {
+    paddingVertical: 5,
+    paddingHorizontal: 5,
+  },
+  liveStreamLinkItem: { // Renomeado de instagramItem
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.88)', 
+    borderRadius: 25,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    marginHorizontal: 5,
+    marginBottom: 5, 
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+  },
+  liveStreamLinkItemText: { // Renomeado de instagramItemText
+    marginLeft: 10,
+    fontSize: 15,
+    fontWeight: '500',
+    color: '#333',
   },
 });
 

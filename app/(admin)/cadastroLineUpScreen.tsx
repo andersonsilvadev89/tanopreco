@@ -355,7 +355,7 @@ export default function CadastroLineUp() {
 
   const handleLocalChange = (itemValue: string) => {
     if (itemValue === 'adicionar_novo_local') {
-      navigation.navigate('LocaisScreen' as never);
+      navigation.navigate('locaisScreen' as never);
       setLocalSelecionado('');
     } else {
       setLocalSelecionado(itemValue);

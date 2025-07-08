@@ -12,6 +12,9 @@ import {
   ScrollView,
   Dimensions,
   Platform,
+  Keyboard, // Importar Keyboard para dispensar
+  KeyboardAvoidingView,
+  TouchableWithoutFeedback, // Importar TouchableWithoutFeedback
 } from 'react-native';
 import { auth, database } from '../../firebaseConfig';
 import {
@@ -22,11 +25,8 @@ import { router } from 'expo-router';
 import { ref, get } from 'firebase/database';
 import { Eye, EyeOff } from 'lucide-react-native';
 
-// --- Importar o gerenciador de imagens ---
-import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho se seu utils estiver em outro lugar
+import { checkAndDownloadImages } from '../../utils/imageManager';
 
-// --- URLs padrão de fallback para assets locais ---
-// Usados se as imagens do Firebase não puderem ser carregadas ou não existirem.
 const defaultLogoLocal = require('../../assets/images/logoEvento.png');
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
@@ -37,8 +37,6 @@ const LoginScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  // --- Novos estados para o carregamento das imagens dinâmicas ---
-  // Inicializa com os assets locais para evitar `null` no início
   const [appImagesReady, setAppImagesReady] = useState(false);
   const [currentLogoSource, setCurrentLogoSource] = useState<any>(defaultLogoLocal);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
@@ -66,31 +64,26 @@ const LoginScreen = ({ navigation }: any) => {
     return () => unsubscribe();
   }, [handleAuthStateChanged]);
 
-  // --- Novo useEffect para carregar as imagens dinâmicas ao iniciar a tela ---
   useEffect(() => {
     const initializeAppImages = async () => {
       try {
         const { logoUrl, fundoUrl } = await checkAndDownloadImages();
 
-        // Define as sources para os componentes Image/ImageBackground
-        // Se a URL retornada for uma string (URI local/remoto), usa { uri: string }
-        // Senão (se for vazia ou erro), usa o asset local (que é um número)
         setCurrentLogoSource(logoUrl ? { uri: logoUrl } : defaultLogoLocal);
         setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
 
       } catch (error) {
         console.error("Erro ao inicializar imagens do app na LoginScreen:", error);
         Alert.alert("Erro de Carregamento", "Não foi possível carregar alguns recursos visuais do aplicativo.");
-        // Em caso de erro, garante que os fallbacks locais sejam usados
         setCurrentLogoSource(defaultLogoLocal);
         setCurrentFundoSource(defaultFundoLocal);
       } finally {
-        setAppImagesReady(true); // Indica que as imagens foram processadas (baixadas/verificadas)
+        setAppImagesReady(true); 
       }
     };
 
     initializeAppImages();
-  }, []); // Executa apenas uma vez ao montar o componente
+  }, []);
 
   const fetchSponsors = async () => {
     setSponsorsLoading(true);
@@ -171,7 +164,7 @@ const LoginScreen = ({ navigation }: any) => {
     }
   };
 
-  // --- Lógica do Carrossel de Patrocinadores (mantida, pois já estava funcional) ---
+  // --- Lógica do Carrossel de Patrocinadores (mantida) ---
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollOffsetRef = useRef(0);
   const animationFrameIdRef = useRef<number | null>(null);
@@ -238,8 +231,6 @@ const LoginScreen = ({ navigation }: any) => {
   };
 
   // --- Condição de carregamento inicial para as imagens e autenticação ---
-  // Mudado `defaultFundoLocal` para `currentFundoSource` no loading, para que a imagem do fundo
-  // já comece a ser baixada e mostrada o mais cedo possível.
   if (!appImagesReady || authLoading) {
     return (
       <ImageBackground source={currentFundoSource} style={styles.loadingContainer}>
@@ -251,110 +242,117 @@ const LoginScreen = ({ navigation }: any) => {
 
   return (
     <ImageBackground
-      // source agora é diretamente currentFundoSource, que já será { uri: string } ou o número do require
       source={currentFundoSource}
       style={styles.background}
     >
-      <View style={styles.overlay}>
-        <View style={styles.logoContainer}>
-          {/* source agora é diretamente currentLogoSource */}
-          <Image
-            source={currentLogoSource}
-            style={styles.logo}
-            resizeMode="contain"
-            // O onError não é mais necessário aqui pois currentLogoSource já trata o fallback
-            // onError={(e) => console.warn("Erro ao carregar logo dinâmica:", e.nativeEvent.error)}
-          />
-        </View>
-
-        <View style={styles.container}>
-          <TextInput
-            style={styles.input}
-            placeholder="Email"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-          <View style={styles.passwordContainer}>
-            <TextInput
-              style={styles.passwordInput}
-              placeholder="Senha"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!mostrarSenha}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined} // 'padding' é ideal para iOS
+          style={styles.overlay} // Aplica a KeyboardAvoidingView ao overlay principal
+        >
+          <View style={styles.logoContainer}>
+            <Image
+              source={currentLogoSource}
+              style={styles.logo}
+              resizeMode="contain"
             />
-            <TouchableOpacity onPress={toggleMostrarSenha} style={styles.eyeIcon}>
-              {mostrarSenha ? (
-                <EyeOff size={24} color="#888" />
+          </View>
+
+          <View style={styles.container}>
+            <TextInput
+              style={styles.input}
+              placeholder="Email"
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              // Adicionado onSubmitEditing para tentar login ao pressionar 'Enter' no teclado
+              onSubmitEditing={handleLogin} 
+              returnKeyType="next" // Para facilitar a navegação para o próximo campo
+            />
+            <View style={styles.passwordContainer}>
+              <TextInput
+                style={styles.passwordInput}
+                placeholder="Senha"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!mostrarSenha}
+                // Adicionado onSubmitEditing para tentar login ao pressionar 'Enter' no teclado
+                onSubmitEditing={handleLogin} 
+                returnKeyType="done" // Indica que este é o último campo antes de "Done" ou "Entrar"
+              />
+              <TouchableOpacity onPress={toggleMostrarSenha} style={styles.eyeIcon}>
+                {mostrarSenha ? (
+                  <EyeOff size={24} color="#888" />
+                ) : (
+                  <Eye size={24} color="#888" />
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {error && <Text style={styles.error}>{error}</Text>}
+
+            <TouchableOpacity
+              style={[styles.entrarButton, loading && styles.entrarButtonDisabled]}
+              onPress={handleLogin}
+              disabled={loading}
+            >
+              {loading && !sponsorsLoading ? ( // sponsorsLoading aqui não faz sentido, removi da condição de loading do botão
+                <ActivityIndicator color="#fff" />
               ) : (
-                <Eye size={24} color="#888" />
+                <Text style={styles.entrarText}>Entrar</Text>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handlePasswordReset} style={[styles.forgotPassword, loading && styles.buttonDisabled]} disabled={loading}>
+              <Text style={styles.forgotPasswordText}>Esqueceu a senha?</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={() => router.push('/(auth)/cadastroScreen')} style={[styles.registerButton, loading && styles.buttonDisabled]} disabled={loading}>
+              <Text style={styles.registerText}>Criar conta</Text>
             </TouchableOpacity>
           </View>
 
-          {error && <Text style={styles.error}>{error}</Text>}
-
-          <TouchableOpacity
-            style={[styles.entrarButton, loading && styles.entrarButtonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
-          >
-            {loading && !sponsorsLoading ? (
-              <ActivityIndicator color="#fff" />
+          <View style={styles.supportersContainer}>
+            <Text style={styles.supportersTitle}>Apoio:</Text>
+            {sponsorsLoading ? (
+              <ActivityIndicator style={{ marginTop: 15 }} color="#fff" size="small" />
+            ) : sponsorsError ? (
+              <Text style={styles.supporterErrorText}>{sponsorsError}</Text>
+            ) : sponsors.length > 0 ? (
+              <ScrollView
+                ref={scrollViewRef}
+                horizontal
+                showsHorizontalScrollIndicator={true}
+                style={styles.supportersLogos}
+                contentContainerStyle={styles.supportersLogosContent}
+                onContentSizeChange={(width, height) => {
+                  setMeasuredContentWidth(width);
+                }}
+                onScrollBeginDrag={handleSponsorsScrollBeginDrag}
+                onScrollEndDrag={handleSponsorsScrollEndDrag}
+                onMomentumScrollEnd={handleSponsorsMomentumScrollEnd}
+                scrollEventThrottle={16}
+              >
+                {sponsors.map((sponsor) => (
+                  sponsor.logoUrl ? (
+                    <Image
+                      key={sponsor.id}
+                      source={{ uri: sponsor.logoUrl }}
+                      style={[
+                        styles.supporterLogo,
+                      ]}
+                      onError={(e) => console.warn(`Erro ao carregar logo do patrocinador ${sponsor.id}: ${sponsor.logoUrl}`, e.nativeEvent.error)}
+                    />
+                  ) : null
+                ))}
+              </ScrollView>
             ) : (
-              <Text style={styles.entrarText}>Entrar</Text>
+              <Text style={styles.supporterText}>Seja nosso apoiador!</Text>
             )}
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={handlePasswordReset} style={[styles.forgotPassword, loading && styles.buttonDisabled]} disabled={loading}>
-            <Text style={styles.forgotPasswordText}>Esqueceu a senha?</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={() => router.push('/(auth)/cadastroScreen')} style={[styles.registerButton, loading && styles.buttonDisabled]} disabled={loading}>
-            <Text style={styles.registerText}>Criar conta</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.supportersContainer}>
-          <Text style={styles.supportersTitle}>Apoio:</Text>
-          {sponsorsLoading ? (
-            <ActivityIndicator style={{ marginTop: 15 }} color="#fff" size="small" />
-          ) : sponsorsError ? (
-            <Text style={styles.supporterErrorText}>{sponsorsError}</Text>
-          ) : sponsors.length > 0 ? (
-            <ScrollView
-              ref={scrollViewRef}
-              horizontal
-              showsHorizontalScrollIndicator={true}
-              style={styles.supportersLogos}
-              contentContainerStyle={styles.supportersLogosContent}
-              onContentSizeChange={(width, height) => {
-                setMeasuredContentWidth(width);
-              }}
-              onScrollBeginDrag={handleSponsorsScrollBeginDrag}
-              onScrollEndDrag={handleSponsorsScrollEndDrag}
-              onMomentumScrollEnd={handleSponsorsMomentumScrollEnd}
-              scrollEventThrottle={16}
-            >
-              {sponsors.map((sponsor) => (
-                sponsor.logoUrl ? (
-                  <Image
-                    key={sponsor.id}
-                    source={{ uri: sponsor.logoUrl }}
-                    style={[
-                      styles.supporterLogo,
-                    ]}
-                    onError={(e) => console.warn(`Erro ao carregar logo do patrocinador ${sponsor.id}: ${sponsor.logoUrl}`, e.nativeEvent.error)}
-                  />
-                ) : null
-              ))}
-            </ScrollView>
-          ) : (
-            <Text style={styles.supporterText}>Seja nosso apoiador!</Text>
-          )}
-        </View>
-      </View>
+          </View>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </ImageBackground>
   );
 };
@@ -366,22 +364,22 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    justifyContent: 'space-around',
+    justifyContent: 'space-around', // Distribui o conteúdo verticalmente
     paddingVertical: 10,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF', // Cor de fundo para o estado de carregamento
+    backgroundColor: '#FFFFFF',
   },
   loadingText: {
     marginTop: 10,
-    color: '#007BFF', // Cor do texto de carregamento
+    color: '#007BFF',
     fontSize: 16,
   },
   logoContainer: {
-    flex: 0.8,
+    flex: 0.8, // Permite que o logo ocupe um pouco mais de espaço
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 20,

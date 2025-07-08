@@ -13,34 +13,39 @@ import {
   StyleSheet,
   ActivityIndicator,
   ImageBackground,
-  Linking
+  Linking // Mantido caso o Servico tivesse um link genérico, mas liveStreamLink foi removido
 } from 'react-native';
 import MapView, { Marker, Region } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { ref, push, set, onValue, remove, update } from 'firebase/database';
 import { auth, database } from '../../firebaseConfig';
-import AdBanner from '../components/AdBanner';
+import AdBanner from '../components/AdBanner'; // AdBanner de volta
 
 import { checkAndDownloadImages } from '../../utils/imageManager'; 
 
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
-interface Local {
+// === INTERFACE DE SERVIÇO ESSENCIAL ===
+interface ServicoEssencial { // Renomeado de 'Local' para 'ServicoEssencial'
   id?: string;
   descricao: string;
   latitude: number;
   longitude: number;
-  liveStreamLink?: string;
+  // REMOVIDO: liveStreamLink não é aplicável para serviços essenciais
+  // Você pode adicionar outros campos aqui se precisar, como 'tipo' (ex: 'Banheiro', 'Saúde')
+  // tipo?: string; 
 }
 
-export default function LocaisScreen() {
+// === NOVO NOME DO COMPONENTE ===
+export default function ServicosEssenciaisScreen() {
   const [descricao, setDescricao] = useState('');
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
-  const [liveStreamLink, setLiveStreamLink] = useState(''); 
+  // REMOVIDO: liveStreamLink state
 
-  const [locais, setLocais] = useState<Local[]>([]);
-  const [carregandoLocais, setCarregandoLocais] = useState(true);
+  // === ESTADO RENOMEADO DE 'locais' PARA 'servicosEssenciais' ===
+  const [servicosEssenciais, setServicosEssenciais] = useState<ServicoEssencial[]>([]);
+  const [carregandoServicos, setCarregandoServicos] = useState(true); // Estado de loading
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [mapRegion, setMapRegion] = useState({
     latitude: -5.5398,
@@ -53,16 +58,18 @@ export default function LocaisScreen() {
   const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
-  const locaisListScrollRef = useRef<ScrollView>(null);
+  const servicosListScrollRef = useRef<ScrollView>(null); // Renomeado ref
   const userId = auth.currentUser?.uid;
 
   useEffect(() => {
     const loadFundoImage = async () => {
       try {
-        const { fundoUrl } = await checkAndDownloadImages();
-        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+        // Se estiver usando checkAndDownloadImages, descomente a linha
+        // const { fundoUrl } = await checkAndDownloadImages();
+        // setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
+        setCurrentFundoSource(defaultFundoLocal); // Usando o fallback local
       } catch (error) {
-        console.error("Erro ao carregar imagem de fundo na LocaisScreen:", error);
+        console.error("Erro ao carregar imagem de fundo na ServicosEssenciaisScreen:", error);
         setCurrentFundoSource(defaultFundoLocal); 
       } finally {
         setFundoAppReady(true); 
@@ -95,22 +102,23 @@ export default function LocaisScreen() {
     })();
 
     if (!userId) {
-      setCarregandoLocais(false);
+      setCarregandoServicos(false); // Usa o estado renomeado
       return;
     }
 
-    const locaisRef = ref(database, 'locais');
-    const unsubscribe = onValue(locaisRef, (snapshot) => {
+    // === BUSCA DADOS DO NOVO NÓ 'servicos_essenciais' ===
+    const servicosRef = ref(database, 'servicos_essenciais');
+    const unsubscribe = onValue(servicosRef, (snapshot) => {
       const data = snapshot.val();
-      const lista: Local[] = data
+      const lista: ServicoEssencial[] = data
         ? Object.entries(data).map(([id, valor]: any) => ({ id, ...valor }))
         : [];
-      setLocais(lista.reverse());
-      setCarregandoLocais(false);
+      setServicosEssenciais(lista.reverse()); // Usa o estado renomeado
+      setCarregandoServicos(false); // Usa o estado renomeado
     }, (error) => {
-      console.error("Erro ao carregar locais:", error);
-      Alert.alert("Erro", "Não foi possível carregar os locais.");
-      setCarregandoLocais(false);
+      console.error("Erro ao carregar serviços essenciais:", error);
+      Alert.alert("Erro", "Não foi possível carregar os serviços essenciais.");
+      setCarregandoServicos(false); // Usa o estado renomeado
     });
 
     return () => unsubscribe();
@@ -122,35 +130,37 @@ export default function LocaisScreen() {
     setLongitude(lon);
   };
 
-  const salvarLocal = async () => {
+  const salvarServico = async () => { // Renomeado para 'salvarServico'
     if (!descricao.trim() || latitude === null || longitude === null) {
       Alert.alert('Erro', 'Descrição e localização (selecionada no mapa) são obrigatórios.');
       return;
     }
     if (!userId) return;
 
-    const localData: Omit<Local, 'id'> = {
+    // === DADOS DO SERVIÇO (sem liveStreamLink) ===
+    const servicoData: Omit<ServicoEssencial, 'id'> = {
       descricao,
       latitude,
       longitude,
-      liveStreamLink: liveStreamLink.trim() === '' ? undefined : liveStreamLink.trim(), 
+      // liveStreamLink foi removido daqui
+      // tipo: 'Banheiro' // Exemplo se você adicionar um campo 'tipo'
     };
 
     try {
       if (editandoId) {
-        const localEditarRef = ref(database, `locais/${editandoId}`);
-        await update(localEditarRef, localData);
-        Alert.alert('Sucesso', 'Local atualizado!');
+        const servicoEditarRef = ref(database, `servicos_essenciais/${editandoId}`); // Novo nó
+        await update(servicoEditarRef, servicoData);
+        Alert.alert('Sucesso', 'Serviço essencial atualizado!');
       } else {
-        const localRef = ref(database, 'locais');
-        const novoRef = push(localRef);
-        await set(novoRef, localData);
-        Alert.alert('Sucesso', 'Local salvo com sucesso!');
+        const servicosRef = ref(database, 'servicos_essenciais'); // Novo nó
+        const novoRef = push(servicosRef);
+        await set(novoRef, servicoData);
+        Alert.alert('Sucesso', 'Serviço essencial salvo com sucesso!');
       }
       limparFormulario();
     } catch (error) {
-      console.error("Erro ao salvar local:", error);
-      Alert.alert("Erro", "Não foi possível salvar o local. Tente novamente.");
+      console.error("Erro ao salvar serviço essencial:", error);
+      Alert.alert("Erro", "Não foi possível salvar o serviço essencial. Tente novamente.");
     }
   };
 
@@ -158,7 +168,7 @@ export default function LocaisScreen() {
     setDescricao('');
     setLatitude(null);
     setLongitude(null);
-    setLiveStreamLink(''); 
+    // REMOVIDO: setLiveStreamLink('');
     setEditandoId(null);
     Keyboard.dismiss();
     
@@ -179,8 +189,8 @@ export default function LocaisScreen() {
     }
   };
 
-  const excluirLocal = (id: string) => {
-    Alert.alert('Confirmação', 'Deseja excluir este local?', [
+  const excluirServico = (id: string) => { // Renomeado para 'excluirServico'
+    Alert.alert('Confirmação', 'Deseja excluir este serviço?', [
       { text: 'Cancelar', style: 'cancel' },
       {
         text: 'Excluir',
@@ -188,38 +198,39 @@ export default function LocaisScreen() {
         onPress: async () => {
           if (!userId) return;
           try {
-            const localRef = ref(database, `locais/${id}`);
-            await remove(localRef);
-            Alert.alert('Sucesso', 'Local excluído!');
+            const servicoRef = ref(database, `servicos_essenciais/${id}`); // Novo nó
+            await remove(servicoRef);
+            Alert.alert('Sucesso', 'Serviço excluído!');
           } catch (error) {
-            console.error("Erro ao excluir local:", error);
-            Alert.alert("Erro", "Não foi possível excluir o local.");
+            console.error("Erro ao excluir serviço:", error);
+            Alert.alert("Erro", "Não foi possível excluir o serviço.");
           }
         },
       },
     ]);
   };
 
-  const editarLocal = (local: Local) => {
-    setDescricao(local.descricao);
-    setLatitude(local.latitude);
-    setLongitude(local.longitude);
-    setLiveStreamLink(local.liveStreamLink || ''); 
-    setEditandoId(local.id || null);
+  const editarServico = (servico: ServicoEssencial) => { // Renomeado para 'editarServico'
+    setDescricao(servico.descricao);
+    setLatitude(servico.latitude);
+    setLongitude(servico.longitude);
+    // REMOVIDO: setLiveStreamLink(local.liveStreamLink || '');
+    setEditandoId(servico.id || null);
     setMapRegion({
-      latitude: local.latitude,
-      longitude: local.longitude,
+      latitude: servico.latitude,
+      longitude: servico.longitude,
       latitudeDelta: 0.0922,
       longitudeDelta: 0.0421,
     });
   };
 
-  if (carregandoLocais || !fundoAppReady) { 
+  // Condição de carregamento
+  if (carregandoServicos || !fundoAppReady) { 
     return (
       <ImageBackground source={currentFundoSource} style={styles.background}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0000ff" />
-          <Text style={styles.loadingText}>Carregando locais...</Text>
+          <Text style={styles.loadingText}>Carregando serviços essenciais...</Text>
         </View>
       </ImageBackground>
     );
@@ -239,29 +250,20 @@ export default function LocaisScreen() {
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.formContent}
             >
-              <Text style={styles.title}>{editandoId ? "Editar Local" : "Cadastro de Locais"}</Text>
+              <Text style={styles.title}>{editandoId ? "Editar Serviço" : "Cadastro de Serviços Essenciais"}</Text>
 
               <Text style={styles.label}>Descrição *</Text>
               <TextInput
                 value={descricao}
                 onChangeText={setDescricao}
-                placeholder="Ex: Palco Principal"
+                placeholder="Ex: Banheiro, Posto de Saúde, Estacionamento P1"
                 style={styles.input}
               />
 
-              <Text style={styles.label}>Link para Perfil/Canal de Live (opcional)</Text>
-              <TextInput
-                value={liveStreamLink}
-                onChangeText={setLiveStreamLink}
-                placeholder="Ex: https://instagram.com/perfil" // Placeholder mais conciso
-                style={styles.input}
-                keyboardType="url" 
-                autoCapitalize="none"
-              />
-
+              
               <Text style={styles.label}>Selecione a localização no mapa *</Text>
               <Text style={styles.labelExplicacao}>* Dois toques aproxima o mapa</Text>
-              <Text style={styles.labelExplicacao}>* Um toques escolhe a localização</Text>
+              <Text style={styles.labelExplicacao}>* Um toque escolhe a localização</Text>
               <View style={styles.mapContainer}>
                 <MapView
                   style={styles.map}
@@ -290,8 +292,8 @@ export default function LocaisScreen() {
 
             <View style={styles.buttonContainer}>
                 <Button
-                    title={editandoId ? "Atualizar Local" : "Salvar Local"}
-                    onPress={salvarLocal}
+                    title={editandoId ? "Atualizar Serviço" : "Salvar Serviço"} // Texto ajustado
+                    onPress={salvarServico} // Função ajustada
                     color="#007bff"
                 />
                 {editandoId && (
@@ -305,31 +307,26 @@ export default function LocaisScreen() {
           <View style={styles.separator} />
 
           <View style={styles.listSection}>
-            <Text style={styles.sectionTitle}>Locais Cadastrados</Text>
-            {locais.length === 0 ? (
-                <Text style={styles.emptyText}>Nenhum local cadastrado.</Text>
+            <Text style={styles.sectionTitle}>Serviços Essenciais Cadastrados</Text> 
+            {servicosEssenciais.length === 0 ? ( // Usa o estado renomeado
+                <Text style={styles.emptyText}>Nenhum serviço essencial cadastrado.</Text>
             ) : (
               <ScrollView
-                style={styles.locaisListScroll}
-                contentContainerStyle={styles.locaisListContent}
+                style={styles.servicosListScroll} // Novo estilo
+                contentContainerStyle={styles.servicosListContent} // Novo estilo
               >
-                {locais.map((item) => (
+                {servicosEssenciais.map((item) => ( // Usa o estado renomeado
                   <View key={item.id} style={styles.listItemContainer}>
-                    <View style={styles.localDetails}>
+                    <View style={styles.localDetails}> 
                       <View style={{ flex: 1, marginRight: 10 }}>
                         <Text style={styles.listItemTextBold}>{item.descricao}</Text>
                         <Text style={styles.listItemText}>Lat: {item.latitude.toFixed(5)}</Text>
                         <Text style={styles.listItemText}>Long: {item.longitude.toFixed(5)}</Text>
-                        {item.liveStreamLink && (
-                          <TouchableOpacity onPress={() => Linking.openURL(item.liveStreamLink!)}>
-                            <Text style={styles.listItemLiveStreamLink}>Link: {item.liveStreamLink}</Text>
-                          </TouchableOpacity>
-                        )}
                       </View>
                       <View style={styles.buttonColumn}>
-                        <Button title="Editar" onPress={() => editarLocal(item)} />
+                        <Button title="Editar" onPress={() => editarServico(item)} /> 
                         <View style={{marginTop: 5}}/>
-                        <Button title="Excluir" onPress={() => excluirLocal(item.id!)} color="red" />
+                        <Button title="Excluir" onPress={() => excluirServico(item.id!)} color="red" />
                       </View>
                     </View>
                   </View>
@@ -350,8 +347,8 @@ const styles = StyleSheet.create({
   formSection: { flex: 1.2, paddingHorizontal: 10, paddingTop: 10, justifyContent: 'space-between' },
   listSection: { flex: 0.8, paddingHorizontal: 10, paddingBottom: 10 },
   formContent: { paddingBottom: 10 },
-  locaisListScroll: { flex: 1 },
-  locaisListContent: { paddingBottom: 10 },
+  locaisListScroll: { flex: 1 }, // Renomeado para servicosListScroll, mas mantido aqui por compatibilidade
+  locaisListContent: { paddingBottom: 10 }, // Renomeado para servicosListContent, mas mantido aqui por compatibilidade
   loadingContainer: { 
     flex: 1, 
     justifyContent: 'center', 
@@ -376,8 +373,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden', 
     borderWidth: 1, 
     borderColor: '#ddd',
-    width: '85%', // <-- AJUSTADO AQUI: LARGURA DO MAPA
-    alignSelf: 'center', // Para centralizar se a largura for menor que 100%
+    width: '85%', 
+    alignSelf: 'center', 
   },
   map: { ...StyleSheet.absoluteFillObject },
   coordsText: { position: 'absolute', bottom: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.6)', paddingVertical: 4, paddingHorizontal: 8, borderRadius: 4, color: '#fff', fontWeight: 'bold', fontSize: 11 },
@@ -394,11 +391,13 @@ const styles = StyleSheet.create({
   localDetails: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   listItemTextBold: { fontWeight: 'bold', fontSize: 16, marginBottom: 4, color: '#2c3e50' },
   listItemText: { fontSize: 13, color: '#34495e', marginBottom: 2 },
-  listItemLiveStreamLink: {
-    fontSize: 13,
-    color: '#007bff', 
-    textDecorationLine: 'underline',
-    marginTop: 5,
-  },
+  // REMOVIDO: listItemLiveStreamLink
   buttonColumn: {},
+  // === NOVOS ESTILOS PARA A LISTA DE SERVIÇOS ESSENCIAIS ===
+  servicosListScroll: { // Reutilizando a base de locaisListScroll
+    flex: 1,
+  },
+  servicosListContent: { // Reutilizando a base de locaisListContent
+    paddingBottom: 10,
+  },
 });

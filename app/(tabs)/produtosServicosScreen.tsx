@@ -1,33 +1,30 @@
-import React, { useState, useEffect, useCallback, useRef } from "react"; // Adicionado useEffect
-import { // Adicionado Dimensions
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import {
   View,
   Text,
   FlatList,
   TextInput,
   Image,
-  ActivityIndicator, // Adicionado ActivityIndicator
+  ActivityIndicator,
   StyleSheet,
   TouchableOpacity,
   ImageBackground,
   Linking,
   Alert,
-  Dimensions, // Adicionado Dimensions para usar screenHeight
+  Dimensions,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { database } from "../../firebaseConfig";
 import { ref, onValue, get } from "firebase/database";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "@react-navigation/native";
-import MapView, { Marker, Callout, Region } from "react-native-maps"; // Importar Region também
+import MapView, { Marker, Callout, Region } from "react-native-maps";
 import AdBanner from "../components/AdBanner";
 import * as Location from "expo-location";
 
-// --- Importar o gerenciador de imagens para o fundo ---
-import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho se necessário
+import { checkAndDownloadImages } from '../../utils/imageManager';
 
-// --- URL padrão de fallback para o fundo local ---
 const defaultFundoLocal = require('../../assets/images/fundo.png');
-// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
 interface ProdutoComEmpresa {
   id: string;
@@ -50,6 +47,15 @@ interface EmpresaData {
   linkInstagram?: string;
 }
 
+// === INTERFACE PARA SERVIÇOS ESSENCIAIS ===
+interface ServicoEssencial {
+  id: string;
+  descricao: string;
+  latitude: number;
+  longitude: number;
+  // Adicione outros campos se você os tiver no Firebase, ex: tipo?: string;
+}
+
 const ITEMS_POR_PAGINA = 10;
 
 export default function VisualizarProdutosServicos() {
@@ -58,8 +64,8 @@ export default function VisualizarProdutosServicos() {
   const [pagina, setPagina] = useState(1);
   const [carregandoMais, setCarregandoMais] = useState(false);
   const [todosCarregados, setTodosCarregados] = useState(false);
-  const [loadingInicial, setLoadingInicial] = useState(true); // Carrega dados da tela
-  const [mapRegion, setMapRegion] = useState<Region>({ // Tipo Region para MapRegion
+  const [loadingInicial, setLoadingInicial] = useState(true);
+  const [mapRegion, setMapRegion] = useState<Region>({
     latitude: -7.2345, // Coordenadas padrão para Barbalha, Ceará
     longitude: -39.4056, // Coordenadas padrão para Barbalha, Ceará
     latitudeDelta: 0.0922,
@@ -77,11 +83,15 @@ export default function VisualizarProdutosServicos() {
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [gettingUserLocation, setGettingUserLocation] = useState(false);
 
-  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
   const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
-  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
+  // === NOVOS ESTADOS PARA SERVIÇOS ESSENCIAIS ===
+  const [servicosEssenciais, setServicosEssenciais] = useState<ServicoEssencial[]>([]);
+  const [servicosLoading, setServicosLoading] = useState(true);
+  const [servicosError, setServicosError] = useState<string | null>(null);
+
+  // --- useEffect para carregar a imagem de fundo dinâmica ---
   useEffect(() => {
     const loadFundoImage = async () => {
       try {
@@ -89,14 +99,13 @@ export default function VisualizarProdutosServicos() {
         setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
       } catch (error) {
         console.error("Erro ao carregar imagem de fundo na VisualizarProdutosServicos:", error);
-        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+        setCurrentFundoSource(defaultFundoLocal);
       } finally {
-        setFundoAppReady(true); // Indica que o fundo foi processado
+        setFundoAppReady(true);
       }
     };
     loadFundoImage();
-  }, []); // Executa apenas uma vez ao montar o componente
-
+  }, []);
 
   useEffect(() => {
     const empresasRef = ref(database, 'solicitacoesEmpresas');
@@ -107,8 +116,36 @@ export default function VisualizarProdutosServicos() {
     return () => unsubscribeEmpresas();
   }, []);
 
+  // === NOVO useEffect para buscar Serviços Essenciais ===
+  useEffect(() => {
+    const fetchServicos = async () => {
+      setServicosLoading(true);
+      setServicosError(null);
+      try {
+        const servicosRef = ref(database, 'servicos_essenciais'); // Nó do Firebase para serviços
+        const snapshot = await get(servicosRef);
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const list: ServicoEssencial[] = Object.keys(data).map(key => ({
+            id: key,
+            ...data[key],
+          }));
+          setServicosEssenciais(list);
+        } else {
+          setServicosEssenciais([]);
+        }
+      } catch (err: any) {
+        console.error("Erro ao buscar serviços essenciais:", err);
+        setServicosError('Não foi possível carregar os serviços essenciais.');
+      } finally {
+        setServicosLoading(false);
+      }
+    };
+    fetchServicos();
+  }, []); // Executa apenas uma vez ao montar
+
+
   const fetchInitialData = useCallback(async () => {
-    // Sua lógica original do fetchInitialData
     if (Object.keys(empresas).length === 0) {
       setLoadingInicial(true);
       return;
@@ -128,13 +165,7 @@ export default function VisualizarProdutosServicos() {
             const produto = produtoSnapshot.val();
             let empresaInfo = empresas[empresaId];
 
-            // A lógica de `empresaInfo.status !== 'Aprovado'` FOI REMOVIDA para manter o código ORIGINAL do usuário
-            // se o usuário não o adicionou.
-            // Se essa checagem era intencional e seu Firebase possui esse `status`, adicione-a de volta
-            // após esta alteração: if (!empresaInfo || empresaInfo.status !== 'Aprovado') { return; }
-
-            // Se a localização não estiver nos dados da empresa, busca no nó 'localizacoes'
-            if (empresaInfo && !empresaInfo.localizacao) { // Adicionado check para `empresaInfo` existir
+            if (empresaInfo && !empresaInfo.localizacao) {
               const locRef = ref(database, `localizacoes/${empresaId}`);
               const locSnapshot = await get(locRef);
               if (locSnapshot.exists()) {
@@ -146,7 +177,7 @@ export default function VisualizarProdutosServicos() {
               }
             }
 
-            if (empresaInfo) { // Garante que empresaInfo não é undefined antes de usar
+            if (empresaInfo) {
               data.push({
                 id: produtoSnapshot.key!,
                 ...produto,
@@ -165,9 +196,8 @@ export default function VisualizarProdutosServicos() {
 
     setProdutosComEmpresa(data.sort((a, b) => a.nome.localeCompare(b.nome)));
     setLoadingInicial(false);
-  }, [empresas]); // Dependência de 'empresas'
+  }, [empresas]);
 
-  // Função para obter a localização atual do usuário
   const getUserCurrentLocation = async () => {
     setGettingUserLocation(true);
     let { status } = await Location.requestForegroundPermissionsAsync();
@@ -282,10 +312,29 @@ export default function VisualizarProdutosServicos() {
     }
   };
 
-  // --- Condição de carregamento geral: Integra o fundo do app ---
-  // A tela principal só é renderizada depois que os dados (loadingInicial), localização do usuário
-  // E o fundo do app (`fundoAppReady`) estão prontos.
-  if (loadingInicial || gettingUserLocation || !fundoAppReady) { // <-- Adicionado !fundoAppReady
+  // === NOVO HANDLER: Para abrir serviços no mapa ===
+  const handleVerNoMapaServico = (servico: ServicoEssencial) => {
+    if (servico.latitude && servico.longitude) {
+      setSelectedLocation({
+        latitude: servico.latitude,
+        longitude: servico.longitude,
+        nome: servico.descricao, // Usa a descrição do serviço como nome
+      });
+      setMapRegion({
+        latitude: servico.latitude,
+        longitude: servico.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+      setMostrarMapa(true);
+    } else {
+      Alert.alert("Localização Indisponível", "Este serviço não possui uma localização cadastrada.");
+    }
+  };
+
+
+  // --- Condição de carregamento geral: Integra o fundo do app e os serviços ---
+  if (loadingInicial || gettingUserLocation || !fundoAppReady || servicosLoading) { // Adicionado servicosLoading
     return (
       <ImageBackground source={currentFundoSource} style={styles.background}>
         <View style={styles.loadingContainer}>
@@ -304,6 +353,7 @@ export default function VisualizarProdutosServicos() {
       <AdBanner />
       <View style={styles.container}>
         <TextInput style={styles.input} placeholder="Buscar (mínimo 3 caracteres)" value={termoBusca} onChangeText={buscarProdutos} />
+        
         <FlatList
           data={dadosParaExibir}
           keyExtractor={(item) => item.id + item.empresaId}
@@ -348,7 +398,35 @@ export default function VisualizarProdutosServicos() {
           onEndReachedThreshold={0.1}
           onEndReached={termoBusca.length < 3 ? carregarMaisProdutos : undefined}
           ListEmptyComponent={!loadingInicial ? <Text style={styles.mensagemNenhumResultado}>Nenhum produto/serviço encontrado.</Text> : null}
+          style={styles.productList} // Estilo para a FlatList principal
         />
+
+        {servicosLoading ? (
+            <View style={styles.servicosLoadingContainer}><ActivityIndicator size="small" color="#fff" /><Text style={styles.servicosLoadingText}>Carregando serviços...</Text></View>
+        ) : servicosError ? (
+            <View style={styles.servicosLoadingContainer}><Text style={styles.servicosErrorText}>{servicosError}</Text></View>
+        ) : servicosEssenciais.length > 0 ? (
+            <View style={styles.servicosEssenciaisSection}>
+                <Text style={styles.servicosEssenciaisTitle}>Serviços Essenciais</Text>
+                <FlatList
+                    data={servicosEssenciais}
+                    keyExtractor={(item) => item.id}
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.servicosEssenciaisListContent}
+                    renderItem={({ item }) => (
+                        <TouchableOpacity
+                            style={styles.servicoEssencialItem}
+                            onPress={() => handleVerNoMapaServico(item)} // Abre o serviço no mapa
+                        >
+                            <Feather name="map-pin" size={18} color="#007bff" /> 
+                            <Text style={styles.servicoEssencialItemText}>{item.descricao}</Text>
+                        </TouchableOpacity>
+                    )}
+                />
+            </View>
+        ) : null}
+
 
         {mostrarMapa && (
           <View style={styles.mapOverlayContainer}>
@@ -387,10 +465,10 @@ export default function VisualizarProdutosServicos() {
                       </Callout>
                     </Marker>
                   )}
-                  {/* Removido: Filtro `empresaInfo.status !== 'Aprovado'` aqui para manter o original */}
                   {produtosComEmpresa
                     .filter(p =>
                       p.localizacao?.latitude && p.localizacao?.longitude &&
+                      // Evita duplicar o marcador se for o "selectedLocation" vindo de um produto
                       !(selectedLocation && p.empresaId === selectedLocation.empresaId && p.id === selectedLocation.produtoId)
                     )
                     .map((produto) => (
@@ -409,6 +487,29 @@ export default function VisualizarProdutosServicos() {
                         </Callout>
                       </Marker>
                     ))}
+                    {servicosEssenciais
+                      .filter(s => 
+                        s.latitude && s.longitude && 
+                        // Evita duplicar o marcador se for o "selectedLocation" vindo de um serviço
+                        !(selectedLocation && selectedLocation.nome === s.descricao && selectedLocation.latitude === s.latitude && selectedLocation.longitude === s.longitude)
+                      )
+                      .map((servico) => (
+                        <Marker
+                          key={servico.id + "_servicomapmarker"}
+                          coordinate={{latitude: servico.latitude, longitude: servico.longitude}}
+                          title={servico.descricao}
+                          description={"Serviço Essencial"}
+                          pinColor="blue" // Cor diferente para serviços
+                        >
+                          <Callout tooltip>
+                            <View style={styles.calloutView}>
+                              <Text style={styles.calloutTitle}>{servico.descricao}</Text>
+                              <Text style={styles.calloutDescription}>Serviço Essencial</Text>
+                            </View>
+                          </Callout>
+                        </Marker>
+                      ))}
+
                 </MapView>
               ) : (
                 <View style={styles.mapLoadingContainer}>
@@ -439,6 +540,7 @@ const styles = StyleSheet.create({
   background: { flex: 1, resizeMode: 'cover' },
   container: { flex: 1, padding: 10 },
   input: { height: 40, borderColor: 'gray', borderWidth: 1, borderRadius: 8, paddingHorizontal: 10, marginBottom: 8, backgroundColor: 'white' },
+  productList: { flex: 1, /* allow FlatList to shrink if services section takes space */ }, // Estilo para a FlatList principal
   itemContainer: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.9)', padding: 8, marginBottom: 8, borderRadius: 8, elevation: 3, alignItems: 'center' },
   imagem: { width: 80, height: 80, borderRadius: 8, marginRight: 10 },
   detalhes: { flex: 1, flexDirection: 'column' },
@@ -503,5 +605,72 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 10,
+  },
+  // === NOVOS ESTILOS PARA A SEÇÃO DE SERVIÇOS ESSENCIAIS ===
+  servicosEssenciaisSection: {
+    height: Dimensions.get('window').height * 0.15, // Altura fixa para a seção de serviços
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    padding: 10,
+    marginTop: 15,
+    marginHorizontal: 5,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    justifyContent: 'center',
+  },
+  servicosEssenciaisTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  servicosEssenciaisListContent: {
+    paddingVertical: 5,
+    paddingHorizontal: 5,
+    alignItems: 'center', // Centraliza os itens na FlatList horizontal
+  },
+  servicoEssencialItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E6F3FF',
+    borderRadius: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginHorizontal: 5,
+    elevation: 2,
+    shadowColor: '#007bff',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.41,
+  },
+  servicoEssencialItemText: {
+    marginLeft: 6,
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#007bff',
+  },
+  servicosLoadingContainer: {
+    height: Dimensions.get('window').height * 0.15, // Mesma altura da seção para manter o layout
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 15,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 12,
+    marginHorizontal: 5,
+  },
+  servicosLoadingText: {
+    marginTop: 10,
+    color: '#007bff',
+    fontSize: 14,
+  },
+  servicosErrorText: {
+    color: 'red',
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 20,
   },
 });
