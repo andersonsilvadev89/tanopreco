@@ -11,15 +11,13 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Linking,
-  Dimensions
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import * as Location from 'expo-location';
 import { ref, set, get, update, remove } from 'firebase/database';
 import { auth, database } from '../../firebaseConfig';
-import { ChevronLeft, Phone, Mail, Instagram } from 'lucide-react-native';
-import { router } from 'expo-router';
+import { Phone, Mail, Instagram } from 'lucide-react-native';
 import AdBanner from '../components/AdBanner';
 
 // --- Importar o gerenciador de imagens para o fundo ---
@@ -276,12 +274,6 @@ const ConfiguracoesEmpresaScreen = () => {
     <ImageBackground source={currentFundoSource} style={styles.background}>
       <AdBanner />
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <ChevronLeft size={24} color="#FFF" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Configurações da Empresa</Text>
-        </View>
         <KeyboardAwareScrollView contentContainerStyle={styles.scrollContainer} enableOnAndroid>
           <View style={styles.card}>
             {!editando ? (

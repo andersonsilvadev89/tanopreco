@@ -148,12 +148,12 @@ const HomeScreen = () => {
         />
 
         <TouchableOpacity
-          style={[styles.card, styles.logoutButton]}
+          style={[styles.cardSair, styles.logoutButton]}
           activeOpacity={0.8}
           onPress={confirmarLogout}
         >
-          <LogOut size={28} color="#dc3545" style={styles.iconStyle} />
-          <Text style={styles.cardText}>Sair</Text>
+          <LogOut size={28} color="#dc3545" style={styles.iconStyleSair} />
+          <Text style={styles.cardText}>Sair (Log Out)</Text>
         </TouchableOpacity>
       </View>
     </ImageBackground>
@@ -197,8 +197,28 @@ const styles = StyleSheet.create({
     marginHorizontal: ITEM_MARGIN / 2,
     minHeight: 125,
   },
+  cardSair: {
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderRadius: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+    width: 80,
+    marginHorizontal: ITEM_MARGIN / 2,
+    minHeight: 65,
+  },
   iconStyle: {
     marginBottom: 10,
+  },
+  iconStyleSair: {
+    marginRight: 10,
   },
   cardText: {
     fontSize: 16,

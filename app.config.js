@@ -3,7 +3,7 @@ export default {
     name: "Assistente de Eventos",
     slug: "petrolina",
     platforms: ["android", "ios"],
-    version: "1.0.8",
+    version: "1.0.9",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     splash: {
@@ -20,7 +20,7 @@ export default {
           apiKey: "AIzaSyDOY_dZzTNgjeMX2z7ssWi755eznnBO68o"
         },
       },
-      versionCode: 18,
+      versionCode: 19,
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"

@@ -7,21 +7,35 @@ import {
   Alert,
   Animated,
   Platform,
+  Linking,
+  TouchableOpacity,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ref, get } from "firebase/database";
 import { database } from "../../firebaseConfig";
+
 interface BannerItem {
   descricao: string;
   id: string;
   imagemUrl: string;
   linkUrl: string;
 }
+
+// Função para embaralhar um array (Fisher-Yates shuffle)
+const shuffleArray = (array: any[]) => {
+  for (let i = array.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [array[i], array[j]] = [array[j], array[i]];
+  }
+  return array;
+};
+
 const AdBanner = () => {
-  const [allBanners, setAllBanners] = useState<string[]>([]);
-  const [currentBannerUrl, setCurrentBannerUrl] = useState<string | null>(null);
+  const [allBanners, setAllBanners] = useState<BannerItem[]>([]);
+  const [currentBanner, setCurrentBanner] = useState<BannerItem | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const insets = useSafeAreaInsets(); // 2. Obter os valores da área segura
+  const insets = useSafeAreaInsets();
+
   useEffect(() => {
     const fetchBanners = async () => {
       try {
@@ -29,7 +43,8 @@ const AdBanner = () => {
         const snapshot = await get(sponsorsRef);
         if (snapshot.exists()) {
           const sponsorsData = snapshot.val();
-          const bannersList: string[] = [];
+          let bannersList: BannerItem[] = []; // Usamos 'let' para poder reatribuir após embaralhar
+
           for (const sponsorId in sponsorsData) {
             const sponsor = sponsorsData[sponsorId];
             if (sponsor && sponsor.banners && Array.isArray(sponsor.banners)) {
@@ -37,38 +52,44 @@ const AdBanner = () => {
                 if (
                   typeof bannerObject === "object" &&
                   bannerObject !== null &&
-                  typeof bannerObject.imagemUrl === "string"
+                  typeof bannerObject.imagemUrl === "string" &&
+                  typeof bannerObject.linkUrl === "string"
                 ) {
-                  bannersList.push(bannerObject.imagemUrl);
+                  bannersList.push(bannerObject);
                 }
               });
             }
           }
+
           if (bannersList.length > 0) {
+            // Embaralha a lista de banners aqui!
+            bannersList = shuffleArray(bannersList);
+
             setAllBanners(bannersList);
-            setCurrentBannerUrl(bannersList[0]);
+            setCurrentBanner(bannersList[0]);
             Animated.timing(fadeAnim, {
               toValue: 1,
               duration: 200,
               useNativeDriver: true,
             }).start();
           } else {
-            setCurrentBannerUrl(null);
+            setCurrentBanner(null);
             fadeAnim.setValue(0);
           }
         } else {
-          setCurrentBannerUrl(null);
+          setCurrentBanner(null);
           fadeAnim.setValue(0);
         }
       } catch (error) {
         console.error("Erro ao buscar banners no componente AdBanner:", error);
         Alert.alert("Erro", "Não foi possível carregar os banners.");
-        setCurrentBannerUrl(null);
+        setCurrentBanner(null);
         fadeAnim.setValue(0);
       }
     };
     fetchBanners();
   }, [fadeAnim]);
+
   useEffect(() => {
     if (allBanners.length <= 1) return;
     const intervalId = setInterval(() => {
@@ -77,8 +98,11 @@ const AdBanner = () => {
         duration: 200,
         useNativeDriver: true,
       }).start(() => {
-        setCurrentBannerUrl((prevUrl) => {
-          const currentIndex = allBanners.indexOf(prevUrl || "");
+        setCurrentBanner((prevBanner) => {
+          // Encontra o índice do banner atual. Se não encontrar (prevBanner é null ou não está na lista), começa do 0.
+          const currentIndex = prevBanner
+            ? allBanners.findIndex((banner) => banner.id === prevBanner.id)
+            : -1;
           const nextIndex = (currentIndex + 1) % allBanners.length;
           return allBanners[nextIndex];
         });
@@ -91,20 +115,38 @@ const AdBanner = () => {
     }, 6000);
     return () => clearInterval(intervalId);
   }, [allBanners, fadeAnim]);
+
+  const handleBannerPress = () => {
+    if (currentBanner && currentBanner.linkUrl) {
+      Linking.openURL(currentBanner.linkUrl).catch((err) =>
+        console.error("Não foi possível abrir a URL:", err)
+      );
+    } else {
+      console.log("Nenhum banner ou URL de link para abrir.");
+    }
+  };
+
   return (
     <View style={[styles.adBanner, { paddingTop: insets.top }]}>
-      {currentBannerUrl ? (
-        <Animated.Image
-          source={{ uri: currentBannerUrl }}
-          style={[styles.bannerImage, { opacity: fadeAnim }]}
-          resizeMode="contain"
-        />
+      {currentBanner ? (
+        <TouchableOpacity
+          onPress={handleBannerPress}
+          activeOpacity={0.8}
+          style={styles.touchableArea}
+        >
+          <Animated.Image
+            source={{ uri: currentBanner.imagemUrl }}
+            style={[styles.bannerImage, { opacity: fadeAnim }]}
+            resizeMode="contain"
+          />
+        </TouchableOpacity>
       ) : (
         <Text style={styles.adBannerText}>Espaço para Patrocínios</Text>
       )}
     </View>
   );
 };
+
 const styles = StyleSheet.create({
   adBanner: {
     backgroundColor: "rgba(220,220,220,0.7)",
@@ -115,13 +157,20 @@ const styles = StyleSheet.create({
   },
   bannerImage: {
     width: "100%",
-    height: 60, // Mantemos a altura da imagem fixa
+    height: 60,
   },
   adBannerText: {
     fontSize: 14,
     fontWeight: "500",
     color: "#555",
-    paddingVertical: 20, // Adiciona um padding para o texto de fallback
+    paddingVertical: 20,
+  },
+  touchableArea: {
+    width: "100%",
+    height: 60,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
+
 export default AdBanner;
