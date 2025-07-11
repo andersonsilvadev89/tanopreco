@@ -2,7 +2,7 @@ import { Tabs, Redirect } from 'expo-router';
 import { auth } from '../../firebaseConfig';
 import { onAuthStateChanged } from 'firebase/auth'; // Importe onAuthStateChanged
 import React, { useState, useEffect } from 'react'; // Importe useState e useEffect
-import { Home, MapPin, Settings, Radio, Sandwich, Users, Briefcase, Shield, CircleHelp } from 'lucide-react-native';
+import { Home, MapPin, Settings, Radio, Sandwich, Users, Briefcase, Shield, CircleHelp, Toilet } from 'lucide-react-native';
 
 export default function TabsLayout() {
   const [user, setUser] = useState<any>(null);
@@ -51,6 +51,13 @@ export default function TabsLayout() {
         options={{
           title: 'Produtos',
           tabBarIcon: ({ color, size }) => <Sandwich color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="servicosEssenciaisScreen"
+        options={{
+          title: 'Serviços',
+          tabBarIcon: ({ color, size }) => <Toilet color={color} size={size} />,
         }}
       />
       <Tabs.Screen

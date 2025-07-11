@@ -21,6 +21,7 @@ import {
   Sandwich,
   Briefcase,
   Shield,
+  Toilet,
 } from "lucide-react-native";
 import { signOut } from "firebase/auth";
 import { auth } from "../../firebaseConfig";
@@ -63,12 +64,12 @@ const HomeScreen = () => {
 
   const options = [
     {
-      label: "Localização de Usuários",
+      label: "Lista de Usuários Solicitar Amizade",
       icon: Users,
       path: "/localizacaoUsuariosScreen",
     },
     {
-      label: "Localização em Tempo Real",
+      label: "Localização de amigos",
       icon: MapPin,
       path: "/mapaAmigosScreen",
     },
@@ -77,11 +78,16 @@ const HomeScreen = () => {
       icon: Sandwich,
       path: "/produtosServicosScreen",
     },
+    {
+      label: "Serviços Essenciais",
+      icon: Toilet,
+      path: "/servicosEssenciaisScreen",
+    },
     { label: "LineUp", icon: Radio, path: "/lineUpScreen" },
-    { label: "Configurações", icon: Settings, path: "/configuracoesScreen" },
-    { label: "Sobre", icon: CircleHelp, path: "/sobreScreen" },
     { label: "Área da Empresa", icon: Briefcase, path: "/empresaScreen" },
     { label: "Área Admin", icon: Shield, path: "/adminScreen" },
+    { label: "Configurações", icon: Settings, path: "/configuracoesScreen" },
+    { label: "Sobre", icon: CircleHelp, path: "/sobreScreen" },
   ];
 
   const confirmarLogout = () => {

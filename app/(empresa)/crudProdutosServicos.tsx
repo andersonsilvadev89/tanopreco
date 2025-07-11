@@ -14,6 +14,7 @@ import {
   Keyboard,
   StyleSheet,
   ImageBackground,
+  Linking, // <--- Importe o Linking
 } from 'react-native';
 import { Masks } from 'react-native-mask-input';
 import MaskInput from 'react-native-mask-input';
@@ -23,13 +24,10 @@ import { auth, database } from '../../firebaseConfig';
 import AdBanner from '../components/AdBanner';
 
 // --- Importar o gerenciador de imagens para o fundo ---
-import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho
+import { checkAndDownloadImages } from '../../utils/imageManager';
 
 // --- URL padrão de fallback para o fundo local ---
-const defaultFundoLocal = require('../../assets/images/fundo.png'); // Usando defaultFundoLocal agora
-
-// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
-
+const defaultFundoLocal = require('../../assets/images/fundo.png');
 
 // --- CONSTANTES DE UPLOAD (MANTIDAS COMO ESTAVAM) ---
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
@@ -43,6 +41,12 @@ interface Produto {
   palavrasChave?: string;
 }
 
+// Interface para os dados da empresa (para obter maxProdutosGratuitos)
+interface EmpresaData {
+  maxProdutosGratuitos?: number;
+  // Adicione outros campos da empresa que você precise ler aqui, se houver
+}
+
 export default function CadastroProduto() {
   const [descricao, setDescricao] = useState('');
   const [preco, setPreco] = useState('');
@@ -54,14 +58,15 @@ export default function CadastroProduto() {
   const [termoBusca, setTermoBusca] = useState('');
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
-  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
   const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
+  const [maxProdutosGratuitos, setMaxProdutosGratuitos] = useState<number | null>(null);
+  const [loadingCompanyData, setLoadingCompanyData] = useState(true);
 
   const scrollRef = useRef<ScrollView>(null);
   const userId = auth.currentUser?.uid;
 
-  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
   useEffect(() => {
     const loadFundoImage = async () => {
       try {
@@ -69,25 +74,52 @@ export default function CadastroProduto() {
         setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
       } catch (error) {
         console.error("Erro ao carregar imagem de fundo na CadastroProduto:", error);
-        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+        setCurrentFundoSource(defaultFundoLocal);
       } finally {
-        setFundoAppReady(true); // Indica que o fundo foi processado
+        setFundoAppReady(true);
       }
     };
     loadFundoImage();
-  }, []); // Executa apenas uma vez ao montar o componente
+  }, []);
 
-  // Lógica principal da tela (inalterada)
+  useEffect(() => {
+    if (!userId) {
+      setLoadingCompanyData(false);
+      return;
+    }
+
+    setLoadingCompanyData(true);
+    const companyRef = ref(database, `solicitacoesEmpresas/${userId}`);
+    const unsubscribeCompany = onValue(companyRef, (snapshot) => {
+      const data: EmpresaData | null = snapshot.val();
+      if (data && typeof data.maxProdutosGratuitos === 'number') {
+        setMaxProdutosGratuitos(data.maxProdutosGratuitos);
+      } else {
+        setMaxProdutosGratuitos(0);
+        console.warn("maxProdutosGratuitos não encontrado ou inválido para esta empresa. Definindo como 0.");
+      }
+      setLoadingCompanyData(false);
+    }, (error) => {
+      console.error("Erro ao carregar dados da empresa (maxProdutosGratuitos):", error);
+      setMaxProdutosGratuitos(0);
+      setLoadingCompanyData(false);
+    });
+
+    return () => unsubscribeCompany();
+  }, [userId]);
+
+
   useEffect(() => {
     if (!userId) return;
     const produtosRef = ref(database, `produtos/${userId}`);
-    onValue(produtosRef, (snapshot) => {
+    const unsubscribeProdutos = onValue(produtosRef, (snapshot) => {
       const data = snapshot.val();
       const lista: Produto[] = data
         ? Object.entries(data).map(([id, valor]: any) => ({ id, ...valor }))
         : [];
       setProdutos(lista.reverse());
     });
+    return () => unsubscribeProdutos();
   }, [userId]);
 
   const salvarProduto = () => {
@@ -96,6 +128,28 @@ export default function CadastroProduto() {
       return;
     }
     if (!userId) return;
+
+    if (editandoId === null && maxProdutosGratuitos !== null) {
+      if (produtos.length >= maxProdutosGratuitos) {
+        Alert.alert(
+          'Limite de Produtos Atingido',
+          `Você já cadastrou o máximo de ${maxProdutosGratuitos} produtos permitidos gratuitamente. Para cadastrar mais, por favor, entre em contato com o suporte para verificar os planos pagos.`,
+          [
+            { text: 'Agora Não              ', style: 'cancel' }, // Opção para fechar sem ação
+            {
+              text: 'Ver Pacotes', // <--- Texto do botão alterado
+              onPress: () => Linking.openURL('https://stoantoniobarbalhacliente.web.app/pacotes.html'),
+            },
+            // Você pode adicionar mais botões com outros links aqui
+            // {
+            //   text: 'Ver Planos',
+            //   onPress: () => Linking.openURL('SUA_URL_DE_PLANOS_AQUI'),
+            // },
+          ]
+        );
+        return;
+      }
+    }
 
     const produtoRef = ref(database, `produtos/${userId}`);
     const produto: Produto = {
@@ -179,7 +233,7 @@ export default function CadastroProduto() {
       Alert.alert("Permissão necessária", "Você precisa permitir o acesso à câmera.");
       return;
     }
-    
+
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
@@ -203,7 +257,7 @@ export default function CadastroProduto() {
         type: 'image/jpeg',
         name: 'foto.jpg',
       } as any);
-      data.append('upload_preset', UPLOAD_PRESET); // Este UPLOAD_PRESET é para a imagem do PRODUTO
+      data.append('upload_preset', UPLOAD_PRESET);
 
       const res = await fetch(CLOUDINARY_URL, {
         method: 'POST',
@@ -234,12 +288,11 @@ export default function CadastroProduto() {
     );
   });
 
-  // --- Condição de carregamento da imagem de fundo ---
-  if (!fundoAppReady) {
+  if (!fundoAppReady || loadingCompanyData) {
     return (
-      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
+      <ImageBackground source={currentFundoSource} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
-        <Text style={styles.loadingText}>Carregando fundo...</Text>
+        <Text style={styles.loadingText}>Carregando dados da empresa...</Text>
       </ImageBackground>
     );
   }
@@ -247,7 +300,7 @@ export default function CadastroProduto() {
   return (
     <ImageBackground source={currentFundoSource} style={styles.background} resizeMode="cover">
       <AdBanner />
-      
+
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingView}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -259,6 +312,13 @@ export default function CadastroProduto() {
         >
           <View style={styles.formContainer}>
             <Text style={styles.title}>Cadastro de Produto</Text>
+
+            {maxProdutosGratuitos !== null && (
+              <Text style={styles.limitMessage}>
+                Você pode cadastrar até {maxProdutosGratuitos} produtos gratuitamente.
+                Atualmente você tem {produtos.length} produtos cadastrados.
+              </Text>
+            )}
 
             <View style={styles.imageContainer}>
               <TouchableOpacity onPress={escolherImagem} accessible accessibilityLabel="Toque para escolher a imagem do produto">
@@ -306,7 +366,17 @@ export default function CadastroProduto() {
               accessibilityLabel="Campo para inserir palavras-chave relacionadas ao produto"
             />
 
-            <Button title={editandoId ? "Atualizar Produto" : "Salvar Produto"} onPress={salvarProduto} accessibilityLabel="Botão para salvar ou atualizar o produto" />
+            <Button
+              title={editandoId ? "Atualizar Produto" : "Salvar Produto"}
+              onPress={salvarProduto}
+              accessibilityLabel="Botão para salvar ou atualizar o produto"
+              disabled={loadingUpload}
+            />
+            {editandoId && (
+              <TouchableOpacity style={styles.clearFormButton} onPress={limparFormulario}>
+                <Text style={styles.clearFormButtonText}>Cancelar Edição / Limpar</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.productListContainer}>
@@ -318,17 +388,17 @@ export default function CadastroProduto() {
               accessibilityLabel="Campo para buscar produtos cadastrados"
             />
             <Text style={styles.sectionTitle}>
-              Produtos Cadastrados
+              Produtos Cadastrados ({produtos.length} {maxProdutosGratuitos !== null ? `/ ${maxProdutosGratuitos}` : ''})
             </Text>
             {produtosFiltrados.length === 0 ? (
-              <Text style={styles.emptyText}>Nenhum produto cadastrado.</Text>
+              <Text style={styles.emptyText}>Nenhum produto encontrado.</Text>
             ) : (
               produtosFiltrados.map((item) => (
                 <View key={item.id} style={styles.listItemContainer}>
                   {item.imagemUrl && (
                     <Image
                       source={{ uri: item.imagemUrl }}
-                      style={styles.fullWidthImage}
+                      style={styles.listItemImage}
                     />
                   )}
                   <View style={styles.productDetails}>
@@ -381,6 +451,13 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     textAlign: 'center',
   },
+  limitMessage: {
+    fontSize: 14,
+    color: '#007BFF',
+    textAlign: 'center',
+    marginBottom: 15,
+    paddingHorizontal: 5,
+  },
   imageContainer: {
     marginBottom: 10,
   },
@@ -395,6 +472,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 150,
     borderRadius: 8,
+  },
+  listItemImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    marginRight: 10,
   },
   input: {
     borderWidth: 1,
@@ -420,11 +503,14 @@ const styles = StyleSheet.create({
     borderColor: '#ccc',
     borderRadius: 8,
     backgroundColor: '#f9f9f9',
-  },
-  productDetails: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 8,
+  },
+  productDetails: {
+    flex: 1,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   listItemTextBold: {
     fontWeight: 'bold',
@@ -448,16 +534,29 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  // Estilos para o estado de carregamento do fundo
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF', // Cor de fundo para o estado de carregamento
+    backgroundColor: '#FFFFFF',
   },
   loadingText: {
     marginTop: 10,
-    color: '#007BFF', // Cor do texto de carregamento
+    color: '#007BFF',
     fontSize: 16,
+  },
+  clearFormButton: {
+    backgroundColor: '#FFC107',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  clearFormButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });

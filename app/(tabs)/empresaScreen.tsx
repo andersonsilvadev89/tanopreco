@@ -24,7 +24,6 @@ import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o c
 
 // --- URL padrão de fallback para o fundo local ---
 const defaultFundoLocal = require('../../assets/images/fundo.png');
-// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
 
 // Interfaces
 interface UserProfile {
@@ -32,6 +31,7 @@ interface UserProfile {
   email: string;
   statusEmpresa?: 'Aguardando' | 'Aprovado' | 'Rejeitado';
 }
+
 interface CompanyRegistrationData {
   nomeEmpresa: string;
   cnpj: string | null;
@@ -43,12 +43,14 @@ interface CompanyRegistrationData {
   status: 'Aguardando' | 'Aprovado' | 'Rejeitado';
   timestamp: number;
   userId: string;
+  // --- NOVO ATRIBUTO: Número máximo de produtos gratuitos ---
+  maxProdutosGratuitos: number;
 }
 
 const EmpresaScreen = () => {
-  const [loadingUserStatus, setLoadingUserStatus] = useState(true); // Carrega dados do usuário/status da empresa
+  const [loadingUserStatus, setLoadingUserStatus] = useState(true);
   const [userCompanyStatus, setUserCompanyStatus] = useState<'Aguardando' | 'Aprovado' | 'Rejeitado' | null>(null);
-  const [empresa, setEmpresa] = useState<Omit<CompanyRegistrationData, 'status' | 'timestamp' | 'userId'>>({
+  const [empresa, setEmpresa] = useState<Omit<CompanyRegistrationData, 'status' | 'timestamp' | 'userId' | 'maxProdutosGratuitos'>>({ // Ajuste aqui para omitir o novo atributo também
     nomeEmpresa: '',
     cnpj: '',
     cpf: '',
@@ -60,11 +62,9 @@ const EmpresaScreen = () => {
   const [formError, setFormError] = useState('');
   const [submittingForm, setSubmittingForm] = useState(false);
 
-  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
-  const [fundoAppReady, setFundoAppReady] = useState(false); // Controla o carregamento do FUNDO DO APP
+  const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
-  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
   useEffect(() => {
     const loadFundoImage = async () => {
       try {
@@ -72,15 +72,14 @@ const EmpresaScreen = () => {
         setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
       } catch (error) {
         console.error("Erro ao carregar imagem de fundo na EmpresaScreen:", error);
-        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+        setCurrentFundoSource(defaultFundoLocal);
       } finally {
-        setFundoAppReady(true); // Indica que o fundo foi processado
+        setFundoAppReady(true);
       }
     };
     loadFundoImage();
-  }, []); // Executa apenas uma vez ao montar o componente
+  }, []);
 
-  // --- LÓGICA DE VERIFICAÇÃO DE STATUS ATUALIZADA ---
   useEffect(() => {
     let databaseListener: Unsubscribe | null = null;
 
@@ -90,16 +89,16 @@ const EmpresaScreen = () => {
       }
 
       if (user) {
-        setLoadingUserStatus(true); // Inicia o loading dos dados do usuário
+        setLoadingUserStatus(true);
         const userStatusRef = ref(database, `usuarios/${user.uid}`);
-        
+
         databaseListener = onValue(userStatusRef, (snapshot) => {
           const status = snapshot.val()?.statusEmpresa || null;
           setUserCompanyStatus(status);
           if (status === 'Aprovado') {
             router.replace('/(empresa)/homeScreen');
           }
-          setLoadingUserStatus(false); // <--- IMPORTANTE: Finaliza o loading dos DADOS DO USUÁRIO
+          setLoadingUserStatus(false);
         }, (error) => {
           console.error("Erro ao ler status da empresa:", error);
           setLoadingUserStatus(false);
@@ -131,13 +130,13 @@ const EmpresaScreen = () => {
       return;
     }
     if (empresa.emailContato) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(empresa.emailContato)) {
-            setFormError('Por favor, insira um formato de e-mail válido.');
-            return;
-        }
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(empresa.emailContato)) {
+        setFormError('Por favor, insira um formato de e-mail válido.');
+        return;
+      }
     }
-    
+
     let processedInstagram: string | null = null;
     const rawInstagramInput = empresa.linkInstagram?.trim();
     if (rawInstagramInput) {
@@ -149,11 +148,11 @@ const EmpresaScreen = () => {
         processedInstagram = rawInstagramInput.startsWith('@') ? rawInstagramInput.substring(1) : rawInstagramInput;
       }
     }
-    
+
     setSubmittingForm(true);
     try {
       const solicitationRef = ref(database, `solicitacoesEmpresas/${userId}`);
-      const newSolicitation = {
+      const newSolicitation: CompanyRegistrationData = { // Garante que o tipo está correto
         nomeEmpresa: empresa.nomeEmpresa,
         cnpj: empresa.cnpj || null,
         cpf: empresa.cpf || null,
@@ -164,20 +163,22 @@ const EmpresaScreen = () => {
         status: 'Aguardando',
         timestamp: Date.now(),
         userId: userId,
+        // --- ADICIONADO: Número máximo de produtos gratuitos ---
+        maxProdutosGratuitos: 5, // Define o valor 5 para empresas novas
       };
       await set(solicitationRef, newSolicitation);
       await set(ref(database, `usuarios/${userId}/statusEmpresa`), 'Aguardando');
       setUserCompanyStatus('Aguardando');
       Alert.alert('Sucesso', 'Sua solicitação foi enviada!');
     } catch (error) {
-      Alert.alert('Erro', 'Não foi possível enviar sua solicitação.');
+      console.error("Erro ao enviar solicitação:", error); // Adicionado console.error para debug
+      Alert.alert('Erro', 'Não foi possível enviar sua solicitação. Tente novamente.');
     } finally {
       setSubmittingForm(false);
     }
   };
 
   // --- RENDERIZAÇÃO ---
-  // Condição de carregamento geral: Espera os dados do usuário/status E o fundo do app.
   if (loadingUserStatus || !fundoAppReady) {
     return (
       <ImageBackground source={currentFundoSource} style={styles.background}>
@@ -189,7 +190,6 @@ const EmpresaScreen = () => {
     );
   }
 
-  // Se o status for 'Aprovado', a tela já redirecionou, então não renderiza nada aqui.
   if (userCompanyStatus === 'Aprovado') { return null; }
 
   return (
@@ -222,7 +222,7 @@ const EmpresaScreen = () => {
               <Text style={styles.messageText}>Cadastre sua Empresa</Text>
               <Text style={styles.subMessageText}>Preencha os dados para solicitar acesso.</Text>
               {formError ? <Text style={styles.formErrorText}>{formError}</Text> : null}
-              
+
               <TextInput style={styles.input} placeholder="Nome da Empresa*" value={empresa.nomeEmpresa} onChangeText={(text) => setEmpresa(p => ({ ...p, nomeEmpresa: text }))} />
               <MaskedTextInput style={styles.input} mask="99.999.999/9999-99" placeholder="CNPJ (opcional)" value={empresa.cnpj ?? ''} onChangeText={(text, rawText) => setEmpresa(p => ({ ...p, cnpj: rawText }))} keyboardType="numeric" />
               <MaskedTextInput style={styles.input} mask="999.999.999-99" placeholder="CPF (opcional)" value={empresa.cpf ?? ''} onChangeText={(text, rawText) => setEmpresa(p => ({ ...p, cpf: rawText }))} keyboardType="numeric" />
@@ -230,7 +230,7 @@ const EmpresaScreen = () => {
               <MaskedTextInput style={styles.input} mask="(99) 99999-9999" placeholder="Telefone de Contato (opcional)" value={empresa.telefoneContato ?? ''} onChangeText={(text, rawText) => setEmpresa(p => ({ ...p, telefoneContato: rawText }))} keyboardType="phone-pad" />
               <TextInput style={styles.input} placeholder="E-mail de Contato (opcional)" value={empresa.emailContato ?? ''} onChangeText={(text) => setEmpresa(p => ({ ...p, emailContato: text }))} keyboardType="email-address" autoCapitalize="none" />
               <TextInput style={styles.input} placeholder="Instagram (link ou @usuario)" value={empresa.linkInstagram ?? ''} onChangeText={(text) => setEmpresa(p => ({ ...p, linkInstagram: text }))} autoCapitalize="none" />
-              
+
               <TouchableOpacity style={styles.submitButton} onPress={handleRegisterCompany} disabled={submittingForm}>
                 {submittingForm ? <ActivityIndicator color="#FFF" /> : <Text style={styles.submitButtonText}>Enviar Solicitação</Text>}
               </TouchableOpacity>
@@ -242,24 +242,23 @@ const EmpresaScreen = () => {
   );
 };
 
-// Estilos...
+// Estilos... (mantidos inalterados)
 const styles = StyleSheet.create({
   background: { flex: 1 },
   safeArea: { flex: 1 },
   header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 10, backgroundColor: 'rgba(0,0,0,0.4)' },
   backButton: { padding: 5 },
   headerTitle: { flex: 1, fontSize: 20, fontWeight: 'bold', color: '#FFF', textAlign: 'center', marginRight: 34 },
-  loadingContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    // O fundo já será a imagem carregada dinamicamente, ou o fallback local
   },
-  loadingText: { 
-    marginTop: 10, 
-    fontSize: 16, 
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
     color: '#FFF',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)', // Sombra para legibilidade
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },

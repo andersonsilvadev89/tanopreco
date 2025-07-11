@@ -22,14 +22,10 @@ import { database } from '../../firebaseConfig';
 import { LinearGradient } from 'expo-linear-gradient';
 import moment from 'moment';
 import 'moment/locale/pt-br';
+import * as Location from 'expo-location'; // <--- Importe o Location do Expo
 
 // === IMPORTAÇÃO DO COMPONENTE AdBanner ===
-import AdBanner from '../components/AdBanner'; // Importe o componente AdBanner
-
-// REMOVIDO: Importações e lógicas de áudio (expo-av)
-
-// --- Importar o gerenciador de imagens para o fundo ---
-// import { checkAndDownloadImages } from '../../utils/imageManager'; 
+import AdBanner from '../components/AdBanner';
 
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
@@ -43,15 +39,12 @@ interface Evento {
   dataMomento: string;
 }
 
-// REMOVIDO: Interface BannerItem (pois o AdBanner agora é um componente separado)
-
-// Interface Locais (agora inclui liveStreamLink)
 interface Locais {
   id: string;
   descricao: string;
   latitude?: number;
   longitude?: number;
-  liveStreamLink?: string; 
+  liveStreamLink?: string;
 }
 
 // --- Constantes ---
@@ -63,8 +56,8 @@ const LineUpScreen = () => {
   const [diaSelecionado, setDiaSelecionado] = useState<Date>(new Date());
   const [mapaVisivel, setMapaVisivel] = useState(false);
   const [mapRegion, setMapRegion] = useState<Region>({
-    latitude: -7.2345, 
-    longitude: -39.4056, 
+    latitude: -7.2345,
+    longitude: -39.4056,
     latitudeDelta: 0.02,
     longitudeDelta: 0.02,
   });
@@ -76,19 +69,19 @@ const LineUpScreen = () => {
 
   const cratoLocation = { latitude: -7.2345, longitude: -39.4056 };
 
-  // REMOVIDO: Estados do AdBanner inline (allBanners, currentBannerUrl, currentBannerIndex, fadeAnim)
-
   const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
-  // --- useEffect para carregar a imagem de fundo dinâmica ---
+  // --- NOVO ESTADO: Armazenará a localização do usuário ---
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  // --- NOVO ESTADO: Para indicar se está obtendo a localização do usuário ---
+  const [gettingUserLocation, setGettingUserLocation] = useState(false);
+
+  // --- useEffect para carregar a imagem de fundo dinâmica (inalterado) ---
   useEffect(() => {
     const loadFundoImage = async () => {
       try {
-        // Se você tiver a função checkAndDownloadImages, descomente e use aqui
-        // const { fundoUrl } = await checkAndDownloadImages();
-        // setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
-        setCurrentFundoSource(defaultFundoLocal); // Mantém o fallback local por simplicidade no Expo Go
+        setCurrentFundoSource(defaultFundoLocal);
       } catch (error) {
         console.error("Erro ao carregar imagem de fundo na LineUpScreen:", error);
         setCurrentFundoSource(defaultFundoLocal);
@@ -99,12 +92,12 @@ const LineUpScreen = () => {
     loadFundoImage();
   }, []);
 
-  // Lógica para buscar locais (agora incluindo liveStreamLink)
+  // Lógica para buscar locais (inalterada)
   useEffect(() => {
     const locaisRef = ref(database, 'locais');
     const unsubscribeLocais = onValue(locaisRef, (snapshot) => {
       const locais: Locais[] = [];
-      const links: Locais[] = []; 
+      const links: Locais[] = [];
       snapshot.forEach((childSnapshot) => {
         const localData = childSnapshot.val();
         const localItem: Locais = {
@@ -112,16 +105,16 @@ const LineUpScreen = () => {
           descricao: localData.descricao,
           latitude: localData.latitude,
           longitude: localData.longitude,
-          liveStreamLink: localData.liveStreamLink, 
+          liveStreamLink: localData.liveStreamLink,
         };
         locais.push(localItem);
-        
+
         if (localData.liveStreamLink) {
           links.push(localItem);
         }
       });
       setLocaisData(locais);
-      setLiveStreamLinksData(links); 
+      setLiveStreamLinksData(links);
     });
     return () => unsubscribeLocais();
   }, []);
@@ -155,7 +148,34 @@ const LineUpScreen = () => {
     }
   }, [diaSelecionado]);
 
-  // REMOVIDO: Lógica do AdBanner inline (useEffect de fetchBanners e de intervalo)
+  // --- NOVA FUNÇÃO: Para obter a localização do usuário ---
+  const getUserCurrentLocation = async () => {
+    setGettingUserLocation(true);
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Permissão de Localização', 'Precisamos da sua permissão para mostrar sua localização no mapa.');
+      setGettingUserLocation(false);
+      return;
+    }
+
+    try {
+      let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      setUserLocation({
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+      });
+    } catch (error) {
+      console.error("Erro ao obter localização do usuário:", error);
+      Alert.alert("Erro de Localização", "Não foi possível obter sua localização atual.");
+    } finally {
+      setGettingUserLocation(false);
+    }
+  };
+
+  // --- Chame a função de localização ao carregar o componente ---
+  useEffect(() => {
+    getUserCurrentLocation();
+  }, []); // [] garante que executa apenas uma vez ao montar
 
   const visualizarNoMapa = (evento: Evento) => {
     const nomeLocalEventoNormalizado = evento.local.toLowerCase().trim();
@@ -180,13 +200,13 @@ const LineUpScreen = () => {
   const voltarDia = () => { setDiaSelecionado(moment(diaSelecionado).subtract(1, 'day').toDate()); };
 
   const renderProgramacaoItem = ({ item }: { item: Evento }) => {
-    const handlePressVerNoMapa = () => { 
+    const handlePressVerNoMapa = () => {
       visualizarNoMapa(item);
     };
-    
+
     if (item.imagemUrl) {
       return (
-        <View style={styles.programacaoItemWrapper}> 
+        <View style={styles.programacaoItemWrapper}>
           <ImageBackground
             source={{ uri: item.imagemUrl }}
             style={styles.programacaoItemImagem}
@@ -201,7 +221,7 @@ const LineUpScreen = () => {
               <Text style={styles.textOverlayNomeBanda} numberOfLines={2}>{item.nomeBanda}</Text>
               <Text style={styles.textOverlayDetalhes}>{item.horaInicio} | {item.local}</Text>
               <Text style={styles.textOverlayData}>{moment(item.dataMomento, 'DD-MM-YYYY').format('DD/MM - dddd')}</Text>
-              
+
               <TouchableOpacity onPress={handlePressVerNoMapa} style={[styles.verNoMapaButtonBase, styles.verNoMapaButtonComImagem]}>
                 <Feather name="map-pin" size={14} color="#FFFFFF" />
                 <Text style={[styles.verNoMapaButtonTextBase, styles.verNoMapaButtonTextComImagem]}>Ver no Mapa</Text>
@@ -225,7 +245,7 @@ const LineUpScreen = () => {
     }
   };
 
-  const renderLiveStreamLinkItem = ({ item }: { item: Locais }) => { 
+  const renderLiveStreamLinkItem = ({ item }: { item: Locais }) => {
     const getPlatformIcon = (url: string) => {
       if (url.includes('instagram.com')) {
         return <Feather name="instagram" size={20} color="#E4405F" />;
@@ -234,7 +254,7 @@ const LineUpScreen = () => {
       } else if (url.includes('facebook.com')) {
         return <Feather name="facebook" size={20} color="#1877F2" />;
       }
-      return <Feather name="link" size={20} color="#007bff" />; 
+      return <Feather name="link" size={20} color="#007bff" />;
     };
 
     const handlePress = () => {
@@ -253,19 +273,22 @@ const LineUpScreen = () => {
   };
 
 
-  if (!fundoAppReady) {
+  if (!fundoAppReady || gettingUserLocation) { // <--- Adicione gettingUserLocation aqui
     return (
       <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
         <Text style={styles.loadingText}>Carregando fundo...</Text>
+        {gettingUserLocation && ( // <--- Mostra mensagem ao obter localização
+          <Text style={styles.loadingText}>Obtendo sua localização...</Text>
+        )}
       </ImageBackground>
     );
   }
 
   return (
     <ImageBackground source={currentFundoSource} style={styles.background}>
-      <AdBanner /> 
-      
+      <AdBanner />
+
       <SafeAreaView style={styles.safeAreaContainer}>
         <View style={styles.container}>
           <View style={styles.headerDate}>
@@ -287,14 +310,14 @@ const LineUpScreen = () => {
             contentContainerStyle={styles.programacaoListContent}
           />
 
-          {liveStreamLinksData.length > 0 && ( 
+          {liveStreamLinksData.length > 0 && (
             <View style={styles.liveStreamLinksSectionContainer}>
               <Text style={styles.liveStreamLinksSectionTitle}>Veja o que está acontecendo agora!</Text>
               <FlatList
                 data={liveStreamLinksData}
                 keyExtractor={(item) => item.id}
                 renderItem={renderLiveStreamLinkItem}
-                horizontal 
+                horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.liveStreamLinksListContent}
               />
@@ -308,6 +331,23 @@ const LineUpScreen = () => {
         <View style={styles.mapOuterContainer}>
             <View style={styles.mapContainer}>
                 <MapView style={styles.map} initialRegion={mapRegion} region={mapRegion}>
+                    {/* Marcador da localização do usuário */}
+                    {userLocation && (
+                      <Marker
+                        coordinate={userLocation}
+                        zIndex={2} // Garante que fique acima de outros marcadores
+                      >
+                        <View style={styles.myLocationMarker}>
+                          <Text style={styles.myLocationMarkerText}>EU</Text>
+                        </View>
+                        <Callout tooltip>
+                          <View style={styles.calloutView}>
+                            <Text style={styles.calloutTitle}>Você</Text>
+                            <Text style={styles.calloutDescription}>Sua localização atual.</Text>
+                          </View>
+                        </Callout>
+                      </Marker>
+                    )}
                     {programacaoDia
                         .filter(evento => {
                             const localDoEvento = locaisData.find((local) => local.descricao.toLowerCase().trim() === evento.local.toLowerCase().trim());
@@ -343,10 +383,10 @@ const LineUpScreen = () => {
   );
 };
 
-// ESTILOS ATUALIZADOS
+// ESTILOS ATUALIZADOS (Adicione os novos estilos e ajuste os existentes se necessário)
 const styles = StyleSheet.create({
   background: { flex: 1, resizeMode: 'cover' },
-  adBanner: { // Estilos para o AdBanner INLINE
+  adBanner: {
     height: 60,
     backgroundColor: 'rgba(220,220,220,0.7)',
     justifyContent: 'center',
@@ -363,15 +403,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#555',
   },
-  safeAreaContainer: { flex: 1 }, 
+  safeAreaContainer: { flex: 1 },
   container: { flex: 1, paddingHorizontal: 10, paddingTop: 10 },
   headerDate: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, },
   botaoNavegacao: { padding: 5 },
   iconeBotao: { backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 25, padding: 5, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1.5 },
   titulo: { fontSize: 20, fontWeight: 'bold', color: '#2c3e50', textAlign: 'center', backgroundColor: 'rgba(255, 255, 255, 0.9)', borderRadius: 8, paddingVertical: 10, paddingHorizontal: 15, flex: 1, marginHorizontal: 5, elevation: 2 },
   programacaoListContent: { paddingBottom: 10, marginRight: 0, },
-  
-  programacaoItemWrapper: { 
+
+  programacaoItemWrapper: {
     height: ITEM_PROGRAMACAO_HEIGHT,
     overflow: 'hidden',
     marginBottom: 12,
@@ -423,10 +463,10 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 1,
     marginTop: 2,
-    marginBottom: 8, 
+    marginBottom: 8,
     textAlign: 'right',
   },
-  programacaoItemSemImagem: { 
+  programacaoItemSemImagem: {
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     padding: 15,
     borderRadius: 8,
@@ -439,12 +479,12 @@ const styles = StyleSheet.create({
     color: '#333',
     marginBottom: 5,
   },
-  detalhesEventoSemImagem: { 
+  detalhesEventoSemImagem: {
     fontSize: 14,
     color: '#555',
-    marginBottom: 8, 
+    marginBottom: 8,
   },
-  detalhesEventoSemImagemLocal: { 
+  detalhesEventoSemImagemLocal: {
     fontSize: 14,
     color: '#555',
     marginTop: 8,
@@ -471,7 +511,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
   },
   verNoMapaButtonSemImagem: {
-    backgroundColor: 'rgba(0, 123, 255, 0.1)', 
+    backgroundColor: 'rgba(0, 123, 255, 0.1)',
   },
   verNoMapaButtonTextSemImagem: {
     color: '#007bff',
@@ -481,7 +521,7 @@ const styles = StyleSheet.create({
   mapContainer: { width: '90%', height: '70%', borderRadius: 15, overflow: 'hidden', backgroundColor: 'white', elevation: 10, shadowColor: '#000', shadowOffset: { width: 0, height: 2}, shadowOpacity: 0.3, shadowRadius: 5 },
   map: { ...StyleSheet.absoluteFillObject },
   fecharMapa: { position: 'absolute', top: 10, right: 10, backgroundColor: 'rgba(255, 255, 255, 0.95)', padding: 8, borderRadius: 20, elevation: 6, zIndex:1 },
-  
+
   markerImageBase: { width: 28, height: 28 },
   selectedMarkerImage: { width: 38, height: 38 },
   calloutView: { width: 200, padding: 12, backgroundColor: 'white', borderRadius: 10, borderColor: '#ddd', borderWidth: 0.5, elevation: 5, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.2, shadowRadius: 1.5 },
@@ -500,29 +540,29 @@ const styles = StyleSheet.create({
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },
-  liveStreamLinksSectionContainer: { 
+  liveStreamLinksSectionContainer: {
     backgroundColor: 'rgba(0, 0, 0, 0.6)',
     borderRadius: 12,
     paddingTop: 5,
     marginTop: 5,
     marginBottom: 5,
     paddingBottom: 5,
-    height: screenHeight * 0.15, 
+    height: screenHeight * 0.15,
   },
-  sectionTitle: { 
+  sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FFFFFF', 
+    color: '#FFFFFF',
     marginBottom: 10,
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.6)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
-  liveStreamLinksSectionTitle: { 
+  liveStreamLinksSectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#FFFFFF', 
+    color: '#FFFFFF',
     marginBottom: 10,
     textAlign: 'center',
     textShadowColor: 'rgba(0, 0, 0, 0.6)',
@@ -533,26 +573,43 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 5,
   },
-  liveStreamLinkItem: { 
+  liveStreamLinkItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.88)', 
+    backgroundColor: 'rgba(255, 255, 255, 0.88)',
     borderRadius: 25,
     paddingVertical: 8,
     paddingHorizontal: 15,
     marginHorizontal: 5,
-    marginBottom: 5, 
+    marginBottom: 5,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 1.5,
   },
-  liveStreamLinkItemText: { 
+  liveStreamLinkItemText: {
     marginLeft: 10,
     fontSize: 15,
     fontWeight: '500',
     color: '#333',
+  },
+  // --- NOVOS ESTILOS PARA O MARCADOR DE LOCALIZAÇÃO DO USUÁRIO ---
+  myLocationMarker: {
+    backgroundColor: '#007BFF', // Cor azul para o marcador do usuário
+    padding: 6,
+    borderRadius: 15, // Forma de círculo
+    width: 30,
+    height: 30,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderColor: 'white', // Borda branca para destaque
+    borderWidth: 1.5,
+  },
+  myLocationMarkerText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 10,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback } from "react"; // Removido 'useRef' pois não é mais usado
 import {
   View,
   Text,
@@ -47,14 +47,8 @@ interface EmpresaData {
   linkInstagram?: string;
 }
 
-// === INTERFACE PARA SERVIÇOS ESSENCIAIS ===
-interface ServicoEssencial {
-  id: string;
-  descricao: string;
-  latitude: number;
-  longitude: number;
-  // Adicione outros campos se você os tiver no Firebase, ex: tipo?: string;
-}
+// === REMOVIDA A INTERFACE ServicoEssencial AQUI ===
+// === REMOVIDA A INTERFACE ServicoEssencial AQUI ===
 
 const ITEMS_POR_PAGINA = 10;
 
@@ -86,10 +80,8 @@ export default function VisualizarProdutosServicos() {
   const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
-  // === NOVOS ESTADOS PARA SERVIÇOS ESSENCIAIS ===
-  const [servicosEssenciais, setServicosEssenciais] = useState<ServicoEssencial[]>([]);
-  const [servicosLoading, setServicosLoading] = useState(true);
-  const [servicosError, setServicosError] = useState<string | null>(null);
+  // === REMOVIDOS ESTADOS PARA SERVIÇOS ESSENCIAIS ===
+  // === REMOVIDOS ESTADOS PARA SERVIÇOS ESSENCIAIS ===
 
   // --- useEffect para carregar a imagem de fundo dinâmica ---
   useEffect(() => {
@@ -116,33 +108,8 @@ export default function VisualizarProdutosServicos() {
     return () => unsubscribeEmpresas();
   }, []);
 
-  // === NOVO useEffect para buscar Serviços Essenciais ===
-  useEffect(() => {
-    const fetchServicos = async () => {
-      setServicosLoading(true);
-      setServicosError(null);
-      try {
-        const servicosRef = ref(database, 'servicos_essenciais'); // Nó do Firebase para serviços
-        const snapshot = await get(servicosRef);
-        if (snapshot.exists()) {
-          const data = snapshot.val();
-          const list: ServicoEssencial[] = Object.keys(data).map(key => ({
-            id: key,
-            ...data[key],
-          }));
-          setServicosEssenciais(list);
-        } else {
-          setServicosEssenciais([]);
-        }
-      } catch (err: any) {
-        console.error("Erro ao buscar serviços essenciais:", err);
-        setServicosError('Não foi possível carregar os serviços essenciais.');
-      } finally {
-        setServicosLoading(false);
-      }
-    };
-    fetchServicos();
-  }, []); // Executa apenas uma vez ao montar
+  // === REMOVIDO useEffect para buscar Serviços Essenciais AQUI ===
+  // === REMOVIDO useEffect para buscar Serviços Essenciais AQUI ===
 
 
   const fetchInitialData = useCallback(async () => {
@@ -312,29 +279,12 @@ export default function VisualizarProdutosServicos() {
     }
   };
 
-  // === NOVO HANDLER: Para abrir serviços no mapa ===
-  const handleVerNoMapaServico = (servico: ServicoEssencial) => {
-    if (servico.latitude && servico.longitude) {
-      setSelectedLocation({
-        latitude: servico.latitude,
-        longitude: servico.longitude,
-        nome: servico.descricao, // Usa a descrição do serviço como nome
-      });
-      setMapRegion({
-        latitude: servico.latitude,
-        longitude: servico.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-      setMostrarMapa(true);
-    } else {
-      Alert.alert("Localização Indisponível", "Este serviço não possui uma localização cadastrada.");
-    }
-  };
+  // === REMOVIDO HANDLER: handleVerNoMapaServico AQUI ===
+  // === REMOVIDO HANDLER: handleVerNoMapaServico AQUI ===
 
 
-  // --- Condição de carregamento geral: Integra o fundo do app e os serviços ---
-  if (loadingInicial || gettingUserLocation || !fundoAppReady || servicosLoading) { // Adicionado servicosLoading
+  // --- Condição de carregamento geral ---
+  if (loadingInicial || gettingUserLocation || !fundoAppReady) { // Removido servicosLoading
     return (
       <ImageBackground source={currentFundoSource} style={styles.background}>
         <View style={styles.loadingContainer}>
@@ -353,7 +303,7 @@ export default function VisualizarProdutosServicos() {
       <AdBanner />
       <View style={styles.container}>
         <TextInput style={styles.input} placeholder="Buscar (mínimo 3 caracteres)" value={termoBusca} onChangeText={buscarProdutos} />
-        
+
         <FlatList
           data={dadosParaExibir}
           keyExtractor={(item) => item.id + item.empresaId}
@@ -398,35 +348,11 @@ export default function VisualizarProdutosServicos() {
           onEndReachedThreshold={0.1}
           onEndReached={termoBusca.length < 3 ? carregarMaisProdutos : undefined}
           ListEmptyComponent={!loadingInicial ? <Text style={styles.mensagemNenhumResultado}>Nenhum produto/serviço encontrado.</Text> : null}
-          style={styles.productList} // Estilo para a FlatList principal
+          style={styles.productList}
         />
 
-        {servicosLoading ? (
-            <View style={styles.servicosLoadingContainer}><ActivityIndicator size="small" color="#fff" /><Text style={styles.servicosLoadingText}>Carregando serviços...</Text></View>
-        ) : servicosError ? (
-            <View style={styles.servicosLoadingContainer}><Text style={styles.servicosErrorText}>{servicosError}</Text></View>
-        ) : servicosEssenciais.length > 0 ? (
-            <View style={styles.servicosEssenciaisSection}>
-                <Text style={styles.servicosEssenciaisTitle}>Serviços Essenciais</Text>
-                <FlatList
-                    data={servicosEssenciais}
-                    keyExtractor={(item) => item.id}
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.servicosEssenciaisListContent}
-                    renderItem={({ item }) => (
-                        <TouchableOpacity
-                            style={styles.servicoEssencialItem}
-                            onPress={() => handleVerNoMapaServico(item)} // Abre o serviço no mapa
-                        >
-                            <Feather name="map-pin" size={18} color="#007bff" /> 
-                            <Text style={styles.servicoEssencialItemText}>{item.descricao}</Text>
-                        </TouchableOpacity>
-                    )}
-                />
-            </View>
-        ) : null}
-
+        {/* === REMOVIDA A SEÇÃO DE SERVIÇOS ESSENCIAIS AQUI === */}
+        {/* === REMOVIDA A SEÇÃO DE SERVIÇOS ESSENCIAIS AQUI === */}
 
         {mostrarMapa && (
           <View style={styles.mapOverlayContainer}>
@@ -487,28 +413,8 @@ export default function VisualizarProdutosServicos() {
                         </Callout>
                       </Marker>
                     ))}
-                    {servicosEssenciais
-                      .filter(s => 
-                        s.latitude && s.longitude && 
-                        // Evita duplicar o marcador se for o "selectedLocation" vindo de um serviço
-                        !(selectedLocation && selectedLocation.nome === s.descricao && selectedLocation.latitude === s.latitude && selectedLocation.longitude === s.longitude)
-                      )
-                      .map((servico) => (
-                        <Marker
-                          key={servico.id + "_servicomapmarker"}
-                          coordinate={{latitude: servico.latitude, longitude: servico.longitude}}
-                          title={servico.descricao}
-                          description={"Serviço Essencial"}
-                          pinColor="blue" // Cor diferente para serviços
-                        >
-                          <Callout tooltip>
-                            <View style={styles.calloutView}>
-                              <Text style={styles.calloutTitle}>{servico.descricao}</Text>
-                              <Text style={styles.calloutDescription}>Serviço Essencial</Text>
-                            </View>
-                          </Callout>
-                        </Marker>
-                      ))}
+                  {/* === REMOVIDOS OS MARCADORES DE SERVIÇOS ESSENCIAIS AQUI === */}
+                  {/* === REMOVIDOS OS MARCADORES DE SERVIÇOS ESSENCIAIS AQUI === */}
 
                 </MapView>
               ) : (
@@ -606,71 +512,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 10,
   },
-  // === NOVOS ESTILOS PARA A SEÇÃO DE SERVIÇOS ESSENCIAIS ===
-  servicosEssenciaisSection: {
-    height: Dimensions.get('window').height * 0.15, // Altura fixa para a seção de serviços
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 12,
-    padding: 10,
-    marginTop: 15,
-    marginHorizontal: 5,
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    justifyContent: 'center',
-  },
-  servicosEssenciaisTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  servicosEssenciaisListContent: {
-    paddingVertical: 5,
-    paddingHorizontal: 5,
-    alignItems: 'center', // Centraliza os itens na FlatList horizontal
-  },
-  servicoEssencialItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#E6F3FF',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    marginHorizontal: 5,
-    elevation: 2,
-    shadowColor: '#007bff',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1.41,
-  },
-  servicoEssencialItemText: {
-    marginLeft: 6,
-    fontSize: 13,
-    fontWeight: '500',
-    color: '#007bff',
-  },
-  servicosLoadingContainer: {
-    height: Dimensions.get('window').height * 0.15, // Mesma altura da seção para manter o layout
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 15,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderRadius: 12,
-    marginHorizontal: 5,
-  },
-  servicosLoadingText: {
-    marginTop: 10,
-    color: '#007bff',
-    fontSize: 14,
-  },
-  servicosErrorText: {
-    color: 'red',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 20,
-  },
+  // === REMOVIDOS ESTILOS PARA A SEÇÃO DE SERVIÇOS ESSENCIAIS AQUI ===
+  // === REMOVIDOS ESTILOS PARA A SEÇÃO DE SERVIÇOS ESSENCIAIS AQUI ===
 });
