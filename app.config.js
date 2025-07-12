@@ -7,13 +7,21 @@ export default {
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     splash: {
-      image: "./assets/images/splash-icon.png", // Use a imagem que você quer
+      image: "./assets/images/splash-icon.png",
       resizeMode: "contain",
       backgroundColor: "#ffffff"
     },
     scheme: "stoantoniobarbalhacliente",
     userInterfaceStyle: "automatic",
     newArchEnabled: false,
+    // --- INÍCIO DA ADIÇÃO PARA UPDATES OTA ---
+    updates: {
+      url: "https://u.expo.dev/c152364f-e543-4f21-9ed3-cfc5163afa10" // Seu Project ID do EAS
+    },
+    runtimeVersion: {
+      policy: "appVersion" // Recomendado para a maioria dos casos
+    },
+    // --- FIM DA ADIÇÃO PARA UPDATES OTA ---
     android: {
       config: {
         googleMaps: {
@@ -32,11 +40,27 @@ export default {
         "com.google.android.gms.permission.AD_ID"
       ],
       package: "com.ae.stoantoniobarbalhacliente",
-      googleServicesFile: "./google-services.json"
+      googleServicesFile: "./google-services.json",
+      // --- INÍCIO DA ADIÇÃO DAS QUERIES ---
+      queries: [
+        {
+          intent: {
+            action: "android.intent.action.VIEW",
+            data: {
+              scheme: "https",
+              host: "instagram.com"
+            }
+          }
+        },
+        {
+          package: "com.instagram.android"
+        }
+      ]
+      // --- FIM DA ADIÇÃO DAS QUERIES ---
     },
     ios: {
       bundleIdentifier: "com.ae.stoantoniobarbalhacliente",
-      buildNumber: "1",
+      buildNumber: "1", // Mantenha este como string
       config: {
         googleMapsApiKey: "AIzaSyBY4ZBNVZ1VkyqJqY_M7u3LPdT6Ielcuw0",
       },
@@ -84,4 +108,4 @@ export default {
     },
     owner: "professor.anderson.a.silva"
   }
-  };
+};
