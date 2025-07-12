@@ -39,7 +39,7 @@ TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }) => {
                 if (userProfileSnap.exists() && userProfileSnap.val().nome) {
                     userName = userProfileSnap.val().nome;
                 }
-            } catch (e) { /* ignore */ }
+            } catch (e) { }
 
             await update(userLocationRef, {
                 latitude: location.coords.latitude,
@@ -417,34 +417,23 @@ const MapaAmigosScreen = () => {
     // --- NOVA FUNÇÃO openInstagramProfile PARA ESTE COMPONENTE ---
     const openInstagramProfile = async (username: string | undefined) => {
         if (!username) {
-            Alert.alert("Instagram não informado", "Este usuário não possui um Instagram cadastrado.");
-            return;
+          Alert.alert(
+            "Instagram não informado",
+            "Esta empresa não possui um Instagram cadastrado."
+          );
+          return;
         }
-        
-        const appUrl = `instagram://user?username=${username}`;
+        // URL de fallback para web
         const webUrl = `https://www.instagram.com/${username}`;
-
+        
         try {
-            const canOpenApp = await Linking.canOpenURL(appUrl);
-
-            if (canOpenApp) {
-                await Linking.openURL(appUrl);
-            } else {
-                const canOpenWeb = await Linking.canOpenURL(webUrl);
-                if (canOpenWeb) {
-                    await Linking.openURL(webUrl);
-                } else {
-                    Alert.alert(
-                        "Erro",
-                        "Não foi possível abrir o perfil do Instagram. Verifique se o aplicativo ou um navegador estão instalados."
-                    );
-                }
-            }
+          // Verifica se pode abrir o app nativo
+          await Linking.openURL(webUrl);
         } catch (error) {
-            console.error("Erro ao tentar abrir o Instagram:", error);
-            Alert.alert("Erro", "Ocorreu um erro inesperado ao tentar abrir o Instagram.");
+          console.error("Erro ao tentar abrir o Instagram:", error);
+          Alert.alert("Erro", "Ocorreu um erro inesperado ao tentar abrir o Instagram.");
         }
-    };
+      };
 
 
     const renderAmigoItem = ({ item }: { item: Amigo }) => {

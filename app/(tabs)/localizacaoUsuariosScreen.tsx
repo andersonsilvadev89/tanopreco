@@ -179,38 +179,23 @@ const LocalizacaoScreen = () => {
     // --- FUNÇÃO openInstagramProfile AQUI (CORRIGIDA) ---
     const openInstagramProfile = async (username: string | undefined) => {
         if (!username) {
-            Alert.alert("Instagram não informado", "Este usuário não possui um Instagram cadastrado.");
-            return;
+          Alert.alert(
+            "Instagram não informado",
+            "Esta empresa não possui um Instagram cadastrado."
+          );
+          return;
         }
-        
-        // Tenta abrir via deep link do Instagram primeiro (Android prefere isso)
-        const appUrl = `instagram://user?username=${username}`;
         // URL de fallback para web
         const webUrl = `https://www.instagram.com/${username}`;
-
+        
         try {
-            // Verifica se pode abrir o app nativo
-            const canOpenApp = await Linking.canOpenURL(appUrl);
-
-            if (canOpenApp) {
-                await Linking.openURL(appUrl);
-            } else {
-                // Se não pode abrir o app, tenta abrir no navegador
-                const canOpenWeb = await Linking.canOpenURL(webUrl);
-                if (canOpenWeb) {
-                    await Linking.openURL(webUrl);
-                } else {
-                    Alert.alert(
-                        "Erro",
-                        "Não foi possível abrir o perfil do Instagram. Verifique se o aplicativo ou um navegador estão instalados."
-                    );
-                }
-            }
+          // Verifica se pode abrir o app nativo
+          await Linking.openURL(webUrl);
         } catch (error) {
-            console.error("Erro ao tentar abrir o Instagram:", error);
-            Alert.alert("Erro", "Ocorreu um erro inesperado ao tentar abrir o Instagram.");
+          console.error("Erro ao tentar abrir o Instagram:", error);
+          Alert.alert("Erro", "Ocorreu um erro inesperado ao tentar abrir o Instagram.");
         }
-    };
+      };
 
     const desfazerAmizade = async (usuario: Usuario) => {
         if (!usuarioLogadoId) return;
