@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react"; // Removido 'useRef' pois não é mais usado
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -12,6 +12,7 @@ import {
   Linking,
   Alert,
   Dimensions,
+  Platform, // <-- Importe Platform aqui!
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { database } from "../../firebaseConfig";
@@ -46,9 +47,6 @@ interface EmpresaData {
   localizacao?: { latitude: number; longitude: number };
   linkInstagram?: string;
 }
-
-// === REMOVIDA A INTERFACE ServicoEssencial AQUI ===
-// === REMOVIDA A INTERFACE ServicoEssencial AQUI ===
 
 const ITEMS_POR_PAGINA = 10;
 
@@ -86,9 +84,6 @@ export default function VisualizarProdutosServicos() {
   const [currentFundoSource, setCurrentFundoSource] =
     useState<any>(defaultFundoLocal);
 
-  // === REMOVIDOS ESTADOS PARA SERVIÇOS ESSENCIAIS ===
-  // === REMOVIDOS ESTADOS PARA SERVIÇOS ESSENCIAIS ===
-
   // --- useEffect para carregar a imagem de fundo dinâmica ---
   useEffect(() => {
     const loadFundoImage = async () => {
@@ -116,9 +111,6 @@ export default function VisualizarProdutosServicos() {
     });
     return () => unsubscribeEmpresas();
   }, []);
-
-  // === REMOVIDO useEffect para buscar Serviços Essenciais AQUI ===
-  // === REMOVIDO useEffect para buscar Serviços Essenciais AQUI ===
 
   const fetchInitialData = useCallback(async () => {
     if (Object.keys(empresas).length === 0) {
@@ -291,6 +283,7 @@ export default function VisualizarProdutosServicos() {
     }
   };
 
+  // --- FUNÇÃO openInstagramProfile AQUI (CORRIGIDA) ---
   const openInstagramProfile = async (username: string | undefined) => {
     if (!username) {
       Alert.alert(
@@ -299,25 +292,38 @@ export default function VisualizarProdutosServicos() {
       );
       return;
     }
-    const url = `https://www.instagram.com/${username}`;
+
+    // Tenta abrir via deep link do Instagram primeiro (Android prefere isso)
+    const appUrl = `instagram://user?username=${username}`;
+    // URL de fallback para web
+    const webUrl = `https://www.instagram.com/${username}`;
+
     try {
-      const supported = await Linking.canOpenURL(url);
-      if (supported) {
-        await Linking.openURL(url);
+      // Verifica se pode abrir o app nativo
+      const canOpenApp = await Linking.canOpenURL(appUrl);
+
+      if (canOpenApp) {
+        await Linking.openURL(appUrl);
       } else {
-        Alert.alert("Erro", `Não foi possível abrir o perfil: ${url}`);
+        // Se não pode abrir o app, tenta abrir no navegador
+        const canOpenWeb = await Linking.canOpenURL(webUrl);
+        if (canOpenWeb) {
+          await Linking.openURL(webUrl);
+        } else {
+          Alert.alert(
+            "Erro",
+            "Não foi possível abrir o perfil do Instagram. Verifique se o aplicativo ou um navegador estão instalados."
+          );
+        }
       }
     } catch (error) {
-      Alert.alert("Erro", "Ocorreu um erro ao tentar abrir o Instagram.");
+      console.error("Erro ao tentar abrir o Instagram:", error);
+      Alert.alert("Erro", "Ocorreu um erro inesperado ao tentar abrir o Instagram.");
     }
   };
 
-  // === REMOVIDO HANDLER: handleVerNoMapaServico AQUI ===
-  // === REMOVIDO HANDLER: handleVerNoMapaServico AQUI ===
-
   // --- Condição de carregamento geral ---
   if (loadingInicial || gettingUserLocation || !fundoAppReady) {
-    // Removido servicosLoading
     return (
       <ImageBackground source={currentFundoSource} style={styles.background}>
         <View style={styles.loadingContainer}>
@@ -381,7 +387,7 @@ export default function VisualizarProdutosServicos() {
                       {item.linkInstagram && (
                         <TouchableOpacity
                           onPress={() =>
-                            openInstagramProfile(item.linkInstagram)
+                            openInstagramProfile(item.linkInstagram) // <-- Chamada para a função corrigida
                           }
                         >
                           <LinearGradient
@@ -435,7 +441,7 @@ export default function VisualizarProdutosServicos() {
           style={styles.productList}
         />
 
-        
+
         {mostrarMapa && (
           <View style={styles.mapOverlayContainer}>
             <View style={styles.mapDisplayBox}>
@@ -456,35 +462,11 @@ export default function VisualizarProdutosServicos() {
                       </Callout>
                     </Marker>
                   )}
-                  {selectedLocation && (
-                    <Marker
-                      coordinate={{
-                        latitude: selectedLocation.latitude,
-                        longitude: selectedLocation.longitude,
-                      }}
-                      title={selectedLocation.nome}
-                      description={"Local selecionado"}
-                      pinColor="red"
-                      zIndex={1}
-                    >
-                      <Callout tooltip>
-                        <View style={styles.calloutView}>
-                          <Text style={styles.calloutTitle}>
-                            {selectedLocation.nome}
-                          </Text>
-                          <Text style={styles.calloutDescription}>
-                            Este é o local selecionado.
-                          </Text>
-                        </View>
-                      </Callout>
-                    </Marker>
-                  )}
                   {produtosComEmpresa
                     .filter(
                       (p) =>
                         p.localizacao?.latitude &&
                         p.localizacao?.longitude &&
-                        // Evita duplicar o marcador se for o "selectedLocation" vindo de um produto
                         !(
                           selectedLocation &&
                           p.empresaId === selectedLocation.empresaId &&
@@ -498,6 +480,7 @@ export default function VisualizarProdutosServicos() {
                         title={produto.nome}
                         description={produto.descricao.substring(0, 40) + "..."}
                         pinColor="yellow"
+                        zIndex={1}
                       >
                         <Callout tooltip>
                           <View style={styles.calloutView}>
@@ -511,7 +494,6 @@ export default function VisualizarProdutosServicos() {
                         </Callout>
                       </Marker>
                     ))}
-                  
                 </MapView>
               ) : (
                 <View style={styles.mapLoadingContainer}>
@@ -566,7 +548,14 @@ const styles = StyleSheet.create({
   },
   imagem: { width: 150, height: 80, borderRadius: 3, marginRight: 10 },
   detalhes: { flex: 1, flexDirection: "column" },
-  descricao: { fontSize: 18, fontWeight: "bold", textAlign: "center", marginBottom: 5, backgroundColor: "rgba(0, 0, 0, 0.06)", borderRadius: 5 },
+  descricao: {
+    fontSize: 18,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginBottom: 5,
+    backgroundColor: "rgba(0, 0, 0, 0.06)",
+    borderRadius: 5,
+  },
   corpoItem: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -725,6 +714,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 10,
   },
-  // === REMOVIDOS ESTILOS PARA A SEÇÃO DE SERVIÇOS ESSENCIAIS AQUI ===
-  // === REMOVIDOS ESTILOS PARA A SEÇÃO DE SERVIÇOS ESSENCIAIS AQUI ===
 });
