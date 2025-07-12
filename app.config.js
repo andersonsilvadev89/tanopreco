@@ -3,7 +3,7 @@ export default {
     name: "Assistente de Eventos",
     slug: "petrolina",
     platforms: ["android", "ios"],
-    version: "1.1.3",
+    version: "1.1.4",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     splash: {
