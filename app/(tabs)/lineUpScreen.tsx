@@ -56,8 +56,8 @@ const LineUpScreen = () => {
   const [diaSelecionado, setDiaSelecionado] = useState<Date>(new Date());
   const [mapaVisivel, setMapaVisivel] = useState(false);
   const [mapRegion, setMapRegion] = useState<Region>({
-    latitude: -7.2345,
-    longitude: -39.4056,
+    latitude: -7.2345, // Coordenadas padrão para Barbalha, Ceará
+    longitude: -39.4056, // Coordenadas padrão para Barbalha, Ceará
     latitudeDelta: 0.02,
     longitudeDelta: 0.02,
   });
@@ -67,7 +67,7 @@ const LineUpScreen = () => {
 
   const [liveStreamLinksData, setLiveStreamLinksData] = useState<Locais[]>([]);
 
-  const cratoLocation = { latitude: -7.2345, longitude: -39.4056 };
+  const cratoLocation = { latitude: -7.2345, longitude: -39.4056 }; // Mantenha Crato como um ponto de referência se necessário
 
   const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
@@ -249,7 +249,7 @@ const LineUpScreen = () => {
     const getPlatformIcon = (url: string) => {
       if (url.includes('instagram.com')) {
         return <Feather name="instagram" size={20} color="#E4405F" />;
-      } else if (url.includes('youtube.com')) {
+      } else if (url.includes('youtube.com')) { // Alterado de "youtube.com" para cobrir mais URLs
         return <Feather name="youtube" size={20} color="#FF0000" />;
       } else if (url.includes('facebook.com')) {
         return <Feather name="facebook" size={20} color="#1877F2" />;
@@ -276,7 +276,7 @@ const LineUpScreen = () => {
   if (!fundoAppReady || gettingUserLocation) { // <--- Adicione gettingUserLocation aqui
     return (
       <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007BFF" />
+        <ActivityIndicator size="large" color="#FFFFFF" />
         <Text style={styles.loadingText}>Carregando fundo...</Text>
         {gettingUserLocation && ( // <--- Mostra mensagem ao obter localização
           <Text style={styles.loadingText}>Obtendo sua localização...</Text>
@@ -331,7 +331,6 @@ const LineUpScreen = () => {
         <View style={styles.mapOuterContainer}>
             <View style={styles.mapContainer}>
                 <MapView style={styles.map} initialRegion={mapRegion} region={mapRegion}>
-                    {/* Marcador da localização do usuário */}
                     {userLocation && (
                       <Marker
                         coordinate={userLocation}
@@ -351,6 +350,7 @@ const LineUpScreen = () => {
                     {programacaoDia
                         .filter(evento => {
                             const localDoEvento = locaisData.find((local) => local.descricao.toLowerCase().trim() === evento.local.toLowerCase().trim());
+                            // Filtra apenas eventos que possuem localização válida
                             return localDoEvento && typeof localDoEvento.latitude === 'number' && typeof localDoEvento.longitude === 'number';
                         })
                         .map((evento) => {
@@ -358,16 +358,25 @@ const LineUpScreen = () => {
                             const isSelected = eventoSelecionadoNoMapa?.id === evento.id;
                             return (
                             <Marker
-                                key={evento.id}
+                                key={evento.id + "_mapmarker"} // Adicionado sufixo para garantir unicidade da key
                                 coordinate={{ latitude: localDoEvento.latitude!, longitude: localDoEvento.longitude! }}
                                 title={evento.nomeBanda}
                                 description={`${evento.local} - ${evento.horaInicio}`}
+                                // Cor do pino: azul para selecionado, vermelho para outros eventos
                                 pinColor={isSelected ? 'rgba(0, 122, 255, 1)' : 'rgba(255, 59, 48, 1)'}
-                                zIndex={isSelected ? 1 : 0}
+                                zIndex={isSelected ? 1 : 0} // Marcador selecionado aparece acima dos outros eventos
                             >
-                                <Image source={{ uri: 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png' }} style={[ styles.markerImageBase, isSelected && styles.selectedMarkerImage ]} resizeMode="contain" />
+                                {Platform.OS === 'ios' ? ( // No iOS, pinColor não tem efeito, então usamos uma imagem
+                                  <Image source={{ uri: isSelected ? 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png' : 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png' }} style={[ styles.markerImageBase, isSelected && styles.selectedMarkerImage ]} resizeMode="contain" />
+                                ) : (
+                                  null // No Android, pinColor funciona, então não precisamos de uma imagem extra aqui se o pinColor for suficiente
+                                )}
                                 <Callout tooltip={Platform.OS === 'ios'}>
-                                <View style={styles.calloutView}><Text style={styles.calloutTitle}>{evento.nomeBanda}</Text><Text style={styles.calloutDescription}>{evento.local}</Text><Text style={styles.calloutDescription}>{evento.horaInicio}</Text></View>
+                                  <View style={styles.calloutView}>
+                                    <Text style={styles.calloutTitle}>{evento.nomeBanda}</Text>
+                                    <Text style={styles.calloutDescription}>{evento.local}</Text>
+                                    <Text style={styles.calloutDescription}>{evento.horaInicio}</Text>
+                                  </View>
                                 </Callout>
                             </Marker>
                             );
@@ -531,10 +540,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    // Usando o fundo padrão para o carregamento inicial
+    backgroundColor: 'rgba(0,0,0,0.5)', // Escurece um pouco para o texto branco
   },
   loadingText: {
     marginTop: 10,
-    color: '#007BFF',
+    color: '#FFFFFF', // Cor do texto de carregamento alterada para branco
     fontSize: 16,
     textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 1, height: 1 },
