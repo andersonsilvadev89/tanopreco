@@ -5,7 +5,8 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      channel: "development"
     },
     "preview": {
       "android": {
@@ -13,9 +14,11 @@
       },
       "ios": {
         "simulator": true
-      }
+      },
+      channel: "preview"
     },
     "production": {
+      "channel": "default", // Adicione isto
       "ios": {
         "distribution": "store",
         "resourceClass": "medium"

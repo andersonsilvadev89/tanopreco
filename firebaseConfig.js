@@ -43,4 +43,4 @@ const googleProvider = new GoogleAuthProvider();
 // Storage para o aplicativo padrão (admin)
 const storage = getStorage(clienteApp);
 
-export { auth, googleProvider, database, adminDatabase, storage };
+export { auth, googleProvider, database, adminDatabase, storage, clienteApp };

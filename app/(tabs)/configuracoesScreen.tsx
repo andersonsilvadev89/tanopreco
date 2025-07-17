@@ -29,6 +29,9 @@ import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o c
 // --- URL padrão de fallback para o fundo local ---
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
+// IMPORTANTE: Certifique-se de que 'expo-constants' está instalado no seu projeto.
+import Constants from 'expo-constants'; 
+
 const LOCATION_TASK_NAME = 'background-location-task';
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
 const UPLOAD_PRESET = 'expocrato';
@@ -44,7 +47,7 @@ interface UserProfile {
 
 const ConfiguracoesScreen = () => {
   const [compartilhando, setCompartilhando] = useState(false);
-  const [carregando, setCarregando] = useState(true); // Carrega dados do usuário
+  const [carregando, setCarregando] = useState(true);
   const [editandoPerfil, setEditandoPerfil] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -55,13 +58,11 @@ const ConfiguracoesScreen = () => {
   const [novaImagemUri, setNovaImagemUri] = useState<string | null>(null);
   const [instagram, setInstagram] = useState('');
 
-  // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
-  const [fundoAppReady, setFundoAppReady] = useState(false); // Controla o carregamento do FUNDO DO APP
+  const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
   const usuarioId = auth.currentUser?.uid;
 
-  // --- NOVO useEffect para carregar a imagem de fundo dinâmica ---
   useEffect(() => {
     const loadFundoImage = async () => {
       try {
@@ -69,21 +70,21 @@ const ConfiguracoesScreen = () => {
         setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
       } catch (error) {
         console.error("Erro ao carregar imagem de fundo na ConfiguracoesScreen:", error);
-        setCurrentFundoSource(defaultFundoLocal); // Em caso de erro, usa o fallback local
+        setCurrentFundoSource(defaultFundoLocal);
       } finally {
-        setFundoAppReady(true); // Indica que o fundo foi processado
+        setFundoAppReady(true);
       }
     };
     loadFundoImage();
-  }, []); // Executa apenas uma vez ao montar o componente
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
     const checkStatusAndProfile = async () => {
       if(!isMounted) return;
-      setCarregando(true); // Inicia o loading dos dados do usuário
+      setCarregando(true);
       if (!usuarioId) {
-          setCarregando(false); // Garante que o loading é falso se não houver usuário
+          setCarregando(false);
           setCompartilhando(false);
           return;
       }
@@ -128,7 +129,7 @@ const ConfiguracoesScreen = () => {
             setNovaImagemUri(null);
           }
       } finally {
-          if(isMounted) setCarregando(false); // <--- IMPORTANTE: Finaliza o loading dos DADOS DO USUÁRIO
+          if(isMounted) setCarregando(false);
       }
     };
 
@@ -142,7 +143,16 @@ const ConfiguracoesScreen = () => {
     const userStatusRef = ref(database, `usuarios/${usuarioId}/compartilhando`);
     try {
         await set(userStatusRef, valor);
-        if (valor) {
+        const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME); // Verifica se a task está rodando
+
+        if (valor) { // Se o usuário está ATIVANDO o compartilhamento
+            if (isTaskRunning) {
+                // Se a task já está rodando, não precisamos iniciá-la novamente.
+                // Apenas avisamos que já está ativa.
+                Alert.alert('Compartilhamento Já Ativo', 'Sua localização já está sendo gerenciada pela task de background.');
+                return; 
+            }
+
             const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
             if (foregroundStatus !== 'granted') {
                 Alert.alert('Permissão Negada', 'Permissão de localização em primeiro plano é necessária.');
@@ -152,16 +162,13 @@ const ConfiguracoesScreen = () => {
             if (backgroundStatus !== 'granted') {
                 Alert.alert('Permissão Recomendada', 'Para melhor experiência, permita a localização em segundo plano ("Permitir o tempo todo").');
             }
-            const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
-            if (isTaskRunning) {
-                await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-            }
+            
             await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-                accuracy: Location.Accuracy.Balanced,
+                accuracy: Location.Accuracy.High,
                 timeInterval: 60000 * 1,
                 distanceInterval: 50,
                 showsBackgroundLocationIndicator: true,
-                pausesUpdatesAutomatically: true,
+                pausesUpdatesAutomatically: false,
                 activityType: Location.ActivityType.Other,
                 foregroundService: {
                     notificationTitle: 'Assistente de Eventos',
@@ -170,15 +177,21 @@ const ConfiguracoesScreen = () => {
                 },
             });
             Alert.alert('Compartilhamento Ativado', 'Sua localização será gerenciada pela task de background.');
-        } else {
-            await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
-            await set(ref(database, `localizacoes/${usuarioId}`), null);
-            Alert.alert('Compartilhamento Desativado');
+        } else { // Se o usuário está DESATIVANDO o compartilhamento
+            if (isTaskRunning) { // Apenas tenta parar se a task estiver registrada
+                await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+                Alert.alert('Compartilhamento Desativado');
+            } else {
+                // Se a task não está rodando, apenas atualiza o Firebase e avisa
+                Alert.alert('Compartilhamento Desativado', 'A tarefa de localização já não estava ativa.');
+            }
+            // Ao desativar o compartilhamento, também limpa a localização no Firebase
+            await set(ref(database, `localizacoes/${usuarioId}`), { compartilhando: false, latitude: null, longitude: null, timestamp: Date.now(), nome: nome });
         }
     } catch (error) {
         console.error("Erro ao alternar compartilhamento:", error);
         Alert.alert("Erro", "Falha ao alterar status de compartilhamento.");
-        setCompartilhando(!valor);
+        setCompartilhando(!valor); // Reverte o switch no UI
         try { await set(userStatusRef, !valor); } catch (dbError) { /* ignore */ }
     }
   };
@@ -382,8 +395,6 @@ const ConfiguracoesScreen = () => {
     );
   };
 
-  // --- Condição de carregamento geral: Espera os dados do usuário E o fundo do app ---
-  // Se 'carregando' está true ou 'fundoAppReady' está false, exibe o loading.
   if (carregando || !fundoAppReady) {
     return (
       <ImageBackground source={currentFundoSource} style={styles.background}>
@@ -395,8 +406,7 @@ const ConfiguracoesScreen = () => {
     );
   }
 
-  // Define qual URI de imagem de perfil será exibida (nova imagem selecionada ou a imagem salva no Firebase)
-  const displayImageUri = novaImagemUri || imagem; // Esta variável é uma string ou null
+  const displayImageUri = novaImagemUri || imagem;
 
   return (
     <ImageBackground source={currentFundoSource} style={styles.background}>
@@ -526,19 +536,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   background: { flex: 1 },
-  scrollContainer: { flexGrow: 1, justifyContent: 'center' },
+  scrollContainer: { flexGrow: 1, justifyContent: 'center', paddingTop: 60 + (Platform.OS === 'ios' ? Constants.statusBarHeight : 0) },
   innerContainer: { paddingHorizontal: 20, paddingVertical: 20, },
   loadingContainer: { 
     flex: 1, 
     justifyContent: 'center', 
     alignItems: 'center', 
-    // O fundo já é o ImageBackground pai, então não precisa de backgroundColor aqui
   },
   loadingText: { 
     marginTop: 10, 
     fontSize: 16, 
     color: 'white',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)', // Sombra para legibilidade
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
   },

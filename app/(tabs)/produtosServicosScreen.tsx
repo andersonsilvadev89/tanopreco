@@ -12,7 +12,7 @@ import {
   Linking,
   Alert,
   Dimensions,
-  Platform, // <-- Importe Platform aqui!
+  Platform,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { database } from "../../firebaseConfig";
@@ -293,13 +293,16 @@ export default function VisualizarProdutosServicos() {
     }
     // URL de fallback para web
     const webUrl = `https://www.instagram.com/${username}`;
-    
+
     try {
-      // Verifica se pode abrir o app nativo
+      // Abre a URL, que tentará abrir o app ou o navegador
       await Linking.openURL(webUrl);
     } catch (error) {
       console.error("Erro ao tentar abrir o Instagram:", error);
-      Alert.alert("Erro", "Ocorreu um erro inesperado ao tentar abrir o Instagram.");
+      Alert.alert(
+        "Erro",
+        "Ocorreu um erro inesperado ao tentar abrir o Instagram."
+      );
     }
   };
 
@@ -422,7 +425,6 @@ export default function VisualizarProdutosServicos() {
           style={styles.productList}
         />
 
-
         {mostrarMapa && (
           <View style={styles.mapOverlayContainer}>
             <View style={styles.mapDisplayBox}>
@@ -446,22 +448,29 @@ export default function VisualizarProdutosServicos() {
                   {produtosComEmpresa
                     .filter(
                       (p) =>
-                        p.localizacao?.latitude &&
-                        p.localizacao?.longitude &&
-                        !(
-                          selectedLocation &&
-                          p.empresaId === selectedLocation.empresaId &&
-                          p.id === selectedLocation.produtoId
-                        )
-                    )
+                        p.localizacao?.latitude && p.localizacao?.longitude
+                    ) // Filtra apenas produtos com localização
                     .map((produto) => (
                       <Marker
                         key={produto.id + produto.empresaId + "_mapmarker"}
                         coordinate={produto.localizacao!}
                         title={produto.nome}
                         description={produto.descricao.substring(0, 40) + "..."}
-                        pinColor="yellow"
-                        zIndex={1}
+                        // Condição para definir a cor do pino
+                        pinColor={
+                          selectedLocation &&
+                          produto.empresaId === selectedLocation.empresaId &&
+                          produto.id === selectedLocation.produtoId
+                            ? "red" // Pino vermelho para o item selecionado
+                            : "yellow" // Pino amarelo para os outros
+                        }
+                        zIndex={
+                          selectedLocation &&
+                          produto.empresaId === selectedLocation.empresaId &&
+                          produto.id === selectedLocation.produtoId
+                            ? 3 // Garante que o pino vermelho fique por cima
+                            : 1
+                        }
                       >
                         <Callout tooltip>
                           <View style={styles.calloutView}>
@@ -486,7 +495,7 @@ export default function VisualizarProdutosServicos() {
                 style={styles.closeMapButtonOverlay}
                 onPress={() => {
                   setMostrarMapa(false);
-                  setSelectedLocation(null);
+                  setSelectedLocation(null); // Limpa o item selecionado ao fechar o mapa
                 }}
               >
                 <Feather name="x" size={24} color="#333" />
