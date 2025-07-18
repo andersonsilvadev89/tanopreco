@@ -16,30 +16,30 @@ export default function Index() {
     async function checkForUpdates() {
       if (!__DEV__) {
         try {
-          console.log("🟡 Verificando atualizações OTA...");
-          console.log("🔁 Runtime Version:", Updates.runtimeVersion);
-          console.log("🔗 Canal de atualização:", Updates.channel || "indefinido");
+          console.log("Verificando atualizações OTA...");
+          console.log("Runtime Version:", Updates.runtimeVersion);
+          console.log("Canal de atualização:", Updates.channel || "indefinido");
 
           setIsUpdating(true);
 
           const update = await Updates.checkForUpdateAsync();
-          console.log("📦 Update disponível?", update.isAvailable);
+          console.log("Update disponível?", update.isAvailable);
 
           if (update.isAvailable) {
-            console.log("⬇️ Baixando atualização...");
+            console.log("⬇Baixando atualização...");
             await Updates.fetchUpdateAsync();
-            console.log("✅ Atualização baixada com sucesso. Recarregando o app...");
+            console.log("Atualização baixada com sucesso. Recarregando o app...");
             await Updates.reloadAsync();
           } else {
-            console.log("🟢 Nenhuma atualização disponível.");
+            console.log("Nenhuma atualização disponível.");
           }
         } catch (error: any) {
-          console.error("❌ Erro ao verificar/baixar atualização OTA:", error?.message || error);
+          console.error("Erro ao verificar/baixar atualização OTA:", error?.message || error);
         } finally {
           setIsUpdating(false);
         }
       } else {
-        console.log("⚠️ Ambiente de desenvolvimento (__DEV__ = true). Ignorando updates OTA.");
+        console.log("Ambiente de desenvolvimento (__DEV__ = true). Ignorando updates OTA.");
         setIsUpdating(false);
       }
     }
@@ -47,7 +47,6 @@ export default function Index() {
     checkForUpdates();
   }, []);
 
-  // Enquanto carrega dados ou verifica atualizações, mostra loader
   if (loading || isUpdating) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
@@ -58,7 +57,6 @@ export default function Index() {
     );
   }
 
-  // Redirecionamento baseado na autenticação
   if (!user) {
     return <Redirect href="/(auth)/loginScreen" />;
   }

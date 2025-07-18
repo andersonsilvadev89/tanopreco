@@ -6,7 +6,7 @@
     "development": {
       "developmentClient": true,
       "distribution": "internal",
-      channel: "development"
+      "channel": "development"
     },
     "preview": {
       "android": {
@@ -15,10 +15,10 @@
       "ios": {
         "simulator": true
       },
-      channel: "preview"
+      "channel": "preview"
     },
     "production": {
-      "channel": "default", // Adicione isto
+      "channel": "default",
       "ios": {
         "distribution": "store",
         "resourceClass": "medium"

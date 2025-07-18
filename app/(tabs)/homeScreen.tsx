@@ -12,7 +12,6 @@ import {
   Platform,
 } from "react-native";
 import { router } from "expo-router";
-import * as Updates from "expo-updates"; // <<== ADICIONADO
 import {
   MapPin,
   Users,
@@ -33,11 +32,15 @@ import { checkAndDownloadImages } from "../../utils/imageManager";
 const defaultFundoLocal = require("../../assets/images/fundo.png");
 const { width: screenWidth } = Dimensions.get("window");
 
+// --- Constantes de Design ---
+
 const NUM_COLUMNS = 2;
-const SPACING = 20;
+const SPACING = 20; // Espaçamento geral entre elementos e margens
 const CARD_PADDING = 10;
 const BORDER_RADIUS = 26;
-const ICON_SIZE = 40;
+const ICON_SIZE = 40; // Mantendo o tamanho maior para os ícones
+
+// --- Cores (Sugestões) ---
 
 const COLORS = {
   primary: "#007AFF",
@@ -54,91 +57,146 @@ const COLORS = {
 const HomeScreen = () => {
   const navigate = (path: string) => router.push(path as any);
   const [fundoAppReady, setFundoAppReady] = useState(false);
-  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+  const [currentFundoSource, setCurrentFundoSource] =
+    useState<any>(defaultFundoLocal);
 
   useEffect(() => {
     const loadFundoImage = async () => {
       try {
         const { fundoUrl } = await checkAndDownloadImages();
+
         setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
       } catch (error) {
-        console.error("Erro ao carregar imagem de fundo:", error);
+        console.error("Erro ao carregar imagem de fundo na HomeScreen:", error);
+
         setCurrentFundoSource(defaultFundoLocal);
       } finally {
         setFundoAppReady(true);
       }
     };
+
     loadFundoImage();
   }, []);
 
   const mainOptions = [
-    { label: "Amigos e Solicitações", icon: Users, path: "/localizacaoUsuariosScreen" },
-    { label: "Localização de Amigos", icon: MapPin, path: "/mapaAmigosScreen" },
-    { label: "Produtos e Serviços", icon: Sandwich, path: "/produtosServicosScreen" },
-    { label: "Serviços Essenciais", icon: Toilet, path: "/servicosEssenciaisScreen" },
+    {
+      label: "Amigos e Solicitações",
+      icon: Users,
+      path: "/localizacaoUsuariosScreen",
+    },
+    {
+      label: "Localização de Amigos",
+      icon: MapPin,
+      path: "/mapaAmigosScreen",
+    },
+    {
+      label: "Produtos e Serviços",
+      icon: Sandwich,
+      path: "/produtosServicosScreen",
+    },
+    {
+      label: "Serviços Essenciais",
+      icon: Toilet,
+      path: "/servicosEssenciaisScreen",
+    },
     { label: "Programação (LineUp)", icon: Radio, path: "/lineUpScreen" },
     { label: "Configurações", icon: Settings, path: "/configuracoesScreen" },
     { label: "Sobre o App", icon: CircleHelp, path: "/sobreScreen" },
   ];
 
   const bottomRowOptions = [
-    { type: "nav", label: "Área da Empresa", icon: Briefcase, path: "/empresaScreen" },
+    {
+      type: "nav",
+      label: "Área da Empresa",
+      icon: Briefcase,
+      path: "/empresaScreen",
+    },
     { type: "logout", label: "Sair", icon: LogOut, path: "" },
-    { type: "nav", label: "Área Administrativa", icon: Shield, path: "/adminScreen" },
+    {
+      type: "nav",
+      label: "Área Administrativa",
+      icon: Shield,
+      path: "/adminScreen",
+    },
   ];
 
   const confirmarLogout = () => {
-    Alert.alert("Sair da Conta", "Tem certeza que deseja sair?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Sair",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await signOut(auth);
-          } catch (error) {
-            Alert.alert("Erro", "Não foi possível sair. Tente novamente.");
-          }
+    Alert.alert(
+      "Sair da Conta",
+      "Tem certeza que deseja sair do aplicativo?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Sair",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await signOut(auth);
+            } catch (error) {
+              console.error("Erro ao fazer logout: ", error);
+              Alert.alert(
+                "Erro ao Sair",
+                "Não foi possível sair. Tente novamente."
+              );
+            }
+          },
         },
-      },
-    ]);
+      ],
+      { cancelable: true }
+    );
   };
 
   const renderGridItem = ({ item }: { item: (typeof mainOptions)[0] }) => {
-    const itemWidth = (screenWidth - SPACING * 2 - SPACING * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+    const itemWidth =
+      (screenWidth - SPACING * 2 - SPACING * (NUM_COLUMNS - 1)) / NUM_COLUMNS;
+
+    const IconComponent = item.icon; // Pegue o componente do ícone
+
     return (
       <TouchableOpacity
         style={[styles.card, { width: itemWidth }]}
         activeOpacity={0.7}
         onPress={() => navigate(item.path)}
       >
-        <item.icon size={ICON_SIZE} color={COLORS.primary} />
+        <IconComponent size={ICON_SIZE} color={COLORS.primary} />
         <Text style={styles.cardText}>{item.label}</Text>
       </TouchableOpacity>
     );
   };
 
-  const renderBottomRowItem = ({ item }: { item: (typeof bottomRowOptions)[0] }) => {
+  const renderBottomRowItem = ({
+    item,
+  }: {
+    item: (typeof bottomRowOptions)[0];
+  }) => {
     const horizontalPadding = SPACING;
     const gapBetweenItems = SPACING / 2;
     const totalGapWidth = gapBetweenItems * (bottomRowOptions.length - 1);
     const availableWidth = screenWidth - horizontalPadding * 2 - totalGapWidth;
     const logoutButtonRatio = 0.33;
     const fixedOptionRatio = (1 - logoutButtonRatio) / 2;
-
     let itemWidth;
     let itemHeight;
+
+    const IconComponent = item.icon; // Pegue o componente do ícone
 
     if (item.type === "logout") {
       itemWidth = availableWidth * logoutButtonRatio;
       itemHeight = itemWidth;
       return (
         <TouchableOpacity
-          style={[styles.logoutButtonRound, { width: itemWidth, height: itemHeight, marginHorizontal: gapBetweenItems / 2 }]}
+          style={[
+            styles.logoutButtonRound,
+            {
+              width: itemWidth,
+              height: itemHeight,
+              marginHorizontal: gapBetweenItems / 2,
+            },
+          ]}
           activeOpacity={0.7}
           onPress={confirmarLogout}
         >
-          <item.icon size={ICON_SIZE - 14} color={COLORS.logoutRed} />
+          <IconComponent size={ICON_SIZE - 14} color={COLORS.logoutRed} />
           <Text style={styles.logoutButtonRoundText}>{item.label}</Text>
         </TouchableOpacity>
       );
@@ -147,11 +205,18 @@ const HomeScreen = () => {
       itemHeight = itemWidth;
       return (
         <TouchableOpacity
-          style={[styles.fixedOptionCard, { width: itemWidth, height: itemHeight, marginHorizontal: gapBetweenItems / 2 }]}
+          style={[
+            styles.fixedOptionCard,
+            {
+              width: itemWidth,
+              height: itemHeight,
+              marginHorizontal: gapBetweenItems / 2,
+            },
+          ]}
           activeOpacity={0.7}
           onPress={() => navigate(item.path)}
         >
-          <item.icon size={ICON_SIZE - 14} color={COLORS.primary} />
+          <IconComponent size={ICON_SIZE - 14} color={COLORS.primary} />
           <Text style={styles.fixedOptionText}>{item.label}</Text>
         </TouchableOpacity>
       );
@@ -160,7 +225,11 @@ const HomeScreen = () => {
 
   if (!fundoAppReady) {
     return (
-      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer} resizeMode="cover">
+      <ImageBackground
+        source={defaultFundoLocal}
+        style={styles.loadingContainer}
+        resizeMode="cover"
+      >
         <ActivityIndicator size="large" color={COLORS.primary} />
         <Text style={styles.loadingText}>Carregando o aplicativo...</Text>
       </ImageBackground>
@@ -168,7 +237,11 @@ const HomeScreen = () => {
   }
 
   return (
-    <ImageBackground source={currentFundoSource} style={styles.background} resizeMode="cover">
+    <ImageBackground
+      source={currentFundoSource}
+      style={styles.background}
+      resizeMode="cover"
+    >
       <View style={styles.overlay} />
       <AdBanner />
       <View style={styles.content}>
@@ -182,47 +255,6 @@ const HomeScreen = () => {
           showsVerticalScrollIndicator={false}
           ListFooterComponent={<View style={{ height: SPACING * 2 }} />}
         />
-
-        {/* 🔄 BOTÃO DE ATUALIZAÇÃO OTA */}
-        <TouchableOpacity
-          style={{
-            backgroundColor: "white",
-            padding: 12,
-            borderRadius: 12,
-            alignItems: "center",
-            marginTop: 10,
-            marginBottom: 5,
-            alignSelf: "center",
-            width: "90%",
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 4,
-            elevation: 3,
-          }}
-          onPress={async () => {
-            try {
-              console.log("🔄 Verificando atualização OTA...");
-              const update = await Updates.checkForUpdateAsync();
-              if (update.isAvailable) {
-                await Updates.fetchUpdateAsync();
-                Alert.alert("Atualização disponível", "Aplicando update...");
-                await Updates.reloadAsync();
-              } else {
-                Alert.alert("Sem atualização", "Você já está na versão mais recente.");
-              }
-            } catch (error: any) {
-              console.error("Erro ao buscar atualização:", error);
-              Alert.alert("Erro", error.message || "Erro ao verificar atualização OTA.");
-            }
-          }}
-        >
-          <Text style={{ fontWeight: "bold", color: "#007AFF" }}>
-            🔄 Deu tudo certo graças a Deus
-          </Text>
-        </TouchableOpacity>
-
-        {/* BOTÕES INFERIORES */}
         <View style={styles.bottomButtonsWrapper}>
           <FlatList
             data={bottomRowOptions}
@@ -230,7 +262,7 @@ const HomeScreen = () => {
             keyExtractor={(item, index) => item.label + index}
             numColumns={3}
             contentContainerStyle={styles.bottomRowGrid}
-            columnWrapperStyle={styles.bottomRowColumnWrapper}
+            columnWrapperStyle={styles.bottomRowGrid}
             scrollEnabled={false}
           />
         </View>
@@ -238,10 +270,14 @@ const HomeScreen = () => {
     </ImageBackground>
   );
 };
-
 const styles = StyleSheet.create({
-  background: { flex: 1 },
-  overlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.2)" },
+  background: {
+    flex: 1,
+  },
+  overlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.2)",
+  },
   content: {
     flex: 1,
     paddingTop: 10,
@@ -255,7 +291,10 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING - 10,
     flexGrow: 1,
   },
-  row: { justifyContent: "space-between", marginBottom: SPACING - 5 },
+  row: {
+    justifyContent: "space-between",
+    marginBottom: SPACING - 5,
+  },
   card: {
     backgroundColor: COLORS.backgroundLight,
     borderRadius: BORDER_RADIUS,
@@ -292,7 +331,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: SPACING,
   },
-  bottomRowColumnWrapper: {},
   fixedOptionCard: {
     backgroundColor: COLORS.backgroundLight,
     borderRadius: BORDER_RADIUS,

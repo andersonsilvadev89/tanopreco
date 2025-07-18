@@ -4,7 +4,7 @@ import {
   Text,
   StyleSheet,
   Switch,
-  Alert,
+  Alert, 
   TouchableOpacity,
   TextInput,
   Image,
@@ -12,7 +12,8 @@ import {
   Platform,
   Linking,
   ActivityIndicator,
-  SafeAreaView
+  SafeAreaView,
+  AppState,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
@@ -23,13 +24,10 @@ import { auth, database } from '../../firebaseConfig';
 import { deleteUser } from 'firebase/auth';
 import AdBanner from '../components/AdBanner'; 
 
-// --- Importar o gerenciador de imagens para o fundo ---
-import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o caminho se necessário
+import { checkAndDownloadImages } from '../../utils/imageManager'; 
 
-// --- URL padrão de fallback para o fundo local ---
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
-// IMPORTANTE: Certifique-se de que 'expo-constants' está instalado no seu projeto.
 import Constants from 'expo-constants'; 
 
 const LOCATION_TASK_NAME = 'background-location-task';
@@ -47,6 +45,7 @@ interface UserProfile {
 
 const ConfiguracoesScreen = () => {
   const [compartilhando, setCompartilhando] = useState(false);
+  const [hasBackgroundPermission, setHasBackgroundPermission] = useState(false);
   const [carregando, setCarregando] = useState(true);
   const [editandoPerfil, setEditandoPerfil] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -62,6 +61,7 @@ const ConfiguracoesScreen = () => {
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
   const usuarioId = auth.currentUser?.uid;
+  const [appState, setAppState] = useState(AppState.currentState);
 
   useEffect(() => {
     const loadFundoImage = async () => {
@@ -78,121 +78,256 @@ const ConfiguracoesScreen = () => {
     loadFundoImage();
   }, []);
 
-  useEffect(() => {
-    let isMounted = true;
-    const checkStatusAndProfile = async () => {
-      if(!isMounted) return;
-      setCarregando(true);
-      if (!usuarioId) {
-          setCarregando(false);
-          setCompartilhando(false);
-          return;
-      }
-      try {
+  const checkLocationAndTaskStatus = async () => {
+    if (!usuarioId) {
+        setCompartilhando(false);
+        setHasBackgroundPermission(false);
+        return;
+    }
+
+    try {
+        const { status: currentForegroundStatus } = await Location.getForegroundPermissionsAsync();
+        const { status: currentBackgroundStatus } = await Location.getBackgroundPermissionsAsync();
+        
+        const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+
+        setHasBackgroundPermission(currentBackgroundStatus === 'granted');
+
         const userRef = ref(database, `usuarios/${usuarioId}`);
         const userSnapshot = await get(userRef);
-        if (isMounted && userSnapshot.exists()) {
-          const profileData = userSnapshot.val() as UserProfile;
-          setCompartilhando(profileData.compartilhando === true);
-          setNome(profileData.nome || auth.currentUser?.displayName || '');
-          setEmail(profileData.email || auth.currentUser?.email || '');
-          setTelefone(profileData.telefone || '');
-          setImagem(profileData.imagem || auth.currentUser?.photoURL || '');
-          setInstagram(profileData.instagram || '');
-        } else if (isMounted && auth.currentUser) {
-          const initialNome = auth.currentUser.displayName || '';
-          const initialEmail = auth.currentUser.email || '';
-          const initialImagem = auth.currentUser.photoURL || '';
-          
-          setNome(initialNome);
-          setEmail(initialEmail);
-          setTelefone('');
-          setImagem(initialImagem);
-          setInstagram('');
-          setCompartilhando(false);
+        
+        const profileData: UserProfile = userSnapshot.exists() 
+            ? (userSnapshot.val() as UserProfile) 
+            : { nome: '', email: '', compartilhando: false };
 
-          await set(userRef, {
-            nome: initialNome, email: initialEmail, telefone: '',
-            imagem: initialImagem, compartilhando: false, instagram: ''
-          });
+        const sharingFromDb = profileData.compartilhando === true;
+
+        // Determine o status REAL do compartilhamento
+        // O compartilhamento só está ATIVO se:
+        // 1. O usuário ativou a intenção no Firebase.
+        // 2. A task de localização ESTÁ rodando.
+        // 3. Pelo menos a permissão de foreground está concedida (essencial para qualquer localização).
+        const reallySharing = sharingFromDb && isTaskRunning && currentForegroundStatus === 'granted';
+
+        setCompartilhando(reallySharing); // Atualiza o switch na UI
+
+        // --- NOVA LÓGICA DE SINCRONIZAÇÃO COM FIREBASE ---
+        // Se o Firebase diz que está compartilhando, mas na verdade não está (e não deveria estar, ex: permissão revogada)
+        if (sharingFromDb && !reallySharing) {
+            console.warn("Detectado que compartilhamento deveria estar ativo no DB, mas não está funcionando. Sincronizando DB.");
+            // Atualiza o Firebase para 'false'
+            await set(ref(database, `usuarios/${usuarioId}/compartilhando`), false);
+            // Limpa os dados de localização no Firebase
+            await set(ref(database, `localizacoes/${usuarioId}`), { compartilhando: false, latitude: null, longitude: null, timestamp: Date.now(), nome: nome });
+            
+            // Se a task estava rodando mas a permissão foi removida, tentar parar
+            if (isTaskRunning) {
+                console.log("Tentando parar a task de localização que não deveria estar ativa.");
+                await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+            }
         }
-        setNovaImagemUri(null);
-      } catch (error) {
-          console.error("Erro ao buscar perfil e status:", error);
-          if(isMounted && auth.currentUser){
-            setNome(auth.currentUser.displayName || '');
-            setEmail(auth.currentUser.email || '');
-            setTelefone('');
-            setImagem(auth.currentUser.photoURL || '');
-            setInstagram('');
-            setCompartilhando(false);
+        // --- FIM DA NOVA LÓGICA ---
+
+    } catch (error) {
+        console.error("Erro ao verificar status de localização e task:", error);
+        setCompartilhando(false);
+        setHasBackgroundPermission(false);
+        // Em caso de erro, também garantir que o Firebase reflita o estado de não compartilhamento
+        if (usuarioId) {
+            await set(ref(database, `usuarios/${usuarioId}/compartilhando`), false);
+            await set(ref(database, `localizacoes/${usuarioId}`), { compartilhando: false, latitude: null, longitude: null, timestamp: Date.now(), nome: nome });
+            if (await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME)) {
+                await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
+            }
+        }
+    } finally {
+        // setCarregando(false); // Opcional
+    }
+  };
+
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+        if (appState.match(/inactive|background/) && nextAppState === 'active') {
+            console.log('App has come to the foreground! Revalidating location permissions.');
+            checkLocationAndTaskStatus(); // Revalida status ao retornar ao app
+        }
+        setAppState(nextAppState);
+    });
+
+    let isMounted = true;
+    const loadUserProfileAndInitialStatus = async () => {
+        if (!isMounted) return;
+        setCarregando(true);
+        if (!usuarioId) {
+            setCarregando(false);
+            return;
+        }
+        try {
+            const userRef = ref(database, `usuarios/${usuarioId}`);
+            const userSnapshot = await get(userRef);
+            
+            if (isMounted && userSnapshot.exists()) {
+                const profileData = userSnapshot.val() as UserProfile;
+                setNome(profileData.nome || auth.currentUser?.displayName || '');
+                setEmail(profileData.email || auth.currentUser?.email || '');
+                setTelefone(profileData.telefone || '');
+                setImagem(profileData.imagem || auth.currentUser?.photoURL || '');
+                setInstagram(profileData.instagram || '');
+            } else if (isMounted && auth.currentUser) {
+                const initialNome = auth.currentUser.displayName || '';
+                const initialEmail = auth.currentUser.email || '';
+                const initialImagem = auth.currentUser.photoURL || '';
+                
+                setNome(initialNome);
+                setEmail(initialEmail);
+                setTelefone('');
+                setImagem(initialImagem);
+                setInstagram('');
+                await set(userRef, {
+                    nome: initialNome, email: initialEmail, telefone: '',
+                    imagem: initialImagem, compartilhando: false, instagram: ''
+                });
+            }
             setNovaImagemUri(null);
-          }
-      } finally {
-          if(isMounted) setCarregando(false);
-      }
+        } catch (error) {
+            console.error("Erro ao buscar perfil:", error);
+            if(isMounted && auth.currentUser){
+                setNome(auth.currentUser.displayName || '');
+                setEmail(auth.currentUser.email || '');
+                setTelefone('');
+                setImagem(auth.currentUser.photoURL || '');
+                setInstagram('');
+                setNovaImagemUri(null);
+            }
+        } finally {
+            if(isMounted) {
+                setCarregando(false);
+                checkLocationAndTaskStatus();
+            }
+        }
     };
 
-    checkStatusAndProfile();
-    return () => { isMounted = false; }
-  }, [usuarioId]);
+    loadUserProfileAndInitialStatus();
+
+    return () => { 
+      isMounted = false; 
+      subscription.remove();
+    }
+  }, [usuarioId, appState]);
+
+  const toggleBackgroundPermission = async (valor: boolean) => {
+    if (!usuarioId) return;
+
+    if (valor) {
+        const { status: currentStatus } = await Location.getBackgroundPermissionsAsync();
+        if (currentStatus === 'granted') {
+            setHasBackgroundPermission(true); 
+            Alert.alert("Permissão Concedida", "A permissão de localização 'Permitir o tempo todo' já está ativa.");
+        } else {
+            const { status: newStatus } = await Location.requestBackgroundPermissionsAsync();
+            if (newStatus === 'granted') {
+                 setHasBackgroundPermission(true); 
+                 Alert.alert("Permissão Concedida", "Agora, a localização poderá ser usada em segundo plano.");
+            } else {
+                setHasBackgroundPermission(false); 
+                Alert.alert(
+                    'Permissão "Permitir o tempo todo" Necessária',
+                    'Para que a localização em segundo plano funcione, por favor, vá nas configurações do aplicativo e em "Permissões" ou "Localização", selecione a opção "Permitir o tempo todo".',
+                    [
+                        { text: 'Abrir Configurações', onPress: () => Linking.openSettings() }, 
+                        { text: 'Cancelar', style: 'cancel' }
+                    ]
+                );
+            }
+        }
+    } else {
+        setHasBackgroundPermission(false); 
+        Alert.alert(
+            'Desativar Permissão',
+            'Para desativar completamente a localização em segundo plano, você precisará ir nas configurações do seu dispositivo. Lá, mude a permissão de localização para "Durante o uso do app" ou "Negar".',
+            [
+                { text: 'Abrir Configurações', onPress: () => Linking.openSettings() },
+                { text: 'Ok', style: 'cancel' }
+            ]
+        );
+    }
+    checkLocationAndTaskStatus();
+  };
+
 
   const toggleCompartilhamento = async (valor: boolean) => {
     if (!usuarioId) return;
-    setCompartilhando(valor);
+    
     const userStatusRef = ref(database, `usuarios/${usuarioId}/compartilhando`);
+    
     try {
-        await set(userStatusRef, valor);
-        const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME); // Verifica se a task está rodando
+        await set(userStatusRef, valor); // Atualiza a intenção no Firebase
 
-        if (valor) { // Se o usuário está ATIVANDO o compartilhamento
-            if (isTaskRunning) {
-                // Se a task já está rodando, não precisamos iniciá-la novamente.
-                // Apenas avisamos que já está ativa.
-                Alert.alert('Compartilhamento Já Ativo', 'Sua localização já está sendo gerenciada pela task de background.');
+        if (valor) {
+            const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
+            
+            if (foregroundStatus !== 'granted') {
+                Alert.alert(
+                    'Permissão de Localização Necessária',
+                    'A permissão de localização em primeiro plano é essencial para iniciar o compartilhamento. Por favor, conceda esta permissão nas configurações do seu dispositivo.',
+                    [
+                        { text: 'Abrir Configurações', onPress: () => Linking.openSettings() },
+                        { text: 'Ok', style: 'cancel' }
+                    ]
+                );
+                await set(userStatusRef, false);
                 return; 
             }
-
-            const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-            if (foregroundStatus !== 'granted') {
-                Alert.alert('Permissão Negada', 'Permissão de localização em primeiro plano é necessária.');
-                setCompartilhando(false); await set(userStatusRef, false); return;
-            }
-            const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-            if (backgroundStatus !== 'granted') {
-                Alert.alert('Permissão Recomendada', 'Para melhor experiência, permita a localização em segundo plano ("Permitir o tempo todo").');
-            }
             
-            await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
-                accuracy: Location.Accuracy.High,
-                timeInterval: 60000 * 1,
-                distanceInterval: 50,
-                showsBackgroundLocationIndicator: true,
-                pausesUpdatesAutomatically: false,
-                activityType: Location.ActivityType.Other,
-                foregroundService: {
-                    notificationTitle: 'Assistente de Eventos',
-                    notificationBody: 'Compartilhamento de localização ativo.',
-                    notificationColor: '#007BFF',
-                },
-            });
-            Alert.alert('Compartilhamento Ativado', 'Sua localização será gerenciada pela task de background.');
-        } else { // Se o usuário está DESATIVANDO o compartilhamento
-            if (isTaskRunning) { // Apenas tenta parar se a task estiver registrada
+            const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+            if (!isTaskRunning) {
+                await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+                    accuracy: Location.Accuracy.High,
+                    timeInterval: 60000 * 1,
+                    distanceInterval: 50,
+                    showsBackgroundLocationIndicator: true,
+                    pausesUpdatesAutomatically: false,
+                    activityType: Location.ActivityType.Other,
+                    foregroundService: {
+                        notificationTitle: 'Assistente de Eventos',
+                        notificationBody: 'Compartilhamento de localização ativo.',
+                        notificationColor: '#007BFF',
+                    },
+                });
+                Alert.alert('Compartilhamento Ativado', 'Sua localização está sendo gerenciada.');
+            } else {
+                 Alert.alert('Compartilhamento Já Ativo', 'Sua localização já estava sendo gerenciada.');
+            }
+
+            const { status: currentBackgroundStatus } = await Location.getBackgroundPermissionsAsync();
+            setHasBackgroundPermission(currentBackgroundStatus === 'granted');
+
+            if (currentBackgroundStatus !== 'granted') {
+                Alert.alert(
+                    'Permissão de Segundo Plano',
+                    'Para garantir que o compartilhamento funcione em segundo plano (com o app fechado), ative "Permitir o tempo todo" nas configurações de localização do app. Use o switch abaixo.',
+                    [{ text: 'Ok' }] 
+                );
+            }
+
+        } else {
+            const isTaskRunning = await TaskManager.isTaskRegisteredAsync(LOCATION_TASK_NAME);
+            if (isTaskRunning) {
                 await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
                 Alert.alert('Compartilhamento Desativado');
             } else {
-                // Se a task não está rodando, apenas atualiza o Firebase e avisa
                 Alert.alert('Compartilhamento Desativado', 'A tarefa de localização já não estava ativa.');
             }
-            // Ao desativar o compartilhamento, também limpa a localização no Firebase
+            // Limpa os dados de localização do usuário no Firebase
             await set(ref(database, `localizacoes/${usuarioId}`), { compartilhando: false, latitude: null, longitude: null, timestamp: Date.now(), nome: nome });
         }
     } catch (error) {
         console.error("Erro ao alternar compartilhamento:", error);
         Alert.alert("Erro", "Falha ao alterar status de compartilhamento.");
-        setCompartilhando(!valor); // Reverte o switch no UI
-        try { await set(userStatusRef, !valor); } catch (dbError) { /* ignore */ }
+        await set(userStatusRef, !valor); 
+    } finally {
+        checkLocationAndTaskStatus(); 
     }
   };
 
@@ -476,7 +611,7 @@ const ConfiguracoesScreen = () => {
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>Compartilhamento de Localização</Text>
             <View style={styles.settingItem}>
-              <Text style={styles.settingLabel}>Compartilhar minha localização - É necessário ativar a localização em segundo plano!</Text>
+              <Text style={styles.settingLabel}>Ativar compartilhamento de localização</Text>
               <Switch
                 value={compartilhando}
                 onValueChange={toggleCompartilhamento}
@@ -485,7 +620,20 @@ const ConfiguracoesScreen = () => {
               />
             </View>
             <Text style={styles.settingDescription}>
-              Sua localização será enviada ao servidor quando as condições de evento (proximidade e horário) forem atendidas.
+              Seu aplicativo enviará sua localização ao servidor quando você ativar.
+            </Text>
+
+            <View style={styles.settingItem}>
+              <Text style={styles.settingLabel}>Manter localização em segundo plano (Permitir o tempo todo)</Text>
+              <Switch
+                value={hasBackgroundPermission}
+                onValueChange={toggleBackgroundPermission}
+                thumbColor={hasBackgroundPermission ? '#2196F3' : '#f4f3f4'}
+                trackColor={{ false: '#ccc', true: '#90CAF9' }}
+              />
+            </View>
+            <Text style={styles.settingDescription}>
+              Para que o compartilhamento funcione mesmo quando o aplicativo estiver fechado, é necessário conceder a permissão "Permitir o tempo todo" nas configurações do seu dispositivo.
             </Text>
           </View>
           
