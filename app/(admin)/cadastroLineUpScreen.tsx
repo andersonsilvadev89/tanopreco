@@ -14,6 +14,7 @@ import {
   Keyboard,
   StyleSheet,
   ImageBackground,
+  FlatList, // Importar FlatList
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, push, set, onValue, remove, update } from 'firebase/database';
@@ -29,8 +30,6 @@ import { checkAndDownloadImages } from '../../utils/imageManager'; // Ajuste o c
 
 // --- URL padrão de fallback para o fundo local ---
 const defaultFundoLocal = require('../../assets/images/fundo.png');
-// REMOVIDO: const fundo = require('../../assets/images/fundo.png'); // Não é mais necessário
-
 
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dz37srew5/image/upload';
 const UPLOAD_PRESET = 'expocrato';
@@ -64,12 +63,15 @@ export default function CadastroLineUp() {
   const [duracao, setDuracao] = useState('15 minutos');
   const [lineUpItens, setLineUpItens] = useState<LineUpItem[]>([]);
   const [loadingUpload, setLoadingUpload] = useState(false);
-  const [carregandoLocais, setCarregandoLocais] = useState(true); // Carrega os locais da tela
+  const [carregandoLocais, setCarregandoLocais] = useState(true);
   const [editandoId, setEditandoId] = useState<string | null>(null);
 
   // --- Novos estados para o carregamento da imagem de fundo dinâmica ---
   const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+
+  // --- Novo estado para controlar a visibilidade da lista de itens ---
+  const [listaVisivel, setListaVisivel] = useState(true); // Começa visível por padrão
 
   const scrollRef = useRef<ScrollView>(null);
   const userId = auth.currentUser?.uid;
@@ -102,7 +104,7 @@ export default function CadastroLineUp() {
       const lista: LineUpItem[] = data
         ? Object.entries(data).map(([id, valor]: any) => ({ id, ...valor }))
         : [];
-      setLineUpItens(lista.reverse());
+      setLineUpItens(lista.reverse()); // Mantido o reverse para a ordem de exibição
     });
 
     const locaisRef = ref(database, 'locais');
@@ -112,7 +114,7 @@ export default function CadastroLineUp() {
         ? Object.entries(data).map(([id, valor]: any) => ({ id, ...valor }))
         : [];
       setLocaisDisponiveis(lista);
-      setCarregandoLocais(false); // Finaliza o carregamento dos locais
+      setCarregandoLocais(false);
     }, (error) => {
       console.error("Erro ao carregar locais:", error);
       Alert.alert("Erro", "Não foi possível carregar os locais disponíveis.");
@@ -363,174 +365,189 @@ export default function CadastroLineUp() {
   };
 
   // --- Condição de carregamento geral: Espera os locais e o fundo do app ---
-  // A tela principal só é renderizada depois que ambos estão prontos.
-  if (carregandoLocais || !fundoAppReady) { // <-- Inclui fundoAppReady
+  if (carregandoLocais || !fundoAppReady) {
     return (
       <ImageBackground source={currentFundoSource} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
-        <Text style={styles.loadingText}>Carregando locais...</Text>
+        <Text style={styles.loadingText}>Carregando dados...</Text>
       </ImageBackground>
     );
   }
 
   return (
     <ImageBackground
-      source={currentFundoSource} // USANDO O FUNDO DINÂMICO AQUI
+      source={currentFundoSource}
       style={styles.backgroundImage}
     >
       <AdBanner />
       <KeyboardAvoidingView
-          style={{ flex: 1 }}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <ScrollView
+          ref={scrollRef}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={styles.scrollViewContent}
         >
-          <ScrollView
-            ref={scrollRef}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={styles.scrollViewContent}
-          >
-            <View style={styles.formContainer}>
-              <Text style={styles.title}>Cadastro da LineUp</Text>
-              
-              <TouchableOpacity
-                onPress={escolherImagem}
-                accessible
-                accessibilityLabel="Escolher imagem da banda"
-                style={styles.imageInputTouchable}
-              >
-                {loadingUpload ? (
-                  <View style={styles.imagePlaceholder}>
-                    <ActivityIndicator size="large" color="#000" />
-                    <Text style={styles.imagePlaceholderText}>Enviando imagem...</Text>
-                  </View>
-                ) : (imagemUri || imagemUrl) ? (
-                  <Image source={{ uri: imagemUri || imagemUrl }} style={styles.fullWidthImage} />
-                ) : (
-                  <View style={styles.imagePlaceholder}>
-                    <Text style={styles.imagePlaceholderText}>Toque para selecionar imagem</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+          <View style={styles.formContainer}>
+            <Text style={styles.title}>Cadastro da LineUp</Text>
 
-              <Text>Nome da Banda *</Text>
-              <TextInput
-                value={nomeBanda}
-                onChangeText={setNomeBanda}
-                placeholder="Nome da banda ou artista"
-                style={styles.input}
-                accessibilityLabel="Campo para inserir o nome da banda"
-              />
-
-              <Text>Data *</Text>
-              <TextInputMask
-                type={'datetime'}
-                options={{
-                  format: 'DD/MM/YYYY',
-                }}
-                value={dataMomento}
-                onChangeText={(text) => {
-                  setDataMomento(text);
-                }}
-                placeholder="DD/MM/AAAA"
-                style={styles.input}
-                keyboardType="number-pad"
-                accessibilityLabel="Campo para inserir a data do evento no formato DD/MM/AAAA"
-                onBlur={() => {
-                  if (dataMomento.length === 10 && !validarData(dataMomento)) {
-                    Alert.alert('Atenção', 'A data digitada não é válida.');
-                  }
-                }}
-              />
-
-              <Text>Hora de Início *</Text>
-              <TextInputMask
-                type={'datetime'}
-                options={{
-                  format: 'HH:MM',
-                }}
-                value={horaInicio}
-                onChangeText={(text) => {
-                  setHoraInicio(text);
-                }}
-                placeholder="HH:MM"
-                style={styles.input}
-                keyboardType="number-pad"
-                accessibilityLabel="Campo para inserir a hora de início no formato HH:MM (24 horas)"
-                onBlur={() => {
-                  if (horaInicio.length === 5 && !validarHora(horaInicio)) {
-                    Alert.alert('Atenção', 'A hora digitada não é válida (formato 24 horas).');
-                  }
-                }}
-              />
-
-              <Text>Local *</Text>
-              {carregandoLocais ? (
-                <ActivityIndicator size="small" color="#0000ff" style={{ marginVertical: 10 }} />
+            <TouchableOpacity
+              onPress={escolherImagem}
+              accessible
+              accessibilityLabel="Escolher imagem da banda"
+              style={styles.imageInputTouchable}
+            >
+              {loadingUpload ? (
+                <View style={styles.imagePlaceholder}>
+                  <ActivityIndicator size="large" color="#000" />
+                  <Text style={styles.imagePlaceholderText}>Enviando imagem...</Text>
+                </View>
+              ) : (imagemUri || imagemUrl) ? (
+                <Image source={{ uri: imagemUri || imagemUrl }} style={styles.fullWidthImage} />
               ) : (
-                <View style={styles.pickerContainer}>
-                  <Picker
-                    selectedValue={localSelecionado}
-                    onValueChange={handleLocalChange}
-                    accessibilityLabel="Selecione o local da apresentação"
-                  >
-                    <Picker.Item label="Selecione um local" value="" enabled={false} />
-                    {locaisDisponiveis.map((loc) => (
-                      <Picker.Item key={loc.id} label={loc.descricao} value={loc.descricao} />
-                    ))}
-                    <Picker.Item label="Adicionar Novo Local..." value="adicionar_novo_local" />
-                  </Picker>
+                <View style={styles.imagePlaceholder}>
+                  <Text style={styles.imagePlaceholderText}>Toque para selecionar imagem</Text>
                 </View>
               )}
+            </TouchableOpacity>
 
-              <Text>Tempo de Duração *</Text>
+            <Text>Nome da Banda *</Text>
+            <TextInput
+              value={nomeBanda}
+              onChangeText={setNomeBanda}
+              placeholder="Nome da banda ou artista"
+              style={styles.input}
+              accessibilityLabel="Campo para inserir o nome da banda"
+            />
+
+            <Text>Data *</Text>
+            <TextInputMask
+              type={'datetime'}
+              options={{
+                format: 'DD/MM/YYYY',
+              }}
+              value={dataMomento}
+              onChangeText={(text) => {
+                setDataMomento(text);
+              }}
+              placeholder="DD/MM/AAAA"
+              style={styles.input}
+              keyboardType="number-pad"
+              accessibilityLabel="Campo para inserir a data do evento no formato DD/MM/AAAA"
+              onBlur={() => {
+                if (dataMomento.length === 10 && !validarData(dataMomento)) {
+                  Alert.alert('Atenção', 'A data digitada não é válida.');
+                }
+              }}
+            />
+
+            <Text>Hora de Início *</Text>
+            <TextInputMask
+              type={'datetime'}
+              options={{
+                format: 'HH:MM',
+              }}
+              value={horaInicio}
+              onChangeText={(text) => {
+                setHoraInicio(text);
+              }}
+              placeholder="HH:MM"
+              style={styles.input}
+              keyboardType="number-pad"
+              accessibilityLabel="Campo para inserir a hora de início no formato HH:MM (24 horas)"
+              onBlur={() => {
+                if (horaInicio.length === 5 && !validarHora(horaInicio)) {
+                  Alert.alert('Atenção', 'A hora digitada não é válida (formato 24 horas).');
+                }
+              }}
+            />
+
+            <Text>Local *</Text>
+            {carregandoLocais ? (
+              <ActivityIndicator size="small" color="#0000ff" style={{ marginVertical: 10 }} />
+            ) : (
               <View style={styles.pickerContainer}>
                 <Picker
-                  selectedValue={duracao}
-                  onValueChange={(itemValue) => setDuracao(itemValue)}
-                  accessibilityLabel="Selecione o tempo de duração da apresentação"
+                  selectedValue={localSelecionado}
+                  onValueChange={handleLocalChange}
+                  accessibilityLabel="Selecione o local da apresentação"
                 >
-                  {duracaoOptions.map((item, index) => (
-                    <Picker.Item key={index} label={item} value={item} />
+                  <Picker.Item label="Selecione um local" value="" enabled={false} />
+                  {locaisDisponiveis.map((loc) => (
+                    <Picker.Item key={loc.id} label={loc.descricao} value={loc.descricao} />
                   ))}
+                  <Picker.Item label="Adicionar Novo Local..." value="adicionar_novo_local" />
                 </Picker>
               </View>
+            )}
 
-              <Button title={editandoId ? "Atualizar Item" : "Salvar Item"} onPress={salvarLineUpItem} accessibilityLabel="Botão para salvar ou atualizar o item da LineUp" />
-              {editandoId && (
-                <TouchableOpacity style={styles.cancelButton} onPress={limparFormulario}>
-                  <Text style={styles.cancelButtonText}>Cancelar Edição</Text>
-                </TouchableOpacity>
-              )}
+            <Text>Tempo de Duração *</Text>
+            <View style={styles.pickerContainer}>
+              <Picker
+                selectedValue={duracao}
+                onValueChange={(itemValue) => setDuracao(itemValue)}
+                accessibilityLabel="Selecione o tempo de duração da apresentação"
+              >
+                {duracaoOptions.map((item, index) => (
+                  <Picker.Item key={index} label={item} value={item} />
+                ))}
+              </Picker>
             </View>
 
-            <View style={styles.separator} />
+            <Button title={editandoId ? "Atualizar Item" : "Salvar Item"} onPress={salvarLineUpItem} accessibilityLabel="Botão para salvar ou atualizar o item da LineUp" />
+            {editandoId && (
+              <TouchableOpacity style={styles.cancelButton} onPress={limparFormulario}>
+                <Text style={styles.cancelButtonText}>Cancelar Edição</Text>
+              </TouchableOpacity>
+            )}
+          </View>
 
+          <View style={styles.separator} />
+
+          <TouchableOpacity
+            style={styles.toggleButton}
+            onPress={() => setListaVisivel(!listaVisivel)}
+            accessibilityLabel={`Clique para ${listaVisivel ? 'esconder' : 'mostrar'} os itens da LineUp`}
+          >
+            <Text style={styles.toggleButtonText}>
+              {listaVisivel ? 'Esconder Itens Cadastrados' : 'Mostrar Itens Cadastrados'}
+            </Text>
+          </TouchableOpacity>
+
+          {listaVisivel && (
             <View style={styles.listContainer}>
               <Text style={styles.sectionTitle}>Itens da LineUp Cadastrados</Text>
               {lineUpItens.length === 0 ? (
                 <Text style={styles.emptyText}>Nenhum item cadastrado na LineUp.</Text>
               ) : (
-                lineUpItens.map((item) => (
-                  <View key={item.id} style={styles.listItem}>
-                    {item.imagemUrl && (
-                      <Image source={{ uri: item.imagemUrl }} style={styles.listItemImage} />
-                    )}
-                    <View style={styles.listItemDetails}>
-                      <Text style={styles.listItemTextBold}>{item.nomeBanda}</Text>
-                      <Text style={styles.listItemText}>Data: {item.dataMomento}</Text>
-                      <Text style={styles.listItemText}>Hora: {item.horaInicio}</Text>
-                      <Text style={styles.listItemText}>Local: {item.local}</Text>
-                      <Text style={styles.listItemText}>Duração: {item.duracao}</Text>
+                <FlatList
+                  data={lineUpItens}
+                  keyExtractor={(item) => item.id!}
+                  renderItem={({ item }) => (
+                    <View style={styles.listItem}>
+                      {item.imagemUrl && (
+                        <Image source={{ uri: item.imagemUrl }} style={styles.listItemImage} />
+                      )}
+                      <View style={styles.listItemDetails}>
+                        <Text style={styles.listItemTextBold}>{item.nomeBanda}</Text>
+                        <Text style={styles.listItemText}>Data: {item.dataMomento}</Text>
+                        <Text style={styles.listItemText}>Hora: {item.horaInicio}</Text>
+                        <Text style={styles.listItemText}>Local: {item.local}</Text>
+                        <Text style={styles.listItemText}>Duração: {item.duracao}</Text>
+                      </View>
+                      <View style={styles.listItemButtons}>
+                        <Button title="Editar" onPress={() => editarLineUpItem(item)} accessibilityLabel={`Editar o item ${item.nomeBanda}`} />
+                        <Button title="Excluir" onPress={() => excluirLineUpItem(item.id!)} color="red" accessibilityLabel={`Excluir o item ${item.nomeBanda}`} />
+                      </View>
                     </View>
-                    <View style={styles.listItemButtons}>
-                      <Button title="Editar" onPress={() => editarLineUpItem(item)} accessibilityLabel={`Editar o item ${item.nomeBanda}`} />
-                      <Button title="Excluir" onPress={() => excluirLineUpItem(item.id!)} color="red" accessibilityLabel={`Excluir o item ${item.nomeBanda}`} />
-                    </View>
-                  </View>
-                ))
+                  )}
+                />
               )}
             </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ImageBackground>
   );
 }
@@ -672,14 +689,26 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    // O fundo já será a imagem carregada dinamicamente, ou o fallback local
   },
   loadingText: {
     marginTop: 10,
     color: '#007BFF',
     fontSize: 16,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)', // Adicionado sombra para melhor legibilidade no fundo dinâmico
+    textShadowColor: 'rgba(0, 0, 0, 0.75)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
+  },
+  // Novos estilos para o botão de alternar a lista
+  toggleButton: {
+    backgroundColor: '#007BFF', // Azul
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginVertical: 10,
+  },
+  toggleButtonText: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });

@@ -1,3 +1,4 @@
+// app.config.js
 export default {
   expo: {
     name: "Assistente de Eventos",
@@ -14,18 +15,16 @@ export default {
     scheme: "stoantoniobarbalhacliente",
     userInterfaceStyle: "automatic",
     newArchEnabled: false,
-    // --- INÍCIO DA ADIÇÃO PARA UPDATES OTA ---
     updates: {
-      url: "https://u.expo.dev/c152364f-e543-4f21-9ed3-cfc5163afa10" // Seu Project ID do EAS
+      url: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ? `https://u.expo.dev/${process.env.EXPO_PUBLIC_EAS_PROJECT_ID}` : undefined
     },
     runtimeVersion: {
-      policy: "appVersion" // Recomendado para a maioria dos casos
+      policy: "appVersion"
     },
-    // --- FIM DA ADIÇÃO PARA UPDATES OTA ---
     android: {
       config: {
         googleMaps: {
-          apiKey: "AIzaSyDOY_dZzTNgjeMX2z7ssWi755eznnBO68o"
+          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
         },
       },
       versionCode: 25,
@@ -41,7 +40,6 @@ export default {
       ],
       package: "com.ae.stoantoniobarbalhacliente",
       googleServicesFile: "./google-services.json",
-      // --- INÍCIO DA ADIÇÃO DAS QUERIES ---
       queries: [
         {
           intent: {
@@ -56,13 +54,12 @@ export default {
           package: "com.instagram.android"
         }
       ]
-      // --- FIM DA ADIÇÃO DAS QUERIES ---
     },
     ios: {
       bundleIdentifier: "com.ae.stoantoniobarbalhacliente",
       buildNumber: "1",
       config: {
-        googleMapsApiKey: "AIzaSyBY4ZBNVZ1VkyqJqY_M7u3LPdT6Ielcuw0",
+        googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       },
       googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
@@ -96,14 +93,16 @@ export default {
       typedRoutes: true
     },
     extra: {
-      "firebaseApiKey": "AIzaSyCyKuYJzr_0w-pw5Ehmrf8i7TPRAxtbLbM",
-      "firebaseAuthDomain": "stoantoniobarbalhacliente.firebaseapp.com",
-      "firebaseProjectId": "stoantoniobarbalhacliente",
-      router: {
-        origin: false
-      },
-      eas: {
-        projectId: "c152364f-e543-4f21-9ed3-cfc5163afa10"
+      "firebaseApiKey": process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
+      "firebaseAuthDomain": process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+      "firebaseProjectId": process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
+      "firebaseStorageBucket": process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
+      "firebaseMessagingSenderId": process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+      "firebaseAppId": process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
+      "firebaseMeasurementId": process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
+      "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+      "eas": {
+        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID
       }
     },
     owner: "professor.anderson.a.silva"

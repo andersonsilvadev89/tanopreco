@@ -450,40 +450,45 @@ export default function VisualizarProdutosServicos() {
                       (p) =>
                         p.localizacao?.latitude && p.localizacao?.longitude
                     ) // Filtra apenas produtos com localização
-                    .map((produto) => (
-                      <Marker
-                        key={produto.id + produto.empresaId + "_mapmarker"}
-                        coordinate={produto.localizacao!}
-                        title={produto.nome}
-                        description={produto.descricao.substring(0, 40) + "..."}
-                        // Condição para definir a cor do pino
-                        pinColor={
-                          selectedLocation &&
-                          produto.empresaId === selectedLocation.empresaId &&
-                          produto.id === selectedLocation.produtoId
-                            ? "red" // Pino vermelho para o item selecionado
-                            : "yellow" // Pino amarelo para os outros
-                        }
-                        zIndex={
-                          selectedLocation &&
-                          produto.empresaId === selectedLocation.empresaId &&
-                          produto.id === selectedLocation.produtoId
-                            ? 3 // Garante que o pino vermelho fique por cima
-                            : 1
-                        }
-                      >
-                        <Callout tooltip>
-                          <View style={styles.calloutView}>
-                            <Text style={styles.calloutTitle}>
-                              {produto.nome}
-                            </Text>
-                            <Text style={styles.calloutDescription}>
-                              {produto.descricao.substring(0, 60) + "..."}
-                            </Text>
-                          </View>
-                        </Callout>
-                      </Marker>
-                    ))}
+                    .map((produto) => {
+                      const isSelected =
+                        selectedLocation &&
+                        produto.empresaId === selectedLocation.empresaId &&
+                        produto.id === selectedLocation.produtoId;
+                      
+                      return (
+                        <Marker
+                          key={produto.id + produto.empresaId + "_mapmarker"}
+                          coordinate={produto.localizacao!}
+                          title={produto.nome}
+                          description={produto.descricao.substring(0, 40) + "..."}
+                          pinColor={
+                            isSelected ? 'red' : 'blue' // pinColor para Android
+                          }
+                          zIndex={isSelected ? 3 : 1}
+                        >
+                          {Platform.OS === 'ios' ? (
+                            <Image
+                              source={{ uri: isSelected ? 'https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png' : 'https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png' }}
+                              style={[ styles.markerImageBase, isSelected && styles.selectedMarkerImage ]}
+                              resizeMode="contain"
+                            />
+                          ) : (
+                            null // No Android, o pinColor é usado
+                          )}
+                          <Callout tooltip>
+                            <View style={styles.calloutView}>
+                              <Text style={styles.calloutTitle}>
+                                {produto.nome}
+                              </Text>
+                              <Text style={styles.calloutDescription}>
+                                {produto.descricao.substring(0, 60) + "..."}
+                              </Text>
+                            </View>
+                          </Callout>
+                        </Marker>
+                      );
+                    })}
                 </MapView>
               ) : (
                 <View style={styles.mapLoadingContainer}>
@@ -703,5 +708,14 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
     fontSize: 10,
+  },
+  // Novos estilos para as imagens dos marcadores
+  markerImageBase: {
+    width: 28, // Tamanho base do marcador
+    height: 28,
+  },
+  selectedMarkerImage: {
+    width: 38, // Tamanho maior para o marcador selecionado
+    height: 38,
   },
 });

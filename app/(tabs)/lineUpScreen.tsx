@@ -416,7 +416,7 @@ const LineUpScreen = () => {
                                             coordinate={{ latitude: localDoEvento.latitude!, longitude: localDoEvento.longitude! }}
                                             title={evento.nomeBanda}
                                             description={`${evento.local} - ${evento.horaInicio}`}
-                                            pinColor={isSelected ? 'rgba(0, 122, 255, 1)' : 'rgba(255, 59, 48, 1)'}
+                                            pinColor={isSelected ? 'rgba(255, 59, 48, 1)' : 'rgba(0, 122, 255, 1)'}
                                             zIndex={isSelected ? 1 : 0}
                                         >
                                             {Platform.OS === 'ios' ? (
