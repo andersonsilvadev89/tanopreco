@@ -28,7 +28,11 @@
     # macOS
     .DS_Store
     *.pem
-
+    
+    # Excluir arquivos de configuração sensíveis
+    google-services.json
+    GoogleService-Info.plist
+    
     # local env files
     .env*.local
     .env

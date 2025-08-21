@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.161717540109-celcbtm24pemqrce1n2cbhiue390tt5q</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyBY4ZBNVZ1VkyqJqY_M7u3LPdT6Ielcuw0</string>
+	<key>GCM_SENDER_ID</key>
+	<string>161717540109</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.ae.stoantoniobarbalhacliente</string>
+	<key>PROJECT_ID</key>
+	<string>stoantoniobarbalhacliente</string>
+	<key>STORAGE_BUCKET</key>
+	<string>stoantoniobarbalhacliente.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:161717540109:ios:be3ecb3edc1e0fd1704c44</string>
+	<key>DATABASE_URL</key>
+	<string>https://stoantoniobarbalhacliente-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>
