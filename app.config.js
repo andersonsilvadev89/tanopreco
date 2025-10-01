@@ -1,10 +1,10 @@
 // app.config.js
 export default {
   expo: {
-    name: "Assistente de Eventos",
-    slug: "petrolina",
+    name: "TaNoPreco",
+    slug: "TaNoPreco",
     platforms: ["android", "ios"],
-    version: "1.1.6",
+    version: "1.0.0",
     orientation: "portrait",
     icon: "./assets/images/icon.png",
     splash: {
@@ -27,7 +27,7 @@ export default {
           apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
         },
       },
-      versionCode: 25,
+      versionCode: 1,
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -38,7 +38,7 @@ export default {
         "ACCESS_BACKGROUND_LOCATION",
         "com.google.android.gms.permission.AD_ID"
       ],
-      package: "com.ae.stoantoniobarbalhacliente",
+      package: "com.tanopreco",
       googleServicesFile: "./google-services.json",
       queries: [
         {
@@ -56,7 +56,7 @@ export default {
       ]
     },
     ios: {
-      bundleIdentifier: "com.ae.stoantoniobarbalhacliente",
+      bundleIdentifier: "com.tanopreco",
       buildNumber: "1",
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
@@ -102,9 +102,9 @@ export default {
       "firebaseMeasurementId": process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
       "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       "eas": {
-        projectId: process.env.EXPO_PUBLIC_EAS_PROJECT_ID
+        projectId: "24f376e8-afe2-4c3e-bab9-035b5e089295"
       }
     },
-    owner: "professor.anderson.a.silva"
+    owner: "andersonsilva.dev89"
   }
 };

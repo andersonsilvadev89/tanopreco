@@ -19,12 +19,10 @@ export default function AuthLayout() {
   if (loading) return null;
 
   return user ? (
-    <Redirect href="/(tabs)/homeScreen" />
+    <Redirect href="/(empresa)/homeScreen" />
   ) : (
     <Stack
-      screenOptions={{
-        headerShown: false,
-      }}
+      screenOptions={{headerShown: false}}
     />
   );
 }

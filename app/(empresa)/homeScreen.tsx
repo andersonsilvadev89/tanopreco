@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -7,17 +7,24 @@ import {
     ImageBackground,
     SafeAreaView,
     ActivityIndicator,
-    ScrollView, // Adicionado ScrollView
+    ScrollView,
+    Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import {
-    Settings,
-    LogOut,
-    Sandwich,
-} from 'lucide-react-native';
-import AdBanner from '../components/AdBanner';
+    FontAwesome5
+} from '@expo/vector-icons';
+import {
+    MaterialCommunityIcons
+} from '@expo/vector-icons';
 
+import AdBanner from '../components/AdBanner';
+import { signOut } from "firebase/auth";
 import { checkAndDownloadImages } from '../../utils/imageManager';
+import { auth } from '@/firebaseConfig';
+import Header from '../components/Header';
+import { ref, onValue } from 'firebase/database';
+import { database } from '@/firebaseConfig';
 
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
@@ -26,6 +33,57 @@ const HomeScreen = () => {
 
     const [fundoAppReady, setFundoAppReady] = useState(false);
     const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
+    const [userName, setUserName] = useState('');
+
+    const confirmarLogout = () => {
+        Alert.alert(
+            "Sair da Conta",
+            "Tem certeza que deseja sair da sua conta?",
+            [
+                { text: "Cancelar", style: "cancel" },
+                {
+                    text: "Sair",
+                    style: "destructive",
+                    onPress: async () => {
+                        try {
+                            await signOut(auth);
+                        } catch (error) {
+                            console.error("Erro ao fazer logout: ", error);
+                            Alert.alert(
+                                "Erro ao Sair",
+                                "Não foi possível sair. Tente novamente."
+                            );
+                        }
+                    },
+                },
+            ],
+            { cancelable: true }
+        );
+    };
+
+    useEffect(() => {
+        const user = auth.currentUser;
+
+        if (user) {
+            const userRef = ref(database, `usuariosEmpresa/${user.uid}`);
+            
+            const unsubscribe = onValue(userRef, (snapshot) => {
+                if (snapshot.exists()) {
+                    setUserName(snapshot.val().nome);
+                } else {
+                    setUserName("Usuário");
+                    console.log("Documento do usuário não encontrado no Realtime Database!");
+                }
+            }, (error) => {
+                console.error("Erro ao buscar nome do usuário:", error);
+                setUserName("Usuário");
+            });
+
+            return () => unsubscribe();
+        } else {
+            setUserName("Usuário");
+        }
+    }, []);
 
     useEffect(() => {
         const loadFundoImage = async () => {
@@ -43,9 +101,8 @@ const HomeScreen = () => {
     }, []);
 
     const options = [
-        { label: 'Produtos e Serviços', icon: Sandwich, path: '/(empresa)/crudProdutosServicos' },
-        { label: 'Configurações', icon: Settings, path: '/(empresa)/configuracoesScreen' },
-        
+        { label: 'Produtos e Serviços', iconName: 'utensils', iconFamily: FontAwesome5, path: 'crudProdutosServicos' },
+        { label: 'Configurações', iconName: 'cog', iconFamily: FontAwesome5, path: 'configuracoesScreen' },
     ];
 
     if (!fundoAppReady) {
@@ -59,78 +116,60 @@ const HomeScreen = () => {
 
     return (
         <ImageBackground source={currentFundoSource} style={styles.background} resizeMode="cover">
-            <AdBanner />
-
+            <Header
+                title="Área Empresarial"
+                nomeUsuario={userName}
+                onPressOfertas={() => navigate('/(tabs)/homeScreen')}
+                onPressLogout={confirmarLogout}
+            />
             <SafeAreaView style={styles.safeAreaContent}>
                 <ScrollView contentContainerStyle={styles.scrollViewContent}>
-                    <Text style={styles.title}>Área Empresarial</Text>
-
                     <View style={styles.gridContainer}>
-                        {options.map(({ label, icon: Icon, path }, index) => (
+                        {options.map(({ label, iconName, iconFamily: Icon, path }, index) => (
                             <TouchableOpacity
                                 key={index}
                                 style={styles.card}
                                 activeOpacity={0.8}
                                 onPress={() => navigate(path)}
                             >
-                                <Icon size={32} color="#007aff" />
+                                <Icon name={iconName} size={32} color="#007aff" />
                                 <Text style={styles.cardText}>{label}</Text>
                             </TouchableOpacity>
                         ))}
                     </View>
                 </ScrollView>
-
-                <TouchableOpacity
-                    style={styles.exitButton}
-                    activeOpacity={0.8}
-                    onPress={() => router.replace('/(tabs)/homeScreen')}
-                >
-                    <LogOut size={24} color="#000" />
-                    <Text style={styles.exitButtonText}>Sair da Área Empresarial</Text>
-                </TouchableOpacity>
             </SafeAreaView>
         </ImageBackground>
     );
 };
 
-// --- ESTILOS ATUALIZADOS ---
 const styles = StyleSheet.create({
     background: {
         flex: 1,
+        marginBottom: -33
     },
-    // Removido justifyContent: 'space-between' do safeArea original
     safeAreaContent: {
         flex: 1,
-        paddingHorizontal: 20, // Mantém o padding horizontal
-        // Remove padding top/bottom que serão tratados pelo ScrollView ou AdBanner/exitButton
+        paddingHorizontal: 20,
     },
-    scrollViewContent: { // Estilo para o contentContainerStyle do ScrollView
-        paddingVertical: 20, // Adiciona padding vertical ao conteúdo rolavel
-        paddingBottom: 10, // Adicione um pequeno padding ao final para não colar no botão de sair
-        flexGrow: 1, // Garante que o ScrollView possa crescer e ocupar espaço
-    },
-    title: {
-        fontSize: 32,
-        fontWeight: 'bold',
-        color: '#FFF',
-        textAlign: 'center',
-        textShadowColor: 'rgba(0, 0, 0, 0.5)',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 3,
-        marginBottom: 20, // Adicionado marginBottom para separar do grid
+    scrollViewContent: {
+        paddingVertical: 20,
+        paddingBottom: 10,
+        flexGrow: 1,
     },
     gridContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
+        flexDirection: "column",
         justifyContent: 'center',
         alignItems: 'center',
         gap: 15,
+        height: '100%',
     },
     card: {
         backgroundColor: 'rgba(255,255,255,0.9)',
-        borderRadius: 20,
+        borderRadius: 100,
         width: '45%',
         aspectRatio: 1,
+        alignSelf: 'center',
         alignItems: 'center',
         justifyContent: 'center',
         padding: 10,
@@ -156,7 +195,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         width: '100%',
         marginTop: 10,
-        marginBottom: 20, // Adiciona um padding inferior para o botão
+        marginBottom: 20,
     },
     exitButtonText: {
         fontSize: 16,

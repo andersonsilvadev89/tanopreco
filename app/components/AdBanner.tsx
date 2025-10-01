@@ -149,7 +149,6 @@ const AdBanner = () => {
 
 const styles = StyleSheet.create({
   adBanner: {
-    backgroundColor: "rgba(220,220,220,0.7)",
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",

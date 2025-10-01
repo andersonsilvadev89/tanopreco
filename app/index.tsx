@@ -1,10 +1,6 @@
 import { Redirect } from "expo-router";
 import { useAuth } from "../context/AuthContext";
-import {
-  ActivityIndicator,
-  View,
-  Text,
-} from "react-native";
+import { ActivityIndicator, View, Text, Alert } from "react-native";
 import React, { useEffect, useState } from "react";
 import * as Updates from "expo-updates";
 
@@ -58,8 +54,7 @@ export default function Index() {
   }
 
   if (!user) {
-    return <Redirect href="/(auth)/loginScreen" />;
+    return <Redirect href="/(tabs)/homeScreen" />;
   }
-
-  return <Redirect href="/(tabs)/homeScreen" />;
+  return <Redirect href="/(empresa)/homeScreen" />;
 }

@@ -12,9 +12,9 @@ import {
   ScrollView,
   Dimensions,
   Platform,
-  Keyboard, // Importar Keyboard para dispensar
+  Keyboard,
   KeyboardAvoidingView,
-  TouchableWithoutFeedback, // Importar TouchableWithoutFeedback
+  TouchableWithoutFeedback,
 } from 'react-native';
 import { auth, database } from '../../firebaseConfig';
 import {
@@ -23,8 +23,7 @@ import {
 } from 'firebase/auth';
 import { router } from 'expo-router';
 import { ref, get } from 'firebase/database';
-import { Eye, EyeOff } from 'lucide-react-native';
-
+import { Feather } from "@expo/vector-icons";
 import { checkAndDownloadImages } from '../../utils/imageManager';
 
 const defaultLogoLocal = require('../../assets/images/logoEvento.png');
@@ -71,14 +70,13 @@ const LoginScreen = ({ navigation }: any) => {
 
         setCurrentLogoSource(logoUrl ? { uri: logoUrl } : defaultLogoLocal);
         setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
-
       } catch (error) {
         console.error("Erro ao inicializar imagens do app na LoginScreen:", error);
         Alert.alert("Erro de Carregamento", "Não foi possível carregar alguns recursos visuais do aplicativo.");
         setCurrentLogoSource(defaultLogoLocal);
         setCurrentFundoSource(defaultFundoLocal);
       } finally {
-        setAppImagesReady(true); 
+        setAppImagesReady(true);
       }
     };
 
@@ -119,7 +117,7 @@ const LoginScreen = ({ navigation }: any) => {
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const loggedUser = userCredential.user;
-      const userRef = ref(database, `usuarios/${loggedUser.uid}`);
+      const userRef = ref(database, `usuariosEmpresa/${loggedUser.uid}`);
       const snapshot = await get(userRef);
       const userData = snapshot.val();
 
@@ -164,7 +162,6 @@ const LoginScreen = ({ navigation }: any) => {
     }
   };
 
-  // --- Lógica do Carrossel de Patrocinadores (mantida) ---
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollOffsetRef = useRef(0);
   const animationFrameIdRef = useRef<number | null>(null);
@@ -230,7 +227,6 @@ const LoginScreen = ({ navigation }: any) => {
     }, 100);
   };
 
-  // --- Condição de carregamento inicial para as imagens e autenticação ---
   if (!appImagesReady || authLoading) {
     return (
       <ImageBackground source={currentFundoSource} style={styles.loadingContainer}>
@@ -241,14 +237,11 @@ const LoginScreen = ({ navigation }: any) => {
   }
 
   return (
-    <ImageBackground
-      source={currentFundoSource}
-      style={styles.background}
-    >
+    <ImageBackground source={currentFundoSource} style={styles.background}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined} // 'padding' é ideal para iOS
-          style={styles.overlay} // Aplica a KeyboardAvoidingView ao overlay principal
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.overlay}
         >
           <View style={styles.logoContainer}>
             <Image
@@ -258,7 +251,7 @@ const LoginScreen = ({ navigation }: any) => {
             />
           </View>
 
-          <View style={styles.container}>
+          <View style={styles.formContainer}>
             <TextInput
               style={styles.input}
               placeholder="Email"
@@ -266,9 +259,8 @@ const LoginScreen = ({ navigation }: any) => {
               onChangeText={setEmail}
               keyboardType="email-address"
               autoCapitalize="none"
-              // Adicionado onSubmitEditing para tentar login ao pressionar 'Enter' no teclado
-              onSubmitEditing={handleLogin} 
-              returnKeyType="next" // Para facilitar a navegação para o próximo campo
+              onSubmitEditing={handleLogin}
+              returnKeyType="next"
             />
             <View style={styles.passwordContainer}>
               <TextInput
@@ -277,15 +269,14 @@ const LoginScreen = ({ navigation }: any) => {
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!mostrarSenha}
-                // Adicionado onSubmitEditing para tentar login ao pressionar 'Enter' no teclado
-                onSubmitEditing={handleLogin} 
-                returnKeyType="done" // Indica que este é o último campo antes de "Done" ou "Entrar"
+                onSubmitEditing={handleLogin}
+                returnKeyType="done"
               />
               <TouchableOpacity onPress={toggleMostrarSenha} style={styles.eyeIcon}>
                 {mostrarSenha ? (
-                  <EyeOff size={24} color="#888" />
+                  <Feather name="eye-off" size={24} color="#888" />
                 ) : (
-                  <Eye size={24} color="#888" />
+                  <Feather name="eye" size={24} color="#888" />
                 )}
               </TouchableOpacity>
             </View>
@@ -297,7 +288,7 @@ const LoginScreen = ({ navigation }: any) => {
               onPress={handleLogin}
               disabled={loading}
             >
-              {loading && !sponsorsLoading ? ( // sponsorsLoading aqui não faz sentido, removi da condição de loading do botão
+              {loading && !sponsorsLoading ? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.entrarText}>Entrar</Text>
@@ -311,45 +302,10 @@ const LoginScreen = ({ navigation }: any) => {
             <TouchableOpacity onPress={() => router.push('/(auth)/cadastroScreen')} style={[styles.registerButton, loading && styles.buttonDisabled]} disabled={loading}>
               <Text style={styles.registerText}>Criar conta</Text>
             </TouchableOpacity>
-          </View>
-
-          <View style={styles.supportersContainer}>
-            <Text style={styles.supportersTitle}>Apoio:</Text>
-            {sponsorsLoading ? (
-              <ActivityIndicator style={{ marginTop: 15 }} color="#fff" size="small" />
-            ) : sponsorsError ? (
-              <Text style={styles.supporterErrorText}>{sponsorsError}</Text>
-            ) : sponsors.length > 0 ? (
-              <ScrollView
-                ref={scrollViewRef}
-                horizontal
-                showsHorizontalScrollIndicator={true}
-                style={styles.supportersLogos}
-                contentContainerStyle={styles.supportersLogosContent}
-                onContentSizeChange={(width, height) => {
-                  setMeasuredContentWidth(width);
-                }}
-                onScrollBeginDrag={handleSponsorsScrollBeginDrag}
-                onScrollEndDrag={handleSponsorsScrollEndDrag}
-                onMomentumScrollEnd={handleSponsorsMomentumScrollEnd}
-                scrollEventThrottle={16}
-              >
-                {sponsors.map((sponsor) => (
-                  sponsor.logoUrl ? (
-                    <Image
-                      key={sponsor.id}
-                      source={{ uri: sponsor.logoUrl }}
-                      style={[
-                        styles.supporterLogo,
-                      ]}
-                      onError={(e) => console.warn(`Erro ao carregar logo do patrocinador ${sponsor.id}: ${sponsor.logoUrl}`, e.nativeEvent.error)}
-                    />
-                  ) : null
-                ))}
-              </ScrollView>
-            ) : (
-              <Text style={styles.supporterText}>Seja nosso apoiador!</Text>
-            )}
+            
+            <TouchableOpacity onPress={() => router.push('/(tabs)/homeScreen')} style={[styles.homeButton, loading && styles.buttonDisabled]} disabled={loading}>
+              <Text style={styles.homeText}>Voltar para a área de ofertas!</Text>
+            </TouchableOpacity>
           </View>
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
@@ -363,9 +319,9 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.25)',
-    justifyContent: 'space-around', // Distribui o conteúdo verticalmente
-    paddingVertical: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.07)',
+    justifyContent: 'center', // Centraliza verticalmente
+    alignItems: 'center', // Centraliza horizontalmente
   },
   loadingContainer: {
     flex: 1,
@@ -379,20 +335,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   logoContainer: {
-    flex: 0.8, // Permite que o logo ocupe um pouco mais de espaço
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 20,
+    width: '90%', // Usa a largura do logo para centralizar
+    alignItems: 'center', // Centraliza a imagem dentro do container
+    marginBottom: 20, // Adiciona espaço entre a logo e o formulário
   },
   logo: {
-    width: '90%',
-    height: '90%',
+    width: '100%',
+    height: 300, // Defina uma altura fixa ou remova a altura para o resizeMode funcionar
   },
-  container: {
+  formContainer: {
     padding: 20,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     marginHorizontal: 20,
     borderRadius: 12,
+    width: '90%', // Mantém a largura do formulário
   },
   passwordContainer: {
     flexDirection: 'row',
@@ -467,56 +423,29 @@ const styles = StyleSheet.create({
     marginTop: 18,
     alignItems: 'center',
   },
+  homeButton: {
+    marginTop: 18,
+    backgroundColor: '#15aa2cff',
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 1.5,
+  },
+  homeText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
   registerText: {
     color: '#007BFF',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  supportersContainer: {
-    flex: 0.7,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  supportersTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginTop: 10,
-    marginBottom: 5,
-    textShadowColor: 'rgba(0, 0, 0, 0.5)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
-  },
-  supportersLogos: {
-    width: '100%',
-  },
-  supportersLogosContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 5,
-    paddingVertical: 5,
-  },
-  supporterText: {
-    color: '#E0E0E0',
-    fontSize: 14,
-    textAlign: 'center',
-    marginTop: 10,
-  },
-  supporterErrorText: {
-    color: '#FFD700',
-    fontSize: 14,
-    textAlign: 'center',
-    marginHorizontal: 15,
-    marginTop: 10,
-  },
-  supporterLogo: {
-    width: 120,
-    height: 120,
-    resizeMode: 'contain',
-    borderRadius: 10,
-    backgroundColor: '#fff',
-    marginLeft: 10,
-  }
 });
 
 export default LoginScreen;

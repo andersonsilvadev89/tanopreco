@@ -16,9 +16,6 @@ import { auth, database, adminDatabase } from '../../firebaseConfig';
 import { ref, get, push, serverTimestamp, onValue } from 'firebase/database'; // Adicionado onValue
 import AdBanner from '../components/AdBanner'; 
 
-// --- Importar o gerenciador de imagens para o fundo ---
-// import { checkAndDownloadImages } from '../../utils/imageManager'; 
-
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
 export default function Sobre() {
@@ -43,24 +40,7 @@ export default function Sobre() {
   const [fundoAppReady, setFundoAppReady] = useState(false);
   const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
-  // --- useEffect para carregar a imagem de fundo dinâmica ---
-  useEffect(() => {
-    const loadFundoImage = async () => {
-      try {
-        // Se você estiver usando checkAndDownloadImages, descomente a linha abaixo
-        // const { fundoUrl } = await checkAndDownloadImages();
-        // setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
-        setCurrentFundoSource(defaultFundoLocal); // Usando fallback local para compatibilidade com Expo Go
-      } catch (error) {
-        console.error("Erro ao carregar imagem de fundo na Sobre:", error);
-        setCurrentFundoSource(defaultFundoLocal); 
-      } finally {
-        setFundoAppReady(true); 
-      }
-    };
-    loadFundoImage();
-  }, []); 
-
+  
   // === NOVO useEffect para buscar o texto "Sobre o App" do Firebase ===
   useEffect(() => {
     const configRef = ref(adminDatabase, 'configuracoes_app'); // Nó onde o texto está salvo

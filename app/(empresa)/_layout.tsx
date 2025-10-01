@@ -1,15 +1,15 @@
 import { Tabs, Redirect } from 'expo-router';
 import { auth } from '../../firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth'; // Importe onAuthStateChanged
-import React, { useState, useEffect } from 'react'; // Importe useState e useEffect
-import { Home, Map, Settings, Sandwich, CircleHelp } from 'lucide-react-native';
+import { onAuthStateChanged } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
+import { FontAwesome5, MaterialCommunityIcons, AntDesign } from '@expo/vector-icons';
 
-export default function TabsLayout() {
+export default function EmpresaLayout() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (authUser) => { // Use onAuthStateChanged
+    const unsubscribe = onAuthStateChanged(auth, (authUser) => {
       setUser(authUser);
       setLoading(false);
     });
@@ -24,33 +24,34 @@ export default function TabsLayout() {
   }
 
   return (
-    <Tabs screenOptions={{ headerShown: false }}>
+    <Tabs screenOptions={{ headerShown: false , tabBarActiveTintColor: "#ffffffea", tabBarInactiveTintColor:"#fff", tabBarStyle: {
+        backgroundColor: "#064ec7"},}}>
       <Tabs.Screen
         name="homeScreen"
         options={{
           title: 'Início',
-          tabBarIcon: ({ color, size }) => <Home color={color} size={size} />,
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <FontAwesome5 name="home" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="crudProdutosServicos"
         options={{
           title: 'Produtos',
-          tabBarIcon: ({ color, size }) => <Sandwich color={color} size={size} />,
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialCommunityIcons name="food-fork-drink" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="configuracoesScreen"
         options={{
           title: 'Config',
-          tabBarIcon: ({ color, size }) => <Settings color={color} size={size} />,
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <AntDesign name="setting" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="sobreScreen"
         options={{
           title: 'Sobre',
-          tabBarIcon: ({ color, size }) => <CircleHelp color={color} size={size} />,
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <AntDesign name="infocirlceo" color={color} size={size} />,
         }}
       />
     </Tabs>

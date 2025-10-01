@@ -27,7 +27,7 @@ import {
   HeaderContainer,
   type Props as HeaderContainerProps,
 } from '../Header/HeaderContainer';
-import { CardStack } from './CardStack';
+import { CardStack, getAnimationEnabled } from './CardStack';
 
 type Props = StackNavigationConfig & {
   direction: LocaleDirection;
@@ -65,7 +65,7 @@ const GestureHandlerWrapper = GestureHandlerRootView ?? View;
  * We need to make sure that both values and order match.
  */
 const isArrayEqual = (a: any[], b: any[]) =>
-  a.length === b.length && a.every((it, index) => it === b[index]);
+  a.length === b.length && a.every((it, index) => Object.is(it, b[index]));
 
 export class StackView extends React.Component<Props, State> {
   static getDerivedStateFromProps(
@@ -142,7 +142,7 @@ export class StackView extends React.Component<Props, State> {
     const isAnimationEnabled = (key: string) => {
       const descriptor = props.descriptors[key] || state.descriptors[key];
 
-      return descriptor ? descriptor.options.animation !== 'none' : true;
+      return getAnimationEnabled(descriptor?.options.animation);
     };
 
     const getAnimationTypeForReplace = (key: string) => {

@@ -1,38 +1,21 @@
 {
   "cli": {
-    "version": ">= 7.0.0"
+    "version": ">= 16.17.4",
+    "appVersionSource": "remote"
   },
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "channel": "development"
+      "distribution": "internal"
     },
     "preview": {
-      "android": {
-        "buildType": "apk"
-      },
-      "ios": {
-        "simulator": true
-      },
-      "channel": "preview"
+      "distribution": "internal"
     },
     "production": {
-      "channel": "default",
-      "ios": {
-        "distribution": "store",
-        "resourceClass": "medium"
-      },
-      "android": {
-        "resourceClass": "medium"
-      }
+      "autoIncrement": true
     }
   },
   "submit": {
-    "production": {
-      "ios": {
-        "ascAppId": "0000000000"
-      }
-    }
+    "production": {}
   }
 }
