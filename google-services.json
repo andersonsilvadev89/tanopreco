@@ -1,60 +1,27 @@
 {
   "project_info": {
-    "project_number": "161717540109",
-    "firebase_url": "https://stoantoniobarbalhacliente-default-rtdb.firebaseio.com",
-    "project_id": "stoantoniobarbalhacliente",
-    "storage_bucket": "stoantoniobarbalhacliente.firebasestorage.app"
+    "project_number": "662489416845",
+    "firebase_url": "https://tanopreco-67706-default-rtdb.firebaseio.com",
+    "project_id": "tanopreco-67706",
+    "storage_bucket": "tanopreco-67706.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:161717540109:android:a5e5d4b112cb7d10704c44",
+        "mobilesdk_app_id": "1:662489416845:android:0f73706cd2472cb5148ec4",
         "android_client_info": {
-          "package_name": "com.ae.stoantoniobarbalhacliente"
+          "package_name": "com.tanopreco"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "161717540109-7ifgbevmesdqvg6u973kcafht1d7mgkh.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.ae.stoantoniobarbalhacliente",
-            "certificate_hash": "c6fe9a073459df3eb0254ac4f2fd5e36e4ec8f47"
-          }
-        },
-        {
-          "client_id": "161717540109-gts7cr66n24eh9jlcqohk2voo072n5va.apps.googleusercontent.com",
-          "client_type": 1,
-          "android_info": {
-            "package_name": "com.ae.stoantoniobarbalhacliente",
-            "certificate_hash": "80fc1dd253186a03a2042031f7f327e61a4a13cb"
-          }
-        },
-        {
-          "client_id": "161717540109-t6honnbr9s3m55qcngk6222ph3oa9g9k.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBaMZ5Oylb-T9A7o2BgJ0ba50NvdOH1aKo"
+          "current_key": "AIzaSyA7oJ0l7dADR925nDTJzA7RCjn7TiucZa4"
         }
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": [
-            {
-              "client_id": "161717540109-t6honnbr9s3m55qcngk6222ph3oa9g9k.apps.googleusercontent.com",
-              "client_type": 3
-            },
-            {
-              "client_id": "161717540109-celcbtm24pemqrce1n2cbhiue390tt5q.apps.googleusercontent.com",
-              "client_type": 2,
-              "ios_info": {
-                "bundle_id": "com.ae.stoantoniobarbalhacliente"
-              }
-            }
-          ]
+          "other_platform_oauth_client": []
         }
       }
     }
