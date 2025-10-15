@@ -100,7 +100,7 @@ const styles = StyleSheet.create({
     width: '100%',
     backgroundColor:'#064ec7',
     paddingBottom: 0,
-    paddingTop: 50,
+    paddingTop: 5,
   },
   topRow: {
     flexDirection: 'row',

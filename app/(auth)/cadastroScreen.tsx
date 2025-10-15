@@ -30,9 +30,15 @@ import CnpjInput from "../components/CnpjInput";
 
 const defaultFundoLocal = require("../../assets/images/fundo.png");
 
+// Constante para o nome do app que estamos buscando
+const TARGET_APP_NAME = "TaNoPreco";
+// A coleção é a mesma que definimos na tela anterior
+const FIREBASE_COLLECTION = "configuracoes_apps";
+
+
 export default function CadastroScreen() {
   const [nome, setNome] = useState("");
-  const [nomeEmpresa, setNomeEmpresa] = useState(""); // Novo campo
+  const [nomeEmpresa, setNomeEmpresa] = useState(""); 
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
@@ -62,7 +68,7 @@ export default function CadastroScreen() {
     senha &&
     confirmarSenha &&
     (cpf || cnpj) &&
-    palavrasChave; // Adicionado nomeEmpresa
+    palavrasChave;
 
   useEffect(() => {
     const carregarLocalizacao = async () => {
@@ -90,24 +96,43 @@ export default function CadastroScreen() {
       setLocalizacaoCarregada(true);
     };
 
+    // === FUNÇÃO CORRIGIDA PARA BUSCAR URL PELO NOME DO APP ===
     const carregarPrivacyPolicy = () => {
-      const appSettingsRef = ref(adminDatabase, "configuracoes_app");
+      // Referencia a coleção de apps
+      const appsRef = ref(adminDatabase, FIREBASE_COLLECTION);
+      
       const unsubscribe = onValue(
-        appSettingsRef,
+        appsRef,
         (snapshot) => {
           const settings = snapshot.val();
-          if (settings && settings.privacyPolicyUrl) {
-            setPrivacyPolicyUrl(settings.privacyPolicyUrl);
+          let foundUrl: string | null = null;
+          
+          if (settings) {
+            // Itera sobre todos os IDs (chaves) na coleção
+            const appIds = Object.keys(settings);
+            for (const id of appIds) {
+              const app = settings[id];
+              // Verifica se o nome do app corresponde ao alvo
+              if (app && app.nomeApp === TARGET_APP_NAME && app.privacyPolicyUrl) {
+                foundUrl = app.privacyPolicyUrl;
+                break; // Paramos assim que encontramos o app correto
+              }
+            }
+          }
+          
+          if (foundUrl) {
+            setPrivacyPolicyUrl(foundUrl);
           } else {
             console.warn(
-              "URL da política de privacidade não encontrada no Firebase em app_settings/privacyPolicyUrl."
+              `URL da política de privacidade não encontrada para o app "${TARGET_APP_NAME}".`
             );
             Alert.alert(
               "Atenção",
-              "A URL da Política de Privacidade não foi encontrada. Por favor, contate o suporte."
+              `A URL da Política de Privacidade para o app "${TARGET_APP_NAME}" não foi encontrada. Por favor, contate o suporte.`
             );
             setPrivacyPolicyUrl(null);
           }
+          
           setLoadingPrivacyPolicyUrl(false);
         },
         (error) => {
@@ -125,6 +150,7 @@ export default function CadastroScreen() {
       );
       return unsubscribe;
     };
+    // ========================================================
 
     carregarLocalizacao();
     const unsubscribePrivacyPolicy = carregarPrivacyPolicy();
@@ -295,7 +321,7 @@ export default function CadastroScreen() {
 
       await set(ref(database, "usuariosEmpresa/" + userId), {
         nome,
-        nomeEmpresa, // Adicionado ao objeto de usuário
+        nomeEmpresa, 
         email,
         telefone: telefone || null,
         instagram: processedInstagram,
@@ -311,7 +337,7 @@ export default function CadastroScreen() {
 
       Alert.alert("Sucesso", "Cadastro realizado com sucesso!");
       setNome("");
-      setNomeEmpresa(""); // Limpa o novo campo
+      setNomeEmpresa(""); 
       setEmail("");
       setTelefone("");
       setInstagram("");
@@ -397,7 +423,7 @@ export default function CadastroScreen() {
           </View>
 
           <TextInput
-            placeholder="Nome da Empresa*" // Novo campo
+            placeholder="Nome da Empresa*" 
             value={nomeEmpresa}
             onChangeText={setNomeEmpresa}
             style={styles.input}
@@ -478,16 +504,15 @@ export default function CadastroScreen() {
             </TouchableOpacity>
             <Text style={styles.termoTexto}>
               Eu concordo com os{" "}
-              <Text
-                style={[
-                  styles.link,
-                  loadingPrivacyPolicyUrl && { opacity: 0.5 },
-                ]}
+              <TouchableOpacity
+                style={{ opacity: loadingPrivacyPolicyUrl ? 0.5 : 1 }}
                 onPress={handleOpenPrivacyPolicy}
                 disabled={loadingPrivacyPolicyUrl || !privacyPolicyUrl}
               >
-                Termos de uso e política de privacidade
-              </Text>
+                <Text style={styles.link}>
+                  Termos de uso e política de privacidade
+                </Text>
+              </TouchableOpacity>
               .
             </Text>
           </View>

@@ -24,6 +24,9 @@ import { useFocusEffect } from "@react-navigation/native";
 import MapView, { Marker, Callout, Region } from "react-native-maps";
 import AdBanner from "../components/AdBanner";
 import * as Location from "expo-location";
+import AdCard from "../components/AdCard";
+import { DefaultNavigator } from "expo-router/build/views/Navigator";
+
 
 const defaultFundoLocal = require("../../assets/images/fundo.png");
 
@@ -31,6 +34,8 @@ const defaultFundoLocal = require("../../assets/images/fundo.png");
 const { width } = Dimensions.get("window");
 const CARD_MARGIN = 8; // Margem para os dois lados do card (4 de cada)
 const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2; // (Largura da tela - margem externa e interna) / 2
+// Altura Mínima Sugerida para igualar o tamanho do AdCard
+const CARD_MIN_HEIGHT = 300;
 
 // Produto
 interface ProdutoComEmpresa {
@@ -41,13 +46,13 @@ interface ProdutoComEmpresa {
   palavrasChave?: string;
   empresaId: string;
   nomeEmpresa: string;
-  localizacao?: {
-    latitude: number;
-    longitude: number;
-  };
+  latitude: number;
+  longitude: number;
   dataFinalOferta?: string;
   destaque?: boolean;
   categoria?: string;
+  isGeneric?: boolean;
+  isAd?: boolean;
 }
 
 // Empresa
@@ -101,12 +106,25 @@ function calcularDistancia(userLocation: any, empresaLocation: any) {
   const a =
     Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.sin(dLon / 2) *
-      Math.sin(dLon / 2) *
-      Math.cos(lat1) *
-      Math.cos(lat2);
+    Math.sin(dLon / 2) *
+    Math.cos(lat1) *
+    Math.cos(lat2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
+
+// 💡 Placeholder do Anúncio Nativo
+const AD_PLACEHOLDER: ProdutoComEmpresa = {
+  id: "ad_placeholder",
+  descricao: "Anúncio",
+  preco: "R$ 0,00",
+  empresaId: "ad",
+  nomeEmpresa: "AdMob",
+  latitude: 0,
+  longitude: 0,
+  isAd: true, // Flag para o AdCard
+};
+
 
 export default function HomeScreen() {
   const [produtosComEmpresa, setProdutosComEmpresa] = useState<ProdutoComEmpresa[]>([]);
@@ -167,17 +185,17 @@ export default function HomeScreen() {
                   id: produtoSnapshot.key!,
                   ...produto,
                   empresaId,
-                  nome: empresaInfo.nomeEmpresa,
+                  nomeEmpresa: empresaInfo.nomeEmpresa,
                   localizacao:
                     empresaInfo.latitude && empresaInfo.longitude
                       ? {
-                          latitude: empresaInfo.latitude,
-                          longitude: empresaInfo.longitude,
-                        }
+                        latitude: empresaInfo.latitude,
+                        longitude: empresaInfo.longitude,
+                      }
                       : undefined,
                   dataFinalOferta: produto.dataFinalOferta,
                   destaque: produto.destaque,
-                  palavrasChave: produto.palavrasChave, // Garante que a propriedade existe
+                  palavrasChave: produto.palavrasChave,
                 });
               }
             });
@@ -243,44 +261,59 @@ export default function HomeScreen() {
         b.preco.replace("R$", "").replace(",", ".").replace(/\./g, "")
       );
       return precoA - precoB;
-    } else if (userLocation && a.localizacao && b.localizacao) {
-      const distA = calcularDistancia(userLocation, a.localizacao);
-      const distB = calcularDistancia(userLocation, b.localizacao);
+    } else if (userLocation && a.latitude && a.longitude && b.latitude && b.longitude) {
+      const distA = calcularDistancia(userLocation, { latitude: a.latitude, longitude: a.longitude });
+      const distB = calcularDistancia(userLocation, { latitude: b.latitude, longitude: b.longitude });
       return (distA ?? 0) - (distB ?? 0);
     }
     return 0;
   });
 
-  // Lógica para adicionar o card genérico
-  const produtosComPreenchimento =
-    produtosOrdenados.length % 2 === 1
-      ? [
-          ...produtosOrdenados,
-          {
-            id: "generico",
-            descricao: "Anuncie sua empresa aqui!",
-            preco: "",
-            imagemUrl:
-              "https://res.cloudinary.com/dvxld92ye/image/upload/v1719262272/geral/anuncie_aqui_g3fdf1.png",
-            empresaId: "generic",
-            nome: "Tá no Preço",
-            isGeneric: true, // Nova flag para identificar o card genérico
-          },
-        ]
-      : produtosOrdenados;
+
+  // 💡 LÓGICA DE INSERÇÃO DO AdCard A CADA 5 PRODUTOS
+  const produtosComAnuncios: ProdutoComEmpresa[] = [];
+  let adCounter = 0;
+  const AD_INTERVAL = 5; // Insere anúncio a cada 5 produtos
+
+  produtosOrdenados.forEach((produto, index) => {
+    produtosComAnuncios.push(produto);
+    adCounter++;
+
+    if (adCounter % AD_INTERVAL === 0) {
+      // Cria um placeholder de AdCard com ID único para inserção regular
+      const adItem: ProdutoComEmpresa = {
+        ...AD_PLACEHOLDER,
+        id: `ad_inserted_${index}_${Math.random()}`,
+      };
+      produtosComAnuncios.push(adItem);
+    }
+  });
+
+  // 💡 LÓGICA DE PREENCHIMENTO FINAL (COM ADCARD)
+  let produtosParaRenderizar: ProdutoComEmpresa[] = produtosComAnuncios;
+
+  // Se o número total for ímpar, adiciona UM AdCard no final para preencher o espaço
+  if (produtosComAnuncios.length % 2 === 1) {
+    const finalAd: ProdutoComEmpresa = {
+      ...AD_PLACEHOLDER,
+      id: `ad_final_${Math.random()}`, // ID único para o card de preenchimento
+    };
+    produtosParaRenderizar = [...produtosComAnuncios, finalAd];
+  }
+
 
   const handleVerNoMapa = (produto: ProdutoComEmpresa) => {
-    if (produto.localizacao?.latitude && produto.localizacao?.longitude) {
+    if (produto.latitude && produto.longitude) {
       setSelectedLocation({
-        latitude: produto.localizacao.latitude,
-        longitude: produto.localizacao.longitude,
+        latitude: produto.latitude,
+        longitude: produto.longitude,
         nome: produto.nomeEmpresa,
         empresaId: produto.empresaId,
         produtoId: produto.id,
       });
       setMapRegion({
-        latitude: produto.localizacao.latitude,
-        longitude: produto.localizacao.longitude,
+        latitude: produto.latitude,
+        longitude: produto.longitude,
         latitudeDelta: 0.01,
         longitudeDelta: 0.01,
       });
@@ -330,13 +363,14 @@ export default function HomeScreen() {
 
   return (
     <ImageBackground source={defaultFundoLocal} style={styles.background}>
+      <AdBanner />
       <View style={styles.container}>
         <View style={styles.topBarContainer}>
           {/* Campo de busca com imagem sobreposta no início do campo */}
           <View style={styles.buscaOverlayContainer}>
             <TextInput
               style={styles.inputBuscaOverlay}
-              placeholder="Buscar produtos ou serviços..."
+              placeholder="Busque produtos ou serviços..."
               value={termoBusca}
               onChangeText={setTermoBusca}
               placeholderTextColor="#888"
@@ -351,8 +385,8 @@ export default function HomeScreen() {
           <View style={styles.ordenacaoContainer}>
             <Text style={{ color: "#ffffffea", fontWeight: "bold", }}>Ordenar por:</Text>
             <Text style={{ marginHorizontal: 5, color: "#ffffffea" }}>Menor Preço</Text>
-            <Switch value={ordenarPorPreco} onValueChange={setOrdenarPorPreco} thumbColor={"white"}trackColor={{ false: "#ccc", true: "#ccc" }}/>
-            <Text style={{ marginHorizontal: 5, color: "#ffffffea"  }}>Proximidade</Text>
+            <Switch value={ordenarPorPreco} onValueChange={setOrdenarPorPreco} thumbColor={"white"} trackColor={{ false: "#ccc", true: "#ccc" }} />
+            <Text style={{ marginHorizontal: 5, color: "#ffffffea" }}>Proximidade</Text>
           </View>
 
           {/* Botões de categorias realistas em linha com rolagem horizontal */}
@@ -364,7 +398,7 @@ export default function HomeScreen() {
                     style={[
                       styles.categoriaBotaoRedondo,
                       categoriaSelecionada === cat.nome &&
-                        styles.categoriaBotaoSelecionado,
+                      styles.categoriaBotaoSelecionado,
                     ]}
                     onPress={() =>
                       setCategoriaSelecionada(
@@ -404,7 +438,7 @@ export default function HomeScreen() {
           />
         ) : (
           <FlatList
-            data={produtosComPreenchimento}
+            data={produtosParaRenderizar}
             keyExtractor={(item) => item.id + item.empresaId}
             ListEmptyComponent={
               <Text style={styles.mensagemNenhumResultado}>
@@ -414,32 +448,24 @@ export default function HomeScreen() {
             numColumns={2}
             columnWrapperStyle={styles.cardRow}
             renderItem={({ item }) => {
-              // Verifica se o item é o card genérico
-              if ((item as any).isGeneric) {
+              // 💡 RENDERIZAÇÃO DO ADCARD NATIVO (PARA INSERÇÃO REGULAR OU PREENCHIMENTO FINAL)
+              if (item.isAd) {
                 return (
                   <View style={styles.cardProdutoGenerico}>
-                    <Text style={styles.descricaoGenerica}>
-                      {item.descricao}
-                    </Text>
-                    <Image
-                      source={{ uri: item.imagemUrl }}
-                      style={styles.imagemGenerica}
-                      resizeMode="contain"
-                    />
+                    <AdCard />
                   </View>
                 );
               }
 
-              // Se não for o card genérico, renderiza o card de produto normal.
-              // A tipagem 'as ProdutoComEmpresa' resolve o erro do TypeScript.
+              // Se não for anúncio, renderiza o card de produto normal.
               const produtoReal = item as ProdutoComEmpresa;
               const empresaInfo = empresas[produtoReal.empresaId];
               const distancia =
                 userLocation && empresaInfo?.latitude && empresaInfo?.longitude
                   ? calcularDistancia(userLocation, {
-                      latitude: empresaInfo.latitude,
-                      longitude: empresaInfo.longitude,
-                    })
+                    latitude: empresaInfo.latitude,
+                    longitude: empresaInfo.longitude,
+                  })
                   : null;
 
               return (
@@ -555,7 +581,7 @@ export default function HomeScreen() {
                   {produtosComEmpresa
                     .filter(
                       (p) =>
-                        p.localizacao?.latitude && p.localizacao?.longitude
+                        p.latitude && p.longitude
                     )
                     .map((produto) => {
                       const isSelected =
@@ -565,7 +591,8 @@ export default function HomeScreen() {
                       return (
                         <Marker
                           key={produto.id + produto.empresaId + "_mapmarker"}
-                          coordinate={produto.localizacao!}
+                          coordinate={{ latitude: produto.latitude, // Exemplo de latitude
+  longitude: produto.longitude }}
                           title={produto.nomeEmpresa}
                           description={
                             produto.descricao.substring(0, 40) + "..."
@@ -626,7 +653,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   background: { flex: 1, resizeMode: "cover" },
-  container: { flex: 1,},
+  container: { flex: 1, },
   buscaRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -687,7 +714,7 @@ const styles = StyleSheet.create({
   },
   categoriaLegenda: {
     fontSize: 13,
-    color:"#ffffffea",
+    color: "#ffffffea",
     fontWeight: "bold",
     textAlign: "center",
     marginTop: 2,
@@ -716,11 +743,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     width: CARD_WIDTH,
+    minHeight: CARD_MIN_HEIGHT, // Altura mínima para igualar o AdCard
   },
   cardProdutoGenerico: {
     backgroundColor: "rgba(255,255,255,0.95)",
     borderRadius: 10,
-    padding: 10,
     marginBottom: 12,
     marginHorizontal: 4,
     elevation: 3,
@@ -731,6 +758,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     width: CARD_WIDTH,
+    minHeight: CARD_MIN_HEIGHT, // Altura mínima para igualar o AdCard
+    padding: 0, // Removido padding interno para permitir o AdCard ter controle total
   },
   descricaoGenerica: {
     fontSize: 15,
@@ -949,13 +978,13 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 20,
     padding: 10,
     marginBottom: 10,
-    color:"#FFF",
+    color: "#FFF",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 2,
     elevation: 2,
-    paddingTop:40,
+    paddingTop: 10,
   },
   buscaOverlayContainer: {
     justifyContent: "center",

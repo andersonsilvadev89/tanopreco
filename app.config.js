@@ -16,7 +16,7 @@ export default {
     userInterfaceStyle: "automatic",
     newArchEnabled: false,
     updates: {
-      url: process.env.EXPO_PUBLIC_EAS_PROJECT_ID ? `https://u.expo.dev/${process.env.EXPO_PUBLIC_EAS_PROJECT_ID}` : undefined
+      url: "https://u.expo.dev/24f376e8-afe2-4c3e-bab9-035b5e089295"
     },
     runtimeVersion: {
       policy: "appVersion"
@@ -27,7 +27,7 @@ export default {
           apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
         },
       },
-      versionCode: 1,
+      versionCode: 10,
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -35,7 +35,6 @@ export default {
       permissions: [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
         "com.google.android.gms.permission.AD_ID"
       ],
       package: "com.tanopreco",
@@ -63,7 +62,6 @@ export default {
       },
       googleServicesFile: "./GoogleService-Info.plist",
       infoPlist: {
-        UIBackgroundModes: ["location"],
         NSPhotoLibraryUsageDescription: "Precisamos de acesso à sua galeria de fotos.",
         NSCameraUsageDescription: "Precisamos de acesso à sua câmera para você tirar uma foto de perfil.",
         NSLocationWhenInUseUsageDescription: "Precisamos da sua localização para mostrar seus amigos no mapa.",
@@ -83,8 +81,7 @@ export default {
       [
         "expo-location",
         {
-          locationAlwaysAndWhenInUsePermission: "Permitir que $(PRODUCT_NAME) use sua localização para te mostrar no mapa.",
-          isAndroidBackgroundLocationEnabled: true
+          locationAlwaysAndWhenInUsePermission: "Permitir que $(PRODUCT_NAME) use sua localização para te mostrar no mapa."
         }
       ],
       "expo-secure-store",

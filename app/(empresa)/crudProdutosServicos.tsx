@@ -216,7 +216,7 @@ export default function CadastroProduto() {
               text: "Ver Pacotes",
               onPress: () =>
                 Linking.openURL(
-                  "https://stoantoniobarbalhacliente.web.app/pacotes.html"
+                  "https://tanopreco-67706.web.app"
                 ),
             },
           ]
@@ -741,11 +741,10 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   listItemImage: {
-    width: "100%",
-    height: 150,
+    width: "30%",
+    height: 100,
     borderRadius: 8,
-    marginBottom: 10,
-  },
+    marginRight: 10,},
   input: {
     borderWidth: 1,
     borderColor: "#ccc",
@@ -765,12 +764,14 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   listItemContainer: {
-    marginBottom: 15,
-    padding: 10,
+    marginBottom: 5,
+    padding: 5,
     borderWidth: 1,
     borderColor: "#ccc",
     borderRadius: 8,
     backgroundColor: "#f9f9f9",
+    flex: 1,
+    flexDirection: "row",
   },
   productDetails: {
     flex: 1,
@@ -784,9 +785,8 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   buttonColumn: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     justifyContent: 'space-around',
-    gap: 10
   },
   productListContainer: {
     backgroundColor: "rgba(224, 247, 250, 0.9)",
@@ -798,6 +798,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
     flex: 1,
+    width: "99%",
   },
   productListOverlay: {
     position: "absolute",

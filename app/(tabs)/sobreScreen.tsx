@@ -11,12 +11,16 @@ import {
   Dimensions,
   Image,
 } from 'react-native';
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { auth, database, adminDatabase } from '../../firebaseConfig'; 
-import { ref, get, push, serverTimestamp, onValue } from 'firebase/database'; // Adicionado onValue
+import { ref, get, push, serverTimestamp, onValue } from 'firebase/database';
 import AdBanner from '../components/AdBanner'; 
 
 const defaultFundoLocal = require('../../assets/images/fundo.png');
+
+// Constantes de configuração do Firebase
+const FIREBASE_COLLECTION = 'configuracoes_apps';
+const TARGET_APP_NAME = "TaNoPreco"; // Nome do App cujas configurações queremos buscar
 
 export default function Sobre() {
   const [sugestao, setSugestao] = useState('');
@@ -25,9 +29,8 @@ export default function Sobre() {
   const [sponsorsLoading, setSponsorsLoading] = useState(true);
   const [sponsorsError, setSponsorsError] = useState<string | null>(null);
 
-  // === NOVO ESTADO PARA O TEXTO "SOBRE O APP" ===
+  // === ESTADOS PARA O TEXTO "SOBRE O APP" ===
   const [sobreAppTexto, setSobreAppTexto] = useState('');
-  // === NOVO ESTADO PARA O LOADING DO TEXTO "SOBRE O APP" ===
   const [loadingSobreAppTexto, setLoadingSobreAppTexto] = useState(true);
 
   const scrollViewRef = useRef<ScrollView>(null);
@@ -36,21 +39,35 @@ export default function Sobre() {
   const [measuredContentWidth, setMeasuredContentWidth] = useState(0);
   const [isUserInteractingWithSponsors, setIsUserInteractingWithSponsors] = useState(false);
   const screenWidth = Dimensions.get('window').width;
-
-  const [fundoAppReady, setFundoAppReady] = useState(false);
-  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
-
   
-  // === NOVO useEffect para buscar o texto "Sobre o App" do Firebase ===
+  // === useEffect para buscar o texto "Sobre o App" do Firebase (CORRIGIDO) ===
   useEffect(() => {
-    const configRef = ref(adminDatabase, 'configuracoes_app'); // Nó onde o texto está salvo
-    const unsubscribe = onValue(configRef, (snapshot) => {
+    // Referencia a coleção completa de configurações de apps
+    const appsRef = ref(adminDatabase, FIREBASE_COLLECTION); 
+    
+    const unsubscribe = onValue(appsRef, (snapshot) => {
       const data = snapshot.val();
-      if (data && data.sobreEsteApp) {
-        setSobreAppTexto(data.sobreEsteApp);
+      let foundText: string | null = null;
+      
+      if (data) {
+        const appIds = Object.keys(data);
+        for (const id of appIds) {
+          const app = data[id];
+          // Procura o app com o nome exato e verifica se o campo de texto existe
+          if (app && app.nomeApp === TARGET_APP_NAME && app.sobreEsteApp) {
+            foundText = app.sobreEsteApp;
+            break; // Encontramos, paramos a iteração
+          }
+        }
+      }
+
+      if (foundText) {
+        setSobreAppTexto(foundText);
       } else {
-        console.warn("Texto 'sobreEsteApp' não encontrado no Firebase em 'configuracoes_app/sobreEsteApp'.");
-        setSobreAppTexto("Informações sobre o app não disponíveis no momento."); // Texto de fallback
+        console.warn(
+          `Texto 'sobreEsteApp' não encontrado para o app "${TARGET_APP_NAME}" em '${FIREBASE_COLLECTION}'.`
+        );
+        setSobreAppTexto("Informações sobre o app não disponíveis no momento. Verifique as configurações de 'sobreEsteApp' para o app 'TaNoPreco'."); // Texto de fallback
       }
       setLoadingSobreAppTexto(false); // Finaliza o loading do texto
     }, (error) => {
@@ -161,6 +178,7 @@ export default function Sobre() {
         uidUsuario: user ? user.uid : 'anonimo',
         nomeUsuario: user && user.displayName ? user.displayName : (user && user.email ? user.email : 'Não informado'),
         timestamp: serverTimestamp(),
+        nomeApp: TARGET_APP_NAME,
       });
       Alert.alert("Enviado!", "Sua mensagem foi enviada com sucesso! Agradecemos seu feedback. 👍");
       setSugestao('');
@@ -173,7 +191,7 @@ export default function Sobre() {
   };
 
   // --- Condição de carregamento geral: Espera o fundo E o texto "Sobre o App" estarem prontos ---
-  if (!fundoAppReady || loadingSobreAppTexto) { 
+  if (loadingSobreAppTexto) { 
     return (
       <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
@@ -184,7 +202,7 @@ export default function Sobre() {
 
   return (
     <ImageBackground
-      source={currentFundoSource} 
+      source={defaultFundoLocal} 
       style={styles.container}
       resizeMode="cover"
     >
@@ -193,7 +211,7 @@ export default function Sobre() {
       <View style={styles.contentArea}>
         <View style={styles.sectionWrapper}>
           <ScrollView contentContainerStyle={styles.scrollContentContainer}>
-            <Text style={styles.title}>🎉 Sobre o Assistente de Eventos 🎉</Text>
+            <Text style={styles.title}> Sobre o TaNoPreco! </Text>
 
             <Text style={styles.paragraphText}>
               {sobreAppTexto}
@@ -209,7 +227,18 @@ export default function Sobre() {
           ) : sponsorsError ? (
             <Text style={styles.supporterErrorText}>{sponsorsError}</Text>
           ) : sponsors.length > 0 ? (
-            <ScrollView ref={scrollViewRef} horizontal showsHorizontalScrollIndicator={true} style={styles.supportersLogos} contentContainerStyle={styles.supportersLogosContent} onContentSizeChange={setMeasuredContentWidth} onScrollBeginDrag={handleSponsorsScrollBeginDrag} onScrollEndDrag={handleSponsorsScrollEndDrag} onMomentumScrollEnd={handleSponsorsMomentumScrollEnd} scrollEventThrottle={16}>
+            <ScrollView 
+              ref={scrollViewRef} 
+              horizontal 
+              showsHorizontalScrollIndicator={true} 
+              style={styles.supportersLogos} 
+              contentContainerStyle={styles.supportersLogosContent} 
+              onContentSizeChange={(w) => setMeasuredContentWidth(w)} // Corrigido para tipagem de onContentSizeChange
+              onScrollBeginDrag={handleSponsorsScrollBeginDrag} 
+              onScrollEndDrag={handleSponsorsScrollEndDrag} 
+              onMomentumScrollEnd={handleSponsorsMomentumScrollEnd} 
+              scrollEventThrottle={16}
+            >
               {sponsors.map((sponsor) => (sponsor.logoUrl ? <Image key={sponsor.id} source={{ uri: sponsor.logoUrl }} style={styles.supporterLogo} onError={(e) => console.warn(`Erro logo ${sponsor.id}: ${sponsor.logoUrl}`, e.nativeEvent.error)} /> : null))}
             </ScrollView>
           ) : (<Text style={styles.supporterText}>Seja nosso apoiador!</Text>)}
@@ -218,8 +247,20 @@ export default function Sobre() {
         <View style={[styles.sectionWrapper, { flex: 0.9 }]}>
           <ScrollView contentContainerStyle={styles.scrollContentContainer}>
             <Text style={styles.title}>💡 Sugestões e Reclamações</Text>
-            <TextInput style={styles.textInputSugestao} multiline placeholder="Sua opinião é muito importante para nós! Conte aqui sua sugestão ou problema..." value={sugestao} onChangeText={setSugestao} placeholderTextColor="#777" editable={!enviandoFeedback} />
-            <TouchableOpacity style={[styles.botaoEnviar, enviandoFeedback && styles.botaoDesabilitado]} onPress={handleEnviarSugestao} disabled={enviandoFeedback}>
+            <TextInput 
+              style={styles.textInputSugestao} 
+              multiline 
+              placeholder="Sua opinião é muito importante para nós! Conte aqui sua sugestão ou problema..." 
+              value={sugestao} 
+              onChangeText={setSugestao} 
+              placeholderTextColor="#777" 
+              editable={!enviandoFeedback} 
+            />
+            <TouchableOpacity 
+              style={[styles.botaoEnviar, enviandoFeedback && styles.botaoDesabilitado]} 
+              onPress={handleEnviarSugestao} 
+              disabled={enviandoFeedback}
+            >
               {enviandoFeedback ? (
                 <ActivityIndicator size="small" color="#fff" />
               ) : (
@@ -241,7 +282,6 @@ const styles = StyleSheet.create({
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#2c3e50', textAlign: 'center' },
 
   paragraphText: { fontSize: 16, color: '#34495e', textAlign: 'justify', lineHeight: 25, marginBottom: 15 },
-  // REMOVIDO: featureItem, emojiBulletPoint, featureText, boldText styles
   
   supportersContainer: { flex: 0.7, justifyContent: 'center', alignItems: 'center', marginTop: 5 },
   supportersTitle: { fontSize: 19, fontWeight: 'bold', color: '#FFFFFF', marginTop: 10, marginBottom: 8, textShadowColor: 'rgba(0, 0, 0, 0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },

@@ -228,10 +228,8 @@ const ConfiguracoesEmpresaScreen = () => {
 
             const companyRef = ref(database, `usuariosEmpresa/${usuarioId}`);
             await update(companyRef, {
-                localizacao: {
                     latitude,
-                    longitude,
-                }
+                    longitude
             });
             setLatitude(latitude);
             setLongitude(longitude);
@@ -350,12 +348,9 @@ const ConfiguracoesEmpresaScreen = () => {
 };
 
 const styles = StyleSheet.create({
-    background: { flex: 1, marginBottom: -33 },
-    safeArea: { flex: 1 },
-    header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 10, backgroundColor: 'rgba(0,0,0,0.3)' },
-    backButton: { padding: 5 },
-    headerTitle: { flex: 1, fontSize: 20, fontWeight: 'bold', color: '#FFF', textAlign: 'center', marginRight: 34 },
-    scrollContainer: { padding: 20 },
+    background: { flex: 1, marginBottom: 0 },
+    safeArea: { flex: 1},
+    scrollContainer: { padding: 10 },
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
@@ -369,16 +364,14 @@ const styles = StyleSheet.create({
         textShadowOffset: { width: 1, height: 1 },
         textShadowRadius: 2,
     },
-    centeredContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    card: { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius: 12, padding: 20, marginBottom: 20 },
-    profileDisplayContainer: { alignItems: 'center' },
-    profileImage: { width: '100%', height: 150, borderRadius: 8, marginBottom: 15, backgroundColor: '#e0e0e0' },
+    card: { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius:12, padding: 15, marginBottom: 20 },
+    profileDisplayContainer: { alignItems: 'center'},
+    profileImage: { width: 120, height: 120, borderRadius: 100, marginBottom: 5, backgroundColor: '#e0e0e0', alignSelf: 'center' },
     profileName: { fontSize: 24, fontWeight: 'bold', color: '#333', textAlign: 'center' },
-    profileDescription: { fontSize: 16, color: '#666', marginTop: 4, marginBottom: 15, textAlign: 'center', fontStyle: 'italic' },
+    profileDescription: { fontSize: 16, color: '#666', textAlign: 'center', fontStyle: 'italic' },
     detailsSection: {
         alignItems: 'flex-start',
         width: '100%',
-        marginBottom: 20,
         borderTopWidth: 1,
         borderTopColor: '#eee',
         paddingTop: 15
@@ -386,7 +379,7 @@ const styles = StyleSheet.create({
     detailRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 8,
+        marginBottom: 5,
     },
     profileDetail: {
         fontSize: 16,
@@ -396,18 +389,17 @@ const styles = StyleSheet.create({
     linkText: {
         color: '#007BFF',
     },
-    editButton: { backgroundColor: '#007BFF', paddingVertical: 10, paddingHorizontal: 25, borderRadius: 20, marginTop: 10 },
+    editButton: { backgroundColor: '#007BFF', paddingVertical: 10, paddingHorizontal: 25, borderRadius: 10, marginTop: 10 },
     editButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-    profileEditContainer: { alignItems: 'center' },
-    profileImageEdit: { width: '100%', height: 150, borderRadius: 8, marginBottom: 8, backgroundColor: '#e0e0e0' },
-    changePhotoText: { color: '#007BFF', fontSize: 16, marginBottom: 20 },
-    input: { backgroundColor: '#fff', width: '100%', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 12, fontSize: 16, marginBottom: 15 },
+    profileEditContainer: { flex: 1, alignItems: 'center' },
+    changePhotoText: { color: '#007BFF', fontSize: 16, marginBottom: 5 },
+    input: { backgroundColor: '#fff', width: '100%', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 5, paddingHorizontal: 15, fontSize: 16, marginBottom: 5 },
     editActionsContainer: { flexDirection: 'row', justifyContent: 'space-around', width: '100%' },
-    actionButton: { paddingVertical: 12, borderRadius: 8, alignItems: 'center', width: '48%' },
+    actionButton: { paddingVertical: 8, borderRadius: 8, alignItems: 'center', width: '48%' },
     saveButton: { backgroundColor: '#4CAF50' },
     cancelButton: { backgroundColor: '#f44336' },
     actionButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-    sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 15, textAlign: 'center' },
+    sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 0, textAlign: 'center' },
     settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
     settingLabel: { fontSize: 16, color: '#444', flex: 1, marginRight: 10 },
     settingDescription: { fontSize: 13, color: '#666', marginTop: 8, lineHeight: 18, textAlign: 'center' },
