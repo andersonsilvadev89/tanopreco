@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -145,6 +145,9 @@ export default function HomeScreen() {
     longitudeDelta: 0.0421,
   });
   const [empresas, setEmpresas] = useState<{ [key: string]: EmpresaData }>({});
+  
+  // 💡 Ref para manipular o MapView
+  const mapRef = useRef<MapView>(null); 
 
   // Carrega empresas
   useEffect(() => {
@@ -186,13 +189,8 @@ export default function HomeScreen() {
                   ...produto,
                   empresaId,
                   nomeEmpresa: empresaInfo.nomeEmpresa,
-                  localizacao:
-                    empresaInfo.latitude && empresaInfo.longitude
-                      ? {
-                        latitude: empresaInfo.latitude,
-                        longitude: empresaInfo.longitude,
-                      }
-                      : undefined,
+                  latitude: empresaInfo.latitude,
+                  longitude: empresaInfo.longitude,
                   dataFinalOferta: produto.dataFinalOferta,
                   destaque: produto.destaque,
                   palavrasChave: produto.palavrasChave,
@@ -219,6 +217,28 @@ export default function HomeScreen() {
       })();
     }, [empresas])
   );
+  
+  // 💡 useEffect para ajustar o mapa (zoom) para incluir o usuário e o produto
+  useEffect(() => {
+    // Apenas ajuste se o mapa estiver visível, a localização do usuário estiver disponível e um local tiver sido selecionado.
+    if (mostrarMapa && userLocation && selectedLocation && mapRef.current) {
+      const coordinates = [
+        userLocation, // Localização do usuário
+        { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }, // Localização do produto
+      ];
+
+      // Dá um pequeno tempo para o MapView ser montado antes de chamar a função
+      const timer = setTimeout(() => {
+        mapRef.current?.fitToCoordinates(coordinates, {
+          // Ajuste de preenchimento (padding) nas bordas
+          edgePadding: { top: 100, right: 50, bottom: 50, left: 50 },
+          animated: true,
+        });
+      }, 300);
+
+      return () => clearTimeout(timer);
+    }
+  }, [mostrarMapa, userLocation, selectedLocation]);
 
   // Filtra produtos válidos
   const produtosValidos = produtosComEmpresa.filter((produto) => {
@@ -250,23 +270,47 @@ export default function HomeScreen() {
     termoBusca.length >= 3 || categoriaSelecionada
       ? produtosValidos
       : produtosValidos.filter((p) => p.destaque);
+      
+  // 💡 Determina o título a ser exibido
+  const tituloDaLista =
+    termoBusca.length >= 3 || categoriaSelecionada
+      ? "Resultados da busca"
+      : "Produtos em Destaque";
+
 
   // Ordenação
   const produtosOrdenados = [...produtosParaExibir].sort((a, b) => {
+    // Função para extrair o preço como número
+    const getPrecoNumerico = (produto: ProdutoComEmpresa) => 
+      parseFloat(produto.preco.replace("R$", "").replace(",", ".").replace(/\./g, ""));
+    
+    // Função para calcular a distância (retorna 0 se a localização não estiver disponível para garantir que continue na lista)
+    const getDistancia = (produto: ProdutoComEmpresa) => 
+      (userLocation && produto.latitude && produto.longitude)
+        ? (calcularDistancia(userLocation, { latitude: produto.latitude, longitude: produto.longitude }) ?? Infinity)
+        : Infinity;
+
+
     if (ordenarPorPreco) {
-      const precoA = parseFloat(
-        a.preco.replace("R$", "").replace(",", ".").replace(/\./g, "")
-      );
-      const precoB = parseFloat(
-        b.preco.replace("R$", "").replace(",", ".").replace(/\./g, "")
-      );
-      return precoA - precoB;
-    } else if (userLocation && a.latitude && a.longitude && b.latitude && b.longitude) {
-      const distA = calcularDistancia(userLocation, { latitude: a.latitude, longitude: a.longitude });
-      const distB = calcularDistancia(userLocation, { latitude: b.latitude, longitude: b.longitude });
-      return (distA ?? 0) - (distB ?? 0);
+      // Ordenação Principal: Menor Preço
+      return getPrecoNumerico(a) - getPrecoNumerico(b);
+    } else {
+      // Ordenação Principal: Proximidade
+      const distA = getDistancia(a);
+      const distB = getDistancia(b);
+      
+      const diferencaDistancia = distA - distB;
+      
+      // 💡 NOVO: Se as distâncias forem as mesmas (diferença dentro de uma tolerância pequena, como 0.001km), 
+      // ordena por preço.
+      // Usei 0.001km (1 metro) como tolerância para considerar as distâncias iguais.
+      if (Math.abs(diferencaDistancia) < 0.001) {
+        // Ordenação Secundária: Menor Preço
+        return getPrecoNumerico(a) - getPrecoNumerico(b);
+      }
+
+      return diferencaDistancia;
     }
-    return 0;
   });
 
 
@@ -303,7 +347,8 @@ export default function HomeScreen() {
 
 
   const handleVerNoMapa = (produto: ProdutoComEmpresa) => {
-    if (produto.latitude && produto.longitude) {
+    const empresaInfo = empresas[produto.empresaId];
+    if (empresaInfo?.latitude && empresaInfo?.longitude) {
       setSelectedLocation({
         latitude: produto.latitude,
         longitude: produto.longitude,
@@ -311,12 +356,15 @@ export default function HomeScreen() {
         empresaId: produto.empresaId,
         produtoId: produto.id,
       });
+      
+      // 💡 setMapRegion: Define uma região inicial para o mapa
       setMapRegion({
         latitude: produto.latitude,
         longitude: produto.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
       });
+
       setMostrarMapa(true);
     } else {
       Alert.alert(
@@ -324,6 +372,22 @@ export default function HomeScreen() {
         "Esta empresa não possui uma localização cadastrada para este produto."
       );
     }
+  };
+
+  // 💡 Função para abrir a rota no Google Maps (App ou Web)
+  const openExternalMapRoute = (latitude: number, longitude: number, label: string) => {
+    // URL universal para Maps com um ponto de destino
+    const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
+    const url = `${scheme}${latitude},${longitude}(${label})`;
+
+    // Tenta abrir o aplicativo
+    Linking.openURL(url).catch(() => {
+      // Se falhar (ex: app não instalado ou Android sem o esquema geo), tenta abrir no Google Maps Web
+      const webUrl = `http://maps.google.com/maps?daddr=${latitude},${longitude}`;
+      Linking.openURL(webUrl).catch(() => {
+        Alert.alert("Erro", "Não foi possível abrir o aplicativo de mapas.");
+      });
+    });
   };
 
   const openInstagramProfile = async (username: string | undefined) => {
@@ -361,6 +425,12 @@ export default function HomeScreen() {
     });
   };
 
+  // 💡 Variáveis para o botão de Rota no Modal
+  const isSelectedLocationValid = selectedLocation && selectedLocation.latitude && selectedLocation.longitude;
+  const selectedLat = isSelectedLocationValid ? selectedLocation.latitude : 0;
+  const selectedLon = isSelectedLocationValid ? selectedLocation.longitude : 0;
+  const selectedName = isSelectedLocationValid ? selectedLocation.nome : "Destino";
+
   return (
     <ImageBackground source={defaultFundoLocal} style={styles.background}>
       <AdBanner />
@@ -381,12 +451,32 @@ export default function HomeScreen() {
             />
           </View>
 
-          {/* Switch de ordenação antes das categorias */}
+          {/* Switch de ordenação */}
           <View style={styles.ordenacaoContainer}>
             <Text style={{ color: "#ffffffea", fontWeight: "bold", }}>Ordenar por:</Text>
-            <Text style={{ marginHorizontal: 5, color: "#ffffffea" }}>Menor Preço</Text>
-            <Switch value={ordenarPorPreco} onValueChange={setOrdenarPorPreco} thumbColor={"white"} trackColor={{ false: "#ccc", true: "#ccc" }} />
-            <Text style={{ marginHorizontal: 5, color: "#ffffffea" }}>Proximidade</Text>
+            
+            {/* Texto de Proximidade (Ativo se ordenarPorPreco for FALSE) */}
+            <Text style={[
+                styles.ordenacaoText, 
+                !ordenarPorPreco && styles.ordenacaoTextActive
+            ]}>
+                Proximidade
+            </Text>
+            
+            <Switch 
+                value={ordenarPorPreco} 
+                onValueChange={setOrdenarPorPreco} 
+                thumbColor={"white"} 
+                trackColor={{ false: "#ccc", true: "#ccc" }} 
+            />
+            
+            {/* Texto de Menor Preço (Ativo se ordenarPorPreco for TRUE) */}
+            <Text style={[
+                styles.ordenacaoText, 
+                ordenarPorPreco && styles.ordenacaoTextActive
+            ]}>
+                Menor Preço
+            </Text>
           </View>
 
           {/* Botões de categorias realistas em linha com rolagem horizontal */}
@@ -428,6 +518,12 @@ export default function HomeScreen() {
             </ScrollView>
           </View>
         </View>
+        
+        {/* Título da Lista de Produtos */}
+        <View style={styles.listTitleContainer}>
+          <Text style={styles.listTitle}>{tituloDaLista}</Text>
+        </View>
+        
 
         {/* Lista de produtos */}
         {loadingInicial ? (
@@ -463,11 +559,14 @@ export default function HomeScreen() {
               const distancia =
                 userLocation && empresaInfo?.latitude && empresaInfo?.longitude
                   ? calcularDistancia(userLocation, {
-                    latitude: empresaInfo.latitude,
-                    longitude: empresaInfo.longitude,
-                  })
+                      latitude: empresaInfo.latitude,
+                      longitude: empresaInfo.longitude,
+                    })
                   : null;
 
+              // Variavel de localizacao
+              const temLocalizacao = empresaInfo?.latitude && empresaInfo?.longitude;
+              
               return (
                 <View style={styles.cardProduto}>
                   {produtoReal.imagemUrl && (
@@ -534,7 +633,7 @@ export default function HomeScreen() {
                           <Text style={styles.legendaBotao}>WhatsApp</Text>
                         </View>
                       )}
-                      {empresaInfo?.latitude && empresaInfo?.longitude && (
+                      {temLocalizacao && (
                         <View style={styles.botaoAcaoItem}>
                           <TouchableOpacity
                             style={styles.botaoRedondo}
@@ -562,7 +661,8 @@ export default function HomeScreen() {
           <View style={styles.mapOverlayContainer}>
             <View style={styles.mapDisplayBox}>
               {mapRegion ? (
-                <MapView style={styles.mapViewStyle} region={mapRegion}>
+                // 💡 Ref para MapView
+                <MapView style={styles.mapViewStyle} region={mapRegion} ref={mapRef}>
                   {userLocation && (
                     <Marker coordinate={userLocation} zIndex={2}>
                       <View style={styles.myLocationMarker}>
@@ -591,8 +691,8 @@ export default function HomeScreen() {
                       return (
                         <Marker
                           key={produto.id + produto.empresaId + "_mapmarker"}
-                          coordinate={{ latitude: produto.latitude, // Exemplo de latitude
-  longitude: produto.longitude }}
+                          coordinate={{ latitude: produto.latitude,
+                            longitude: produto.longitude }}
                           title={produto.nomeEmpresa}
                           description={
                             produto.descricao.substring(0, 40) + "..."
@@ -634,6 +734,18 @@ export default function HomeScreen() {
                   <Text>Carregando mapa...</Text>
                 </View>
               )}
+              
+              {/* Botão para abrir a rota no Google Maps (dentro do modal) */}
+              {isSelectedLocationValid && (
+                <TouchableOpacity
+                  style={styles.externalMapButton}
+                  onPress={() => openExternalMapRoute(selectedLat, selectedLon, selectedName)}
+                >
+                  <Text style={styles.externalMapButtonText}>Abrir Rota no Google Maps</Text>
+                  <Feather name="external-link" size={16} color="#FFF" style={{ marginLeft: 5 }} />
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity
                 style={styles.closeMapButtonOverlay}
                 onPress={() => {
@@ -723,6 +835,16 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+  },
+  // 💡 ESTILO: Texto de ordenação base
+  ordenacaoText: { 
+    marginHorizontal: 5, 
+    color: "#ffffffea" 
+  },
+  // 💡 ESTILO: Texto de ordenação ativo
+  ordenacaoTextActive: { 
+    fontWeight: "bold",
+    textDecorationLine: "underline", 
   },
   productList: { flex: 1 },
   cardRow: {
@@ -916,8 +1038,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     padding: 5,
+    justifyContent: 'space-between', // Para posicionar o botão externo
   },
-  mapViewStyle: { flex: 1, borderRadius: 10 },
+  mapViewStyle: { 
+    flex: 1, 
+    borderRadius: 10,
+    marginBottom: 10, // Espaço para o botão
+  },
   closeMapButtonOverlay: {
     position: "absolute",
     top: 10,
@@ -977,7 +1104,6 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     padding: 10,
-    marginBottom: 10,
     color: "#FFF",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -1025,6 +1151,36 @@ const styles = StyleSheet.create({
     color: "#555",
     fontWeight: "bold",
     marginBottom: 2,
+    textAlign: "center",
+  },
+  // Botão de Rota Externa no Modal
+  externalMapButton: {
+    backgroundColor: "#34A853", // Cor do Google
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 5,
+    alignSelf: 'center',
+    width: '95%',
+  },
+  externalMapButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  // Container e Texto do Título
+  listTitleContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    backgroundColor: "transparent", // Mantendo transparente para ver o fundo
+  },
+  listTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#222",
     textAlign: "center",
   },
 });

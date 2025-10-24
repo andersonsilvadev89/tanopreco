@@ -15,6 +15,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { auth, database, adminDatabase } from '../../firebaseConfig'; 
 import { ref, get, push, serverTimestamp, onValue } from 'firebase/database';
 import AdBanner from '../components/AdBanner'; 
+import AdCard from '../components/AdCard'; 
 
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
@@ -219,32 +220,8 @@ export default function Sobre() {
             
           </ScrollView>
         </View>
-
-        <View style={styles.supportersContainer}>
-          <Text style={styles.supportersTitle}>Apoio:</Text>
-          {sponsorsLoading ? (
-            <ActivityIndicator style={{ marginTop: 15 }} color="#fff" size="small" />
-          ) : sponsorsError ? (
-            <Text style={styles.supporterErrorText}>{sponsorsError}</Text>
-          ) : sponsors.length > 0 ? (
-            <ScrollView 
-              ref={scrollViewRef} 
-              horizontal 
-              showsHorizontalScrollIndicator={true} 
-              style={styles.supportersLogos} 
-              contentContainerStyle={styles.supportersLogosContent} 
-              onContentSizeChange={(w) => setMeasuredContentWidth(w)} // Corrigido para tipagem de onContentSizeChange
-              onScrollBeginDrag={handleSponsorsScrollBeginDrag} 
-              onScrollEndDrag={handleSponsorsScrollEndDrag} 
-              onMomentumScrollEnd={handleSponsorsMomentumScrollEnd} 
-              scrollEventThrottle={16}
-            >
-              {sponsors.map((sponsor) => (sponsor.logoUrl ? <Image key={sponsor.id} source={{ uri: sponsor.logoUrl }} style={styles.supporterLogo} onError={(e) => console.warn(`Erro logo ${sponsor.id}: ${sponsor.logoUrl}`, e.nativeEvent.error)} /> : null))}
-            </ScrollView>
-          ) : (<Text style={styles.supporterText}>Seja nosso apoiador!</Text>)}
-        </View>
-
-        <View style={[styles.sectionWrapper, { flex: 0.9 }]}>
+      
+        <View style={[styles.sectionWrapper, { flex: 0.6 }]}>
           <ScrollView contentContainerStyle={styles.scrollContentContainer}>
             <Text style={styles.title}>💡 Sugestões e Reclamações</Text>
             <TextInput 
@@ -277,7 +254,7 @@ export default function Sobre() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   contentArea: { flex: 1, paddingHorizontal: 10, paddingBottom: 10 },
-  sectionWrapper: { flex: 1, marginTop: 10, backgroundColor: 'rgba(255, 255, 255, 0.92)', borderRadius: 10, overflow: 'hidden' },
+  sectionWrapper: { flex: 1, marginTop: 10, backgroundColor: 'rgba(255, 255, 255, 1)', borderRadius: 10, overflow: 'hidden', borderColor: '#0056b3', borderWidth:  1},
   scrollContentContainer: { padding: 15, paddingBottom: 20 },
   title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#2c3e50', textAlign: 'center' },
 

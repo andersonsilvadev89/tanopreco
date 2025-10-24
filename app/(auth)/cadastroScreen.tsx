@@ -19,7 +19,7 @@ import {
   fetchSignInMethodsForEmail,
 } from "firebase/auth";
 import { auth, database, adminDatabase } from "../../firebaseConfig";
-import { ref, set, onValue } from "firebase/database";
+import { ref, set, onValue, query, orderByChild, equalTo, get } from "firebase/database"; // Adicionado 'get', 'query', 'orderByChild', 'equalTo'
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { Feather } from "@expo/vector-icons";
 import { MaskedTextInput } from "react-native-mask-text";
@@ -38,7 +38,7 @@ const FIREBASE_COLLECTION = "configuracoes_apps";
 
 export default function CadastroScreen() {
   const [nome, setNome] = useState("");
-  const [nomeEmpresa, setNomeEmpresa] = useState(""); 
+  const [nomeEmpresa, setNomeEmpresa] = useState("");
   const [email, setEmail] = useState("");
   const [senha, setSenha] = useState("");
   const [confirmarSenha, setConfirmarSenha] = useState("");
@@ -260,6 +260,18 @@ export default function CadastroScreen() {
     }
   };
 
+  const checkDuplicateField = async (
+    fieldName: string,
+    value: string
+  ): Promise<boolean> => {
+    if (!value) return false;
+    const usersRef = ref(database, "usuariosEmpresa");
+    const snapshot = await get(
+      query(usersRef, orderByChild(fieldName), equalTo(value))
+    );
+    return snapshot.exists();
+  };
+
   const cadastrarUsuario = async () => {
     if (!camposPreenchidos()) {
       setErro(
@@ -286,13 +298,51 @@ export default function CadastroScreen() {
     setLoading(true);
     setErro("");
 
+    // Processar Instagram para garantir que o formato de verificação é o correto
+    let processedInstagram: string | null = null;
+    const rawInstagramInput = instagram?.trim();
+
+    if (rawInstagramInput) {
+      const instagramUrlRegex =
+        /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)/;
+      const match = rawInstagramInput.match(instagramUrlRegex);
+
+      if (match && match[1]) {
+        processedInstagram = match[1];
+      } else {
+        processedInstagram = rawInstagramInput.startsWith("@")
+          ? rawInstagramInput.substring(1)
+          : rawInstagramInput;
+      }
+    }
+
     try {
+      // 1. Verificar Duplicidade no Firebase Auth (Email)
       const methods = await fetchSignInMethodsForEmail(auth, email);
       if (methods.length > 0) {
         setErro("Email já cadastrado em outra conta.");
         setLoading(false);
         return;
       }
+
+      // 2. Verificar Duplicidade no Realtime Database (CPF, CNPJ, Instagram)
+      if (cpf && await checkDuplicateField("cpf", cpf)) {
+        setErro("CPF já cadastrado em outra conta de empresa.");
+        setLoading(false);
+        return;
+      }
+      if (cnpj && await checkDuplicateField("cnpj", cnpj)) {
+        setErro("CNPJ já cadastrado em outra conta de empresa.");
+        setLoading(false);
+        return;
+      }
+      if (processedInstagram && await checkDuplicateField("instagram", processedInstagram)) {
+        setErro("Instagram já cadastrado em outra conta de empresa.");
+        setLoading(false);
+        return;
+      }
+
+      // 3. Criar o Usuário no Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -300,28 +350,13 @@ export default function CadastroScreen() {
       );
       const userId = userCredential.user.uid;
 
+      // 4. Fazer Upload da Imagem
       const imageUrl = await uploadImagem();
 
-      let processedInstagram: string | null = null;
-      const rawInstagramInput = instagram?.trim();
-
-      if (rawInstagramInput) {
-        const instagramUrlRegex =
-          /(?:https?:\/\/)?(?:www\.)?instagram\.com\/([a-zA-Z0-9_.]+)/;
-        const match = rawInstagramInput.match(instagramUrlRegex);
-
-        if (match && match[1]) {
-          processedInstagram = match[1];
-        } else {
-          processedInstagram = rawInstagramInput.startsWith("@")
-            ? rawInstagramInput.substring(1)
-            : rawInstagramInput;
-        }
-      }
-
+      // 5. Salvar Dados da Empresa no Realtime Database
       await set(ref(database, "usuariosEmpresa/" + userId), {
         nome,
-        nomeEmpresa, 
+        nomeEmpresa,
         email,
         telefone: telefone || null,
         instagram: processedInstagram,
@@ -337,7 +372,7 @@ export default function CadastroScreen() {
 
       Alert.alert("Sucesso", "Cadastro realizado com sucesso!");
       setNome("");
-      setNomeEmpresa(""); 
+      setNomeEmpresa("");
       setEmail("");
       setTelefone("");
       setInstagram("");
@@ -347,8 +382,17 @@ export default function CadastroScreen() {
       setTermoAceito(false);
       router.replace("/(auth)/loginScreen");
     } catch (error: any) {
-      setErro(error.message);
-      Alert.alert("teste");
+      console.error("Erro no cadastro:", error);
+      // setErro(error.message); // Mantive a linha original comentada caso queira usar a mensagem de erro padrão do Firebase Auth
+      let message = "Erro ao cadastrar. Por favor, tente novamente.";
+      if (error.code === "auth/weak-password") {
+        message = "A senha deve ter pelo menos 6 caracteres.";
+      } else if (error.code === "auth/invalid-email") {
+        message = "O endereço de e-mail é inválido.";
+      } else if (error.code === "auth/email-already-in-use") {
+        message = "O e-mail já está sendo utilizado por outra conta.";
+      }
+      setErro(message);
     } finally {
       setLoading(false);
     }
@@ -423,7 +467,7 @@ export default function CadastroScreen() {
           </View>
 
           <TextInput
-            placeholder="Nome da Empresa*" 
+            placeholder="Nome da Empresa*"
             value={nomeEmpresa}
             onChangeText={setNomeEmpresa}
             style={styles.input}
