@@ -30,7 +30,7 @@ yarn-error.*
 *.pem
 
 # Excluir arquivos de configuração sensíveis
-#google-services.json
+google-services.json
 GoogleService-Info.plist
 
 # local env files
