@@ -27,7 +27,7 @@ export default {
           apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
         },
       },
-      versionCode: 11,
+      versionCode: 13,
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -38,7 +38,7 @@ export default {
         "com.google.android.gms.permission.AD_ID"
       ],
       package: "com.tanopreco",
-      googleServicesFile: "./google-services.json",
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
       queries: [
         {
           intent: {

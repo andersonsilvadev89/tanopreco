@@ -1,85 +1,190 @@
 import { Redirect } from "expo-router";
 import { useAuth } from "../context/AuthContext";
-import { ActivityIndicator, View, Text } from "react-native";
+import {
+  ActivityIndicator,
+  View,
+  Text,
+  Modal,
+  Pressable,
+  Linking,
+  StyleSheet,
+} from "react-native";
 import React, { useEffect, useState } from "react";
 import * as Updates from "expo-updates";
-
-// ⚠️ ADICIONE ESTA IMPORTAÇÃO 
-import mobileAds from 'react-native-google-mobile-ads'; 
+import mobileAds from "react-native-google-mobile-ads";
+import VersionCheck from "react-native-version-check";
 
 export default function Index() {
   const { user, loading } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [storeUrl, setStoreUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    // ------------------------------------------
-    // 1. INICIALIZAÇÃO DO GOOGLE MOBILE ADS SDK
-    // ------------------------------------------
+    // 1️⃣ Inicializar Google Mobile Ads (executado imediatamente)
     console.log("Inicializando Google Mobile Ads SDK...");
     mobileAds()
       .initialize()
-      .then(adapterStatuses => {
-        // A inicialização está completa. Agora você pode carregar anúncios.
-        console.log('Mobile Ads SDK inicializado com sucesso.');
-        // Opcional: console.log('Status dos adaptadores:', adapterStatuses);
-      })
-      .catch(error => {
-        console.error("Erro ao inicializar Google Mobile Ads SDK:", error);
-      });
-    // ------------------------------------------
+      .then(() => console.log("Mobile Ads SDK inicializado com sucesso."))
+      .catch((error) =>
+        console.error("Erro ao inicializar Google Mobile Ads SDK:", error)
+      );
 
-    // ------------------------------------------
-    // 2. LÓGICA DE VERIFICAÇÃO DE UPDATES OTA
-    // ------------------------------------------
-    async function checkForUpdates() {
+    // 2️⃣ Função assíncrona para checagem de atualizações (OTA e Loja)
+    async function initializeChecks() {
+      // ** Checagem OTA (Expo Updates) **
       if (!__DEV__) {
         try {
           console.log("Verificando atualizações OTA...");
-          console.log("Runtime Version:", Updates.runtimeVersion);
-          console.log("Canal de atualização:", Updates.channel || "indefinido");
-
           setIsUpdating(true);
 
           const update = await Updates.checkForUpdateAsync();
-          console.log("Update disponível?", update.isAvailable);
-
           if (update.isAvailable) {
-            console.log("⬇Baixando atualização...");
+            console.log("⬇ Baixando atualização OTA...");
             await Updates.fetchUpdateAsync();
-            console.log("Atualização baixada com sucesso. Recarregando o app...");
             await Updates.reloadAsync();
           } else {
-            console.log("Nenhuma atualização disponível.");
+            console.log("Nenhuma atualização OTA disponível.");
           }
         } catch (error: any) {
-          console.error("Erro ao verificar/baixar atualização OTA:", error?.message || error);
+          console.error("Erro ao verificar/baixar atualização OTA:", error);
         } finally {
           setIsUpdating(false);
         }
       } else {
-        console.log("Ambiente de desenvolvimento (__DEV__ = true). Ignorando updates OTA.");
-        setIsUpdating(false);
+        console.log("Modo desenvolvimento (__DEV__ = true). Ignorando OTA.");
+      }
+
+      // ** Checagem de versão da Play Store/App Store **
+      try {
+        // CORREÇÃO 1: Adicionando 'as any' para ignorar erro de 'provider'
+        const latestVersion = await VersionCheck.getLatestVersion({
+          provider: "playStore",
+          packageName: "com.tanopreco", // ⚠️ Lembre-se de mudar para seu ID real
+        } as any); 
+
+        const currentVersion = VersionCheck.getCurrentVersion();
+        console.log(`Versão instalada: ${currentVersion}`);
+        console.log(`Versão na Loja: ${latestVersion}`);
+
+        // CORREÇÃO 2: Adicionando 'await' para resolver a Promise antes de checar 'isNeeded'
+        const needUpdateResult = await VersionCheck.needUpdate({
+          currentVersion,
+          latestVersion,
+        });
+
+        // Agora 'needUpdateResult' tem a propriedade 'isNeeded'
+        if (needUpdateResult?.isNeeded) {
+          // CORREÇÃO 3: Adicionando 'as any' para ignorar erro de 'provider'
+          const storeUrl = await VersionCheck.getStoreUrl({
+            provider: "playStore",
+            packageName: "com.tanopreco", // ⚠️ Lembre-se de mudar para seu ID real
+          } as any);
+
+          setStoreUrl(storeUrl);
+          setShowUpdateModal(true);
+        }
+      } catch (error) {
+        // Ignorar erro de versão se o modal já está ativo
+        if (!showUpdateModal) {
+          console.error("Erro ao verificar versão da Loja:", error);
+        }
       }
     }
 
-    checkForUpdates();
-  }, []); // O useEffect é executado apenas uma vez ao montar o componente
+    initializeChecks();
+  }, [showUpdateModal]);
 
+  // 🔄 Enquanto carrega
   if (loading || isUpdating) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+      <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" />
-        {isUpdating && <Text style={{ marginTop: 10, color: 'gray' }}>Verificando atualizações OTA...</Text>}
-        {loading && <Text style={{ marginTop: 10, color: 'gray' }}>Carregando dados do usuário...</Text>}
+        {isUpdating && (
+          <Text style={styles.loadingText}>Verificando atualizações...</Text>
+        )}
+        {loading && (
+          <Text style={styles.loadingText}>Carregando dados do usuário...</Text>
+        )}
       </View>
     );
   }
 
-  if (!user) {
-    // Certifique-se de que a rota de login/home para não-logados está correta.
-    return <Redirect href="/(tabs)/homeScreen" />; 
+  // 🧩 Modal de atualização obrigatória
+  if (showUpdateModal) {
+    return (
+      <Modal visible={showUpdateModal} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Nova versão disponível!</Text>
+            <Text style={styles.modalMessage}>
+              Há uma nova versão do aplicativo disponível na Play Store. Atualize
+              para continuar usando.
+            </Text>
+            <Pressable
+              style={styles.updateButton}
+              onPress={() => {
+                if (storeUrl) Linking.openURL(storeUrl);
+              }}
+            >
+              <Text style={styles.updateButtonText}>Atualizar agora</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+    );
   }
-  
-  // Rota para usuários logados.
-  return <Redirect href="/(empresa)/homeScreen" />; 
+
+  // 🔐 Redirecionamento de acordo com autenticação
+  if (!user) {
+    return <Redirect href="/(tabs)/homeScreen" />;
+  }
+
+  return <Redirect href="/(empresa)/homeScreen" />;
 }
+
+const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 10,
+    color: "gray",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 24,
+    width: "85%",
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginBottom: 10,
+  },
+  modalMessage: {
+    textAlign: "center",
+    fontSize: 16,
+    marginBottom: 20,
+  },
+  updateButton: {
+    backgroundColor: "#007AFF",
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+  },
+  updateButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+});
