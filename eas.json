@@ -11,10 +11,10 @@
     },
     "preview": {
       "distribution": "internal",
-      "channel": "preview",
       "env": {
         "GOOGLE_SERVICES_JSON": "./google-services.json"
-      }
+      },
+      "channel": "preview"
     },
     "production": {
       "autoIncrement": true,

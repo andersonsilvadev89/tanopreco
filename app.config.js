@@ -85,6 +85,14 @@ export default {
         }
       ],
       "expo-secure-store",
+      [
+        "@react-native-google-mobile-ads/app-config",
+        {
+          android: {
+            mobileAdsAppId: "ca-app-pub-5241782827769638~1347375952" 
+          }
+        }
+      ]
     ],
     experiments: {
       typedRoutes: true
