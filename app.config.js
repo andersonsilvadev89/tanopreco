@@ -84,15 +84,7 @@ export default {
           locationAlwaysAndWhenInUsePermission: "Permitir que $(PRODUCT_NAME) use sua localização para te mostrar no mapa."
         }
       ],
-      "expo-secure-store",
-      [
-        "@react-native-google-mobile-ads/app-config",
-        {
-          android: {
-            mobileAdsAppId: "ca-app-pub-5241782827769638~1347375952" 
-          }
-        }
-      ]
+      "expo-secure-store"
     ],
     experiments: {
       typedRoutes: true
