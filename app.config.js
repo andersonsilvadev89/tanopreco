@@ -1,34 +1,3 @@
-import fs from "fs";
-
-const plistPath = "./GoogleService-Info.plist";
-const googleJsonPath = "./google-services.json";
-
-/* --------------------------------------------------
-   🔐 Decodifica os arquivos do Firebase vindos do EAS
--------------------------------------------------- */
-
-// 🧩 iOS — GoogleService-Info.plist
-if (process.env.GOOGLE_SERVICES_FILE_IOS && !fs.existsSync(plistPath)) {
-  try {
-    const decoded = Buffer.from(process.env.GOOGLE_SERVICES_FILE_IOS, "base64").toString("utf-8");
-    fs.writeFileSync(plistPath, decoded);
-    console.log("✅ GoogleService-Info.plist criado com sucesso!");
-  } catch (error) {
-    console.error("❌ Erro ao criar GoogleService-Info.plist:", error);
-  }
-}
-
-// 🧩 Android — google-services.json
-if (process.env.GOOGLE_SERVICES_JSON && !fs.existsSync(googleJsonPath)) {
-  try {
-    const decoded = Buffer.from(process.env.GOOGLE_SERVICES_JSON, "base64").toString("utf-8");
-    fs.writeFileSync(googleJsonPath, decoded);
-    console.log("✅ google-services.json criado com sucesso!");
-  } catch (error) {
-    console.error("❌ Erro ao criar google-services.json:", error);
-  }
-}
-
 export default {
   expo: {
     name: "TaNoPreco",
