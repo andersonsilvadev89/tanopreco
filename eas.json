@@ -9,7 +9,7 @@
       "distribution": "internal",
       "env": {
         "GOOGLE_SERVICES_JSON": "$GOOGLE_SERVICES_JSON",
-        "GOOGLE_SERVICES_FILE_IOS": "GOOGLE_SERVICES_PLIST"
+        "GOOGLE_SERVICES_FILE_IOS": "$GOOGLE_SERVICES_PLIST"
       },
       "channel": "development"
     },
@@ -17,7 +17,7 @@
       "distribution": "internal",
       "env": {
         "GOOGLE_SERVICES_JSON": "$GOOGLE_SERVICES_JSON",
-        "GOOGLE_SERVICES_FILE_IOS": "GOOGLE_SERVICES_PLIST"
+        "GOOGLE_SERVICES_FILE_IOS": "$GOOGLE_SERVICES_PLIST"
       },
       "channel": "preview"
     },
@@ -25,7 +25,7 @@
       "autoIncrement": true,
       "env": {
         "GOOGLE_SERVICES_JSON": "$GOOGLE_SERVICES_JSON",
-        "GOOGLE_SERVICES_FILE_IOS": "GOOGLE_SERVICES_PLIST"
+        "GOOGLE_SERVICES_FILE_IOS": "$GOOGLE_SERVICES_PLIST"
       },
       "channel": "production"
     }
