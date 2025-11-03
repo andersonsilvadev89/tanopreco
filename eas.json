@@ -9,7 +9,7 @@
       "distribution": "internal",
       "env": {
         "GOOGLE_SERVICES_JSON": "$GOOGLE_SERVICES_JSON",
-        "GOOGLE_SERVICES_FILE_IOS": "$GOOGLE_SERVICES_PLIST"
+        "GOOGLE_SERVICES_PLIST": "$GOOGLE_SERVICES_PLIST"
       },
       "channel": "development"
     },
