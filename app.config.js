@@ -60,8 +60,9 @@ export default {
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       },
-      googleServicesFile: "./GoogleService-Info.plist",
+      googleServicesFile: process.env.GOOGLE_SERVICES_FILE_IOS,
       infoPlist: {
+        "ITSAppUsesNonExemptEncryption": false,
         NSPhotoLibraryUsageDescription: "Precisamos de acesso à sua galeria de fotos.",
         NSCameraUsageDescription: "Precisamos de acesso à sua câmera para você tirar uma foto de perfil.",
         NSLocationWhenInUseUsageDescription: "Precisamos da sua localização para mostrar seus amigos no mapa.",
