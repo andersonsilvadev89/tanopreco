@@ -1,4 +1,18 @@
-// app.config.js
+import fs from "fs";
+
+const plistPath = "./GoogleService-Info.plist";
+
+// 🔐 Decodifica o Base64 vindo do EAS (caso o arquivo ainda não exista)
+if (process.env.GOOGLE_SERVICES_FILE_IOS && !fs.existsSync(plistPath)) {
+  try {
+    const decoded = Buffer.from(process.env.GOOGLE_SERVICES_FILE_IOS, "base64").toString("utf-8");
+    fs.writeFileSync(plistPath, decoded);
+    console.log("✅ GoogleService-Info.plist criado com sucesso!");
+  } catch (error) {
+    console.error("❌ Erro ao criar GoogleService-Info.plist:", error);
+  }
+}
+
 export default {
   expo: {
     name: "TaNoPreco",
@@ -60,7 +74,8 @@ export default {
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       },
-      googleServicesFile: process.env.GOOGLE_SERVICES_FILE_IOS,
+      // 🔧 Agora o Expo vai usar o arquivo gerado acima
+      googleServicesFile: plistPath,
       infoPlist: {
         "ITSAppUsesNonExemptEncryption": false,
         NSPhotoLibraryUsageDescription: "Precisamos de acesso à sua galeria de fotos.",
