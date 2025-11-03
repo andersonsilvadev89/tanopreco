@@ -1,3 +1,4 @@
+// app.config.js
 export default {
   expo: {
     name: "TaNoPreco",
@@ -37,7 +38,7 @@ export default {
         "com.google.android.gms.permission.AD_ID"
       ],
       package: "com.tanopreco",
-      googleServicesFile: googleJsonPath,
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
       queries: [
         {
           intent: {
@@ -59,7 +60,7 @@ export default {
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       },
-      googleServicesFile: plistPath,
+      googleServicesFile: process.env.GOOGLE_SERVICES_FILE_IOS,
       infoPlist: {
         "ITSAppUsesNonExemptEncryption": false,
         NSPhotoLibraryUsageDescription: "Precisamos de acesso à sua galeria de fotos.",
