@@ -1,8 +1,13 @@
 import fs from "fs";
 
 const plistPath = "./GoogleService-Info.plist";
+const googleJsonPath = "./google-services.json";
 
-// 🔐 Decodifica o Base64 vindo do EAS (caso o arquivo ainda não exista)
+/* --------------------------------------------------
+   🔐 Decodifica os arquivos do Firebase vindos do EAS
+-------------------------------------------------- */
+
+// 🧩 iOS — GoogleService-Info.plist
 if (process.env.GOOGLE_SERVICES_FILE_IOS && !fs.existsSync(plistPath)) {
   try {
     const decoded = Buffer.from(process.env.GOOGLE_SERVICES_FILE_IOS, "base64").toString("utf-8");
@@ -10,6 +15,17 @@ if (process.env.GOOGLE_SERVICES_FILE_IOS && !fs.existsSync(plistPath)) {
     console.log("✅ GoogleService-Info.plist criado com sucesso!");
   } catch (error) {
     console.error("❌ Erro ao criar GoogleService-Info.plist:", error);
+  }
+}
+
+// 🧩 Android — google-services.json
+if (process.env.GOOGLE_SERVICES_JSON && !fs.existsSync(googleJsonPath)) {
+  try {
+    const decoded = Buffer.from(process.env.GOOGLE_SERVICES_JSON, "base64").toString("utf-8");
+    fs.writeFileSync(googleJsonPath, decoded);
+    console.log("✅ google-services.json criado com sucesso!");
+  } catch (error) {
+    console.error("❌ Erro ao criar google-services.json:", error);
   }
 }
 
@@ -52,7 +68,7 @@ export default {
         "com.google.android.gms.permission.AD_ID"
       ],
       package: "com.tanopreco",
-      googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
+      googleServicesFile: googleJsonPath,
       queries: [
         {
           intent: {
@@ -74,7 +90,6 @@ export default {
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       },
-      // 🔧 Agora o Expo vai usar o arquivo gerado acima
       googleServicesFile: plistPath,
       infoPlist: {
         "ITSAppUsesNonExemptEncryption": false,
