@@ -27,7 +27,7 @@ export default {
           apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
         },
       },
-      versionCode: 18,
+      versionCode: 19,
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -61,11 +61,7 @@ export default {
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       },
-      // 🛑 CORREÇÃO APLICADA AQUI 🛑
-      // 1. Usamos a variável GOOGLE_SERVICES_FILE_IOS (o EAS usa este nome para Secret Files).
-      // 2. Adicionamos um fallback (?? './GoogleService-Info.plist') para o caso de a variável não existir
-      //    localmente, garantindo que o EAS CLI não falhe ao ler a configuração.
-      googleServicesFile: process.env.GOOGLE_SERVICES_FILE_IOS ?? './GoogleService-Info.plist', 
+      googleServicesFile: process.env.GOOGLE_SERVICES_PLIST ?? './GoogleService-Info.plist', 
       infoPlist: {
         "ITSAppUsesNonExemptEncryption": false,
         NSPhotoLibraryUsageDescription: "Precisamos de acesso à sua galeria de fotos.",
