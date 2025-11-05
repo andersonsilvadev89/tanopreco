@@ -2,7 +2,7 @@
 export default {
   expo: {
     name: "TaNoPreco",
-    slug: "tanopreco",
+    slug: "TaNopreco",
     platforms: ["android", "ios"],
     version: "1.0.0",
     orientation: "portrait",
@@ -104,7 +104,7 @@ export default {
       "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       "eas": {
         // ID CORRIGIDO - Colocando o ID que o EAS encontrou no seu log de erro:
-        projectId: "8af0d6d8-9d49-4c6b-880a-e1134819588f" 
+        projectId: "24f376e8-afe2-4c3e-bab9-035b5e089295" 
       }
     },
     owner: "andersonsilva.dev89"
