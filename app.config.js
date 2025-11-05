@@ -109,3 +109,17 @@ googleMobileAdsAppId: "ca-app-pub-5241782827769638~8974053643"
     owner: "andersonsilva.dev89"
   }
 };
+
+module.exports = {
+  expo: {
+    android: {
+      config: {
+        googleMobileAdsAppId: "ca-app-pub-5241782827769638~1347375952"
+      }
+    },
+    // configuração direta para o plugin react-native-google-mobile-ads (se pedir)
+    "react-native-google-mobile-ads": {
+      "android_app_id": "ca-app-pub-5241782827769638~1347375952"
+    }
+  }
+};
