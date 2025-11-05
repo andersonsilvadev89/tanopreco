@@ -103,7 +103,7 @@ googleMobileAdsAppId: "ca-app-pub-5241782827769638~8974053643"
       "firebaseMeasurementId": process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
       "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       "eas": {
-        projectId: "24f376e8-afe2-4c3e-bab9-035b5e089295"
+        projectId: "8af0d6d8-9d49-4c6b-880a-e1134819588f"
       }
     },
     owner: "andersonsilva.dev89"
@@ -117,7 +117,6 @@ module.exports = {
         googleMobileAdsAppId: "ca-app-pub-5241782827769638~1347375952"
       }
     },
-    // configuração direta para o plugin react-native-google-mobile-ads (se pedir)
     "react-native-google-mobile-ads": {
       "android_app_id": "ca-app-pub-5241782827769638~1347375952"
     }
