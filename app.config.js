@@ -26,8 +26,9 @@ export default {
         googleMaps: {
           apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
         },
+        googleMobileAdsAppId: "ca-app-pub-5241782827769638~1347375952"
       },
-      versionCode: 19,
+      versionCode: 20,
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -60,6 +61,7 @@ export default {
       buildNumber: "1",
       config: {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+googleMobileAdsAppId: "ca-app-pub-5241782827769638~8974053643"
       },
       googleServicesFile: process.env.GOOGLE_SERVICES_PLIST ?? './GoogleService-Info.plist', 
       infoPlist: {

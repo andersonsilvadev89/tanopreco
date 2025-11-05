@@ -32,6 +32,9 @@ import { auth, database } from "../../firebaseConfig";
 import AdBanner from "../components/AdBanner";
 import { Feather } from "@expo/vector-icons";
 
+// ➡️ NOVO COMPONENTE: LocalizacaoModal
+import LocalizacaoModal from "../components/LocalizacaoModal"; // ⚠️ Ajuste o caminho conforme a sua estrutura
+
 const defaultFundoLocal = require("../../assets/images/fundo.png");
 const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dvekhdfgc/image/upload";
 const UPLOAD_PRESET = "tanopreco";
@@ -94,6 +97,10 @@ interface Produto {
   dataFinalOferta?: string;
   destaque?: boolean;
   editavel?: boolean;
+  // 🆕 NOVOS CAMPOS DE LOCALIZAÇÃO
+  localizacaoDiferente?: boolean;
+  latitude?: number;
+  longitude?: number;
 }
 
 interface EmpresaData {
@@ -116,6 +123,12 @@ export default function CadastroProduto() {
   const [imagemUrl, setImagemUrl] = useState<string | undefined>();
   const [imagemUri, setImagemUri] = useState<string | undefined>();
   const [produtos, setProdutos] = useState<Produto[]>([]);
+
+  // 🆕 NOVOS ESTADOS PARA LOCALIZAÇÃO
+  const [localizacaoDiferente, setLocalizacaoDiferente] = useState(false);
+  const [modalMapaVisivel, setModalMapaVisivel] = useState(false);
+  const [latitude, setLatitude] = useState<number | undefined>(undefined);
+  const [longitude, setLongitude] = useState<number | undefined>(undefined);
 
   const [loadingUpload, setLoadingUpload] = useState(false);
   const [termoBusca, setTermoBusca] = useState("");
@@ -190,7 +203,10 @@ export default function CadastroProduto() {
       .split(",")
       .map((w) => w.trim())
       .filter((w) => w.length > 0 && !categorias.includes(w));
-    const allPalavrasChave = [...categoriasSelecionadas, ...palavrasChaveAdicionais];
+    const allPalavrasChave = [
+      ...categoriasSelecionadas,
+      ...palavrasChaveAdicionais,
+    ];
     setPalavrasChave(allPalavrasChave.join(", "));
   }, [categoriasSelecionadas]);
 
@@ -215,9 +231,7 @@ export default function CadastroProduto() {
             {
               text: "Ver Pacotes",
               onPress: () =>
-                Linking.openURL(
-                  "https://tanopreco-67706.web.app"
-                ),
+                Linking.openURL("https://tanopreco-67706.web.app"),
             },
           ]
         );
@@ -236,6 +250,15 @@ export default function CadastroProduto() {
       return;
     }
 
+    // 🆕 VALIDAÇÃO DA LOCALIZAÇÃO CUSTOMIZADA
+    if (
+      localizacaoDiferente &&
+      (latitude === undefined || longitude === undefined)
+    ) {
+      Alert.alert("Atenção", "Selecione a localização customizada no mapa.");
+      return;
+    }
+
     const produtoRef = ref(database, `produtos/${userId}`);
     const produto: Produto = {
       descricao: descricao,
@@ -245,6 +268,10 @@ export default function CadastroProduto() {
       dataFinalOferta,
       destaque,
       editavel,
+      // 🆕 SALVA NOVOS DADOS DE LOCALIZAÇÃO
+      localizacaoDiferente,
+      latitude: localizacaoDiferente ? latitude : undefined,
+      longitude: localizacaoDiferente ? longitude : undefined,
     };
 
     if (editandoId) {
@@ -278,6 +305,10 @@ export default function CadastroProduto() {
     setImagemUri(undefined);
     setEditandoId(null);
     setDestaque(false);
+    // 🆕 LIMPA ESTADOS DE LOCALIZAÇÃO
+    setLocalizacaoDiferente(false);
+    setLatitude(undefined);
+    setLongitude(undefined);
     Keyboard.dismiss();
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ y: 0, animated: true });
@@ -331,6 +362,10 @@ export default function CadastroProduto() {
     setImagemUrl(produto.imagemUrl);
     setEditandoId(produto.id || null);
     setDestaque(!!produto.destaque);
+    // 🆕 CARREGA NOVOS DADOS DE LOCALIZAÇÃO
+    setLocalizacaoDiferente(!!produto.localizacaoDiferente);
+    setLatitude(produto.latitude);
+    setLongitude(produto.longitude);
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ y: 0, animated: true });
     }
@@ -423,6 +458,25 @@ export default function CadastroProduto() {
     setCategoriasSelecionadas((prev) =>
       prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
     );
+  };
+
+  // 🆕 LÓGICA DE ABRIR MODAL AO ATIVAR SWITCH
+  const handleToggleLocalizacaoDiferente = (value: boolean) => {
+    setLocalizacaoDiferente(value);
+    if (value) {
+      // Abre o modal automaticamente ao ativar o switch
+      setModalMapaVisivel(true);
+    } else {
+      // Limpa a localização se for desativado (usa a localização da empresa)
+      setLatitude(undefined);
+      setLongitude(undefined);
+    }
+  };
+
+  const handleLocalizacaoSalva = (coords: { latitude: number; longitude: number }) => {
+    setLatitude(coords.latitude);
+    setLongitude(coords.longitude);
+    setModalMapaVisivel(false);
   };
 
   if (loadingCompanyData) {
@@ -544,6 +598,35 @@ export default function CadastroProduto() {
               accessibilityLabel="Campo para inserir palavras-chave relacionadas ao produto"
               editable={true}
             />
+
+            {/* 🆕 SWITCH DE LOCALIZAÇÃO */}
+            <View style={styles.switchContainer}>
+              <Text style={styles.switchLabel}>
+                Usar localização diferente:
+              </Text>
+              <Switch
+                trackColor={{ false: "#767577", true: "#81b0ff" }}
+                thumbColor={localizacaoDiferente ? "#f5dd4b" : "#f4f3f4"}
+                ios_backgroundColor="#3e3e3e"
+                onValueChange={handleToggleLocalizacaoDiferente}
+                value={localizacaoDiferente}
+              />
+            </View>
+            {localizacaoDiferente && (
+              <TouchableOpacity
+                style={styles.localizacaoBotao}
+                onPress={() => setModalMapaVisivel(true)}
+              >
+                <Feather name="map-pin" size={16} color="white" />
+                <Text style={styles.localizacaoBotaoTexto}>
+                  {latitude !== undefined && longitude !== undefined
+                    ? `Localização Selecionada: Lat ${latitude.toFixed(4)}, Lon ${longitude.toFixed(4)}`
+                    : "Selecionar Localização no Mapa *"}
+                </Text>
+              </TouchableOpacity>
+            )}
+            {/* --------------------------- */}
+
             <View style={styles.switchContainer}>
               <Text style={styles.switchLabel}>Marcar como Destaque</Text>
               <Switch
@@ -656,6 +739,13 @@ export default function CadastroProduto() {
                         {item.destaque && (
                           <Text style={styles.ofertaFlag}>Destaque!</Text>
                         )}
+                        {/* 🆕 EXIBE LOCALIZAÇÃO CUSTOMIZADA NA LISTA */}
+                        {item.localizacaoDiferente && item.latitude && item.longitude && (
+                          <Text style={styles.localizacaoText}>
+                            📍 Local Customizada
+                          </Text>
+                        )}
+                        {/* --------------------------------------------- */}
                       </View>
                       <View style={styles.buttonColumn}>
                         <Button
@@ -681,6 +771,15 @@ export default function CadastroProduto() {
             </View>
           </KeyboardAvoidingView>
         )}
+
+        {/* 🆕 CHAMA O MODAL DO MAPA */}
+        <LocalizacaoModal
+          isVisible={modalMapaVisivel}
+          onClose={() => setModalMapaVisivel(false)}
+          onSave={handleLocalizacaoSalva}
+          initialCoords={{ latitude: latitude, longitude: longitude }}
+        />
+
       </View>
     </ImageBackground>
   );
@@ -782,6 +881,13 @@ const styles = StyleSheet.create({
   },
   listItemText: {
     marginBottom: 3,
+  },
+  // 🆕 ESTILO PARA EXIBIR LOCALIZAÇÃO NA LISTA
+  localizacaoText: {
+    fontSize: 12,
+    color: "#007BFF",
+    marginTop: 5,
+    fontWeight: 'bold',
   },
   buttonColumn: {
     flexDirection: 'column',
@@ -938,5 +1044,20 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
-  }
+  },
+  // 🆕 ESTILOS DO BOTÃO DE LOCALIZAÇÃO
+  localizacaoBotao: {
+    backgroundColor: "#007BFF",
+    padding: 10,
+    borderRadius: 8,
+    alignItems: "center",
+    marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 5,
+  },
+  localizacaoBotaoTexto: {
+    color: "white",
+    fontWeight: "bold",
+  },
 });
