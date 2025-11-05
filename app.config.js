@@ -2,7 +2,7 @@
 export default {
   expo: {
     name: "TaNoPreco",
-    slug: "TaNopreco",
+    slug: "TaNoPreco",
     platforms: ["android", "ios"],
     version: "1.0.0",
     orientation: "portrait",
