@@ -103,7 +103,6 @@ export default {
       "firebaseMeasurementId": process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
       "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       "eas": {
-        // ID CORRIGIDO - Colocando o ID que o EAS encontrou no seu log de erro:
         projectId: "24f376e8-afe2-4c3e-bab9-035b5e089295" 
       }
     },
