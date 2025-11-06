@@ -27,7 +27,7 @@ export default {
           apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
         }
       },
-      versionCode: 19,
+      versionCode: 21,
       adaptiveIcon: {
         foregroundImage: "./assets/images/adaptive-icon.png",
         backgroundColor: "#ffffff"
@@ -62,7 +62,7 @@ export default {
         googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
         googleMobileAdsAppId: "ca-app-pub-5241782827769638~8974053643"
       },
-      googleServicesFile: process.env.GOOGLE_SERVICES_PLIST ?? './GoogleService-Info.plist', 
+      googleServicesFile: process.env.GOOGLE_SERVICES_PLIST ?? './GoogleService-Info.plist',
       infoPlist: {
         "ITSAppUsesNonExemptEncryption": false,
         NSPhotoLibraryUsageDescription: "Precisamos de acesso à sua galeria de fotos.",
@@ -87,6 +87,12 @@ export default {
           locationAlwaysAndWhenInUsePermission: "Permitir que $(PRODUCT_NAME) use sua localização para te mostrar no mapa."
         }
       ],
+      [
+        "react-native-google-mobile-ads",
+        {
+          android_app_id: "ca-app-pub-5241782827769638~1347375952"
+        }
+      ],
       "expo-secure-store"
     ],
     experiments: {
@@ -102,7 +108,7 @@ export default {
       "firebaseMeasurementId": process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
       "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       "eas": {
-        projectId: "24f376e8-afe2-4c3e-bab9-035b5e089295" 
+        projectId: "24f376e8-afe2-4c3e-bab9-035b5e089295"
       }
     },
     owner: "andersonsilva.dev89"
