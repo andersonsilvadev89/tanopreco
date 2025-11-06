@@ -88,8 +88,8 @@ export default {
     [
       "react-native-google-mobile-ads",
       {
-        android_app_id: "ca-app-pub-5241782827769638~1347375952",
-        ios_app_id: "ca-app-pub-5241782827769638~8974053643"
+        androidAppId: "ca-app-pub-5241782827769638~1347375952",
+        iosAppId: "ca-app-pub-5241782827769638~8974053643"
       }
     ],
     "expo-secure-store"
