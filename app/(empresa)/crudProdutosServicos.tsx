@@ -142,12 +142,21 @@ export default function CadastroProduto() {
   const [loadingCompanyData, setLoadingCompanyData] = useState(true);
   const [mostrarLista, setMostrarLista] = useState(false);
 
+  // ✅ ESTADOS PARA ARMAZENAR POSIÇÕES Y DOS INPUTS PARA O FOCO
+  const [descricaoY, setDescricaoY] = useState(0);
+  const [precoY, setPrecoY] = useState(0);
+  const [dataFinalOfertaY, setDataFinalOfertaY] = useState(0);
+  const [palavrasChaveY, setPalavrasChaveY] = useState(0);
+  // --------------------------------------------------
+
   const scrollRef = useRef<ScrollView>(null);
   const userId = auth.currentUser?.uid;
 
+  // ✅ FUNÇÃO PARA ROLAR O SCROLLVIEW ATÉ O INPUT
   const scrollToInput = (y: number) => {
     setTimeout(() => {
-      scrollRef.current?.scrollTo({ y, animated: true });
+      // Subtrai 50 para deixar o input um pouco mais visível acima do teclado
+      scrollRef.current?.scrollTo({ y: y - 50, animated: true });
     }, 300);
   };
 
@@ -543,6 +552,11 @@ export default function CadastroProduto() {
               placeholder="Descrição do produto"
               style={styles.input}
               accessibilityLabel="Campo para inserir a descrição do produto"
+              // ✅ FOCO AUTOMÁTICO
+              onLayout={(event) => {
+                setDescricaoY(event.nativeEvent.layout.y);
+              }}
+              onFocus={() => scrollToInput(descricaoY)}
             />
             <Text>Preço</Text>
             <TextInput
@@ -552,6 +566,11 @@ export default function CadastroProduto() {
               keyboardType="numeric"
               style={styles.input}
               accessibilityLabel="Campo para inserir o preço do produto"
+              // ✅ FOCO AUTOMÁTICO
+              onLayout={(event) => {
+                setPrecoY(event.nativeEvent.layout.y);
+              }}
+              onFocus={() => scrollToInput(precoY)}
             />
             <Text>Data Final da Oferta</Text>
             <TextInput
@@ -562,6 +581,11 @@ export default function CadastroProduto() {
               style={styles.input}
               maxLength={10}
               accessibilityLabel="Campo para inserir a data final da oferta"
+              // ✅ FOCO AUTOMÁTICO
+              onLayout={(event) => {
+                setDataFinalOfertaY(event.nativeEvent.layout.y);
+              }}
+              onFocus={() => scrollToInput(dataFinalOfertaY)}
             />
             <Text style={{ marginBottom: 5, fontWeight: "bold" }}>
               Categorias *
@@ -597,6 +621,11 @@ export default function CadastroProduto() {
               style={styles.input}
               accessibilityLabel="Campo para inserir palavras-chave relacionadas ao produto"
               editable={true}
+              // ✅ FOCO AUTOMÁTICO
+              onLayout={(event) => {
+                setPalavrasChaveY(event.nativeEvent.layout.y);
+              }}
+              onFocus={() => scrollToInput(palavrasChaveY)}
             />
 
             {/* 🆕 SWITCH DE LOCALIZAÇÃO */}
@@ -618,11 +647,13 @@ export default function CadastroProduto() {
                 onPress={() => setModalMapaVisivel(true)}
               >
                 <Feather name="map-pin" size={16} color="white" />
+                {/* ✅ CORREÇÃO APLICADA: Verifica se é número antes de chamar toFixed() */}
                 <Text style={styles.localizacaoBotaoTexto}>
-                  {latitude !== null && longitude !== null
+                  {typeof latitude === 'number' && typeof longitude === 'number' && latitude !== null && longitude !== null
                     ? `Localização Selecionada: Lat ${latitude.toFixed(4)}, Lon ${longitude.toFixed(4)}`
                     : "Selecionar Localização no Mapa *"}
                 </Text>
+                {/* ------------------------------------------- */}
               </TouchableOpacity>
             )}
             {/* --------------------------- */}
@@ -844,7 +875,8 @@ const styles = StyleSheet.create({
     width: "30%",
     height: 100,
     borderRadius: 8,
-    marginRight: 10,},
+    marginRight: 10,
+  },
   input: {
     borderWidth: 1,
     borderColor: "#ccc",

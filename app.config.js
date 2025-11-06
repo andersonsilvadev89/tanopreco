@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 export default {
   name: "TaNoPreco",
   slug: "TaNoPreco",
@@ -25,7 +27,7 @@ export default {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       }
     },
-    versionCode: 21,
+    versionCode: 22,
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff"

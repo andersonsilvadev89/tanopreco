@@ -27,7 +27,6 @@ import * as Location from "expo-location";
 import AdCard from "../components/AdCard";
 import { DefaultNavigator } from "expo-router/build/views/Navigator";
 
-
 const defaultFundoLocal = require("../../assets/images/fundo.png");
 
 // Pega a largura da tela para cálculo
@@ -46,8 +45,14 @@ interface ProdutoComEmpresa {
   palavrasChave?: string;
   empresaId: string;
   nomeEmpresa: string;
-  latitude: number;
-  longitude: number;
+  // Localização da Empresa (Default)
+  latitudeEmpresa: number; 
+  longitudeEmpresa: number;
+  // NOVOS CAMPOS DO PRODUTO (para localizacaoDiferente)
+  latitudeProduto?: number; 
+  longitudeProduto?: number;
+  localizacaoDiferente?: boolean; // NOVO: Flag para usar a lat/lon do produto
+  // ---
   dataFinalOferta?: string;
   destaque?: boolean;
   categoria?: string;
@@ -120,11 +125,30 @@ const AD_PLACEHOLDER: ProdutoComEmpresa = {
   preco: "R$ 0,00",
   empresaId: "ad",
   nomeEmpresa: "AdMob",
-  latitude: 0,
-  longitude: 0,
+  latitudeEmpresa: 0, // Ajustado para a nova interface
+  longitudeEmpresa: 0, // Ajustado para a nova interface
   isAd: true, // Flag para o AdCard
 };
 
+// 💡 NOVO: Função para obter a Latitude e Longitude a ser usada.
+// Dá preferência à localização do Produto se a flag estiver true.
+function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; longitude: number; isProdutoLocation: boolean } | null {
+  if (produto.localizacaoDiferente && produto.latitudeProduto && produto.longitudeProduto) {
+    return {
+      latitude: produto.latitudeProduto,
+      longitude: produto.longitudeProduto,
+      isProdutoLocation: true,
+    };
+  } else if (produto.latitudeEmpresa && produto.longitudeEmpresa) {
+    return {
+      latitude: produto.latitudeEmpresa,
+      longitude: produto.longitudeEmpresa,
+      isProdutoLocation: false,
+    };
+  }
+  return null;
+}
+// ---
 
 export default function HomeScreen() {
   const [produtosComEmpresa, setProdutosComEmpresa] = useState<ProdutoComEmpresa[]>([]);
@@ -180,26 +204,35 @@ export default function HomeScreen() {
         if (snapshot.exists()) {
           snapshot.forEach((userSnapshot) => {
             const empresaId = userSnapshot.key!;
-            userSnapshot.forEach((produtoSnapshot) => {
-              const produto = produtoSnapshot.val();
-              const empresaInfo = empresas[empresaId];
-              if (empresaInfo) {
-                data.push({
-                  id: produtoSnapshot.key!,
-                  ...produto,
-                  empresaId,
-                  nomeEmpresa: empresaInfo.nomeEmpresa,
-                  latitude: empresaInfo.latitude,
-                  longitude: empresaInfo.longitude,
-                  dataFinalOferta: produto.dataFinalOferta,
-                  destaque: produto.destaque,
-                  palavrasChave: produto.palavrasChave,
+            const empresaInfo = empresas[empresaId];
+            if (empresaInfo) {
+                userSnapshot.forEach((produtoSnapshot) => {
+                  const produto = produtoSnapshot.val();
+                  
+                  // 💡 AJUSTE: Mapeando os campos de localização corretamente
+                  const latitudeProduto = produto.latitude || null;
+                  const longitudeProduto = produto.longitude || null;
+                  const localizacaoDiferente = !!produto.localizacaoDiferente; // Garantir que seja booleano
+                  
+                  data.push({
+                    id: produtoSnapshot.key!,
+                    ...produto,
+                    empresaId,
+                    nomeEmpresa: empresaInfo.nomeEmpresa,
+                    latitudeEmpresa: empresaInfo.latitude || 0, // Lat da Empresa (padrão)
+                    longitudeEmpresa: empresaInfo.longitude || 0, // Lon da Empresa (padrão)
+                    latitudeProduto, // Lat do Produto (opcional)
+                    longitudeProduto, // Lon do Produto (opcional)
+                    localizacaoDiferente, // Flag
+                    dataFinalOferta: produto.dataFinalOferta,
+                    destaque: produto.destaque,
+                    palavrasChave: produto.palavrasChave,
+                  });
                 });
-              }
-            });
+            }
           });
         }
-        setProdutosComEmpresa(data);
+        setProdutosComEmpresa(data.filter(p => isOfertaValida(p.dataFinalOferta))); // Filtro de validade movido aqui (opcional)
         setLoadingInicial(false);
       });
       // Localização do usuário
@@ -240,9 +273,9 @@ export default function HomeScreen() {
     }
   }, [mostrarMapa, userLocation, selectedLocation]);
 
-  // Filtra produtos válidos
+  // Filtra produtos válidos (Opcional: O filtro de validade foi movido para o useFocusEffect)
   const produtosValidos = produtosComEmpresa.filter((produto) => {
-    if (!isOfertaValida(produto.dataFinalOferta)) return false;
+    // if (!isOfertaValida(produto.dataFinalOferta)) return false; // REMOVIDO: Já está no useFocusEffect
 
     // Lógica para filtrar por categoria
     if (categoriaSelecionada) {
@@ -284,11 +317,13 @@ export default function HomeScreen() {
     const getPrecoNumerico = (produto: ProdutoComEmpresa) => 
       parseFloat(produto.preco.replace("R$", "").replace(",", ".").replace(/\./g, ""));
     
-    // Função para calcular a distância (retorna 0 se a localização não estiver disponível para garantir que continue na lista)
-    const getDistancia = (produto: ProdutoComEmpresa) => 
-      (userLocation && produto.latitude && produto.longitude)
-        ? (calcularDistancia(userLocation, { latitude: produto.latitude, longitude: produto.longitude }) ?? Infinity)
+    // Função para calcular a distância
+    const getDistancia = (produto: ProdutoComEmpresa) => {
+      const location = getProdutoLocation(produto); // Obtém a localização correta (produto ou empresa)
+      return (userLocation && location)
+        ? (calcularDistancia(userLocation, { latitude: location.latitude, longitude: location.longitude }) ?? Infinity)
         : Infinity;
+    }
 
 
     if (ordenarPorPreco) {
@@ -303,7 +338,6 @@ export default function HomeScreen() {
       
       // 💡 NOVO: Se as distâncias forem as mesmas (diferença dentro de uma tolerância pequena, como 0.001km), 
       // ordena por preço.
-      // Usei 0.001km (1 metro) como tolerância para considerar as distâncias iguais.
       if (Math.abs(diferencaDistancia) < 0.001) {
         // Ordenação Secundária: Menor Preço
         return getPrecoNumerico(a) - getPrecoNumerico(b);
@@ -346,12 +380,14 @@ export default function HomeScreen() {
   }
 
 
+  // 💡 AJUSTE: Usar a função getProdutoLocation para determinar qual lat/lon usar
   const handleVerNoMapa = (produto: ProdutoComEmpresa) => {
-    const empresaInfo = empresas[produto.empresaId];
-    if (empresaInfo?.latitude && empresaInfo?.longitude) {
+    const location = getProdutoLocation(produto);
+
+    if (location) {
       setSelectedLocation({
-        latitude: produto.latitude,
-        longitude: produto.longitude,
+        latitude: location.latitude,
+        longitude: location.longitude,
         nome: produto.nomeEmpresa,
         empresaId: produto.empresaId,
         produtoId: produto.id,
@@ -359,8 +395,8 @@ export default function HomeScreen() {
       
       // 💡 setMapRegion: Define uma região inicial para o mapa
       setMapRegion({
-        latitude: produto.latitude,
-        longitude: produto.longitude,
+        latitude: location.latitude,
+        longitude: location.longitude,
         latitudeDelta: 0.0922,
         longitudeDelta: 0.0421,
       });
@@ -369,13 +405,15 @@ export default function HomeScreen() {
     } else {
       Alert.alert(
         "Localização Indisponível",
-        "Esta empresa não possui uma localização cadastrada para este produto."
+        "Esta empresa/produto não possui uma localização cadastrada."
       );
     }
   };
+  // ---
 
   // 💡 Função para abrir a rota no Google Maps (App ou Web)
   const openExternalMapRoute = (latitude: number, longitude: number, label: string) => {
+    // ... (restante da função é o mesmo)
     // URL universal para Maps com um ponto de destino
     const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
     const url = `${scheme}${latitude},${longitude}(${label})`;
@@ -391,6 +429,7 @@ export default function HomeScreen() {
   };
 
   const openInstagramProfile = async (username: string | undefined) => {
+    // ... (função é a mesma)
     if (!username) {
       Alert.alert(
         "Instagram não informado",
@@ -411,6 +450,7 @@ export default function HomeScreen() {
   };
 
   const openWhatsApp = (telefone: string | undefined) => {
+    // ... (função é a mesma)
     if (!telefone) {
       Alert.alert(
         "WhatsApp não informado",
@@ -556,16 +596,20 @@ export default function HomeScreen() {
               // Se não for anúncio, renderiza o card de produto normal.
               const produtoReal = item as ProdutoComEmpresa;
               const empresaInfo = empresas[produtoReal.empresaId];
+              
+              // 💡 AJUSTE: Usar a função que determina a localização correta
+              const location = getProdutoLocation(produtoReal);
+
               const distancia =
-                userLocation && empresaInfo?.latitude && empresaInfo?.longitude
+                userLocation && location
                   ? calcularDistancia(userLocation, {
-                      latitude: empresaInfo.latitude,
-                      longitude: empresaInfo.longitude,
+                      latitude: location.latitude,
+                      longitude: location.longitude,
                     })
                   : null;
 
               // Variavel de localizacao
-              const temLocalizacao = empresaInfo?.latitude && empresaInfo?.longitude;
+              const temLocalizacao = !!location;
               
               return (
                 <View style={styles.cardProduto}>
@@ -679,11 +723,9 @@ export default function HomeScreen() {
                     </Marker>
                   )}
                   {produtosComEmpresa
-                    .filter(
-                      (p) =>
-                        p.latitude && p.longitude
-                    )
-                    .map((produto) => {
+                    .map(p => ({ produto: p, location: getProdutoLocation(p) })) // Obtem a localização correta
+                    .filter(item => item.location) // Filtra apenas produtos com localização válida
+                    .map(({ produto, location }) => {
                       const isSelected =
                         selectedLocation &&
                         produto.empresaId === selectedLocation.empresaId &&
@@ -691,8 +733,8 @@ export default function HomeScreen() {
                       return (
                         <Marker
                           key={produto.id + produto.empresaId + "_mapmarker"}
-                          coordinate={{ latitude: produto.latitude,
-                            longitude: produto.longitude }}
+                          coordinate={{ latitude: location!.latitude,
+                            longitude: location!.longitude }}
                           title={produto.nomeEmpresa}
                           description={
                             produto.descricao.substring(0, 40) + "..."
@@ -764,6 +806,23 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  // ... (Seus estilos existentes) ...
+
+  // NOVO ESTILO: Badge para localização diferente
+  localizacaoDiferenteBadge: {
+    backgroundColor: '#ffc107', // Amarelo/laranja de alerta
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 5,
+    marginTop: 5,
+    marginBottom: 5,
+  },
+  localizacaoDiferenteText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  // ---
   background: { flex: 1, resizeMode: "cover" },
   container: { flex: 1, },
   buscaRow: {
