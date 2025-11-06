@@ -25,8 +25,7 @@ export default {
       config: {
         googleMaps: {
           apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
-        },
-        googleMobileAdsAppId: "ca-app-pub-5241782827769638~1347375952"
+        }
       },
       versionCode: 19,
       adaptiveIcon: {
