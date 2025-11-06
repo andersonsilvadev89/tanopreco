@@ -10,7 +10,7 @@ interface Props {
   isVisible: boolean;
   onClose: () => void;
   onSave: (coords: { latitude: number; longitude: number }) => void;
-  initialCoords?: { latitude: number | undefined; longitude: number | undefined };
+  initialCoords?: { latitude: number | null; longitude: number | null };
 }
 
 // Coordenadas padrão (Exemplo: São Paulo, Brasil)
@@ -35,7 +35,7 @@ const LocalizacaoModal: React.FC<Props> = ({ isVisible, onClose, onSave, initial
 
     const setupLocation = async () => {
       // Tenta usar a localização inicial salva
-      if (initialLat !== undefined && initialLon !== undefined) {
+      if (initialLat && initialLon ) {
         setMarkerCoords({ latitude: initialLat, longitude: initialLon });
         setCurrentRegion({ ...DEFAULT_COORDS, latitude: initialLat, longitude: initialLon });
         setLoading(false);

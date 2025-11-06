@@ -99,8 +99,8 @@ interface Produto {
   editavel?: boolean;
   // 🆕 NOVOS CAMPOS DE LOCALIZAÇÃO
   localizacaoDiferente?: boolean;
-  latitude?: number;
-  longitude?: number;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 interface EmpresaData {
@@ -127,8 +127,8 @@ export default function CadastroProduto() {
   // 🆕 NOVOS ESTADOS PARA LOCALIZAÇÃO
   const [localizacaoDiferente, setLocalizacaoDiferente] = useState(false);
   const [modalMapaVisivel, setModalMapaVisivel] = useState(false);
-  const [latitude, setLatitude] = useState<number | undefined>(undefined);
-  const [longitude, setLongitude] = useState<number | undefined>(undefined);
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
 
   const [loadingUpload, setLoadingUpload] = useState(false);
   const [termoBusca, setTermoBusca] = useState("");
@@ -253,7 +253,7 @@ export default function CadastroProduto() {
     // 🆕 VALIDAÇÃO DA LOCALIZAÇÃO CUSTOMIZADA
     if (
       localizacaoDiferente &&
-      (latitude === undefined || longitude === undefined)
+      (latitude === null || longitude === null)
     ) {
       Alert.alert("Atenção", "Selecione a localização customizada no mapa.");
       return;
@@ -270,8 +270,8 @@ export default function CadastroProduto() {
       editavel,
       // 🆕 SALVA NOVOS DADOS DE LOCALIZAÇÃO
       localizacaoDiferente,
-      latitude: localizacaoDiferente ? latitude : undefined,
-      longitude: localizacaoDiferente ? longitude : undefined,
+      latitude: localizacaoDiferente ? latitude : null,
+      longitude: localizacaoDiferente ? longitude : null,
     };
 
     if (editandoId) {
@@ -307,8 +307,8 @@ export default function CadastroProduto() {
     setDestaque(false);
     // 🆕 LIMPA ESTADOS DE LOCALIZAÇÃO
     setLocalizacaoDiferente(false);
-    setLatitude(undefined);
-    setLongitude(undefined);
+    setLatitude(null);
+    setLongitude(null);
     Keyboard.dismiss();
     if (scrollRef.current) {
       scrollRef.current.scrollTo({ y: 0, animated: true });
@@ -468,8 +468,8 @@ export default function CadastroProduto() {
       setModalMapaVisivel(true);
     } else {
       // Limpa a localização se for desativado (usa a localização da empresa)
-      setLatitude(undefined);
-      setLongitude(undefined);
+      setLatitude(null);
+      setLongitude(null);
     }
   };
 
@@ -619,7 +619,7 @@ export default function CadastroProduto() {
               >
                 <Feather name="map-pin" size={16} color="white" />
                 <Text style={styles.localizacaoBotaoTexto}>
-                  {latitude !== undefined && longitude !== undefined
+                  {latitude !== null && longitude !== null
                     ? `Localização Selecionada: Lat ${latitude.toFixed(4)}, Lon ${longitude.toFixed(4)}`
                     : "Selecionar Localização no Mapa *"}
                 </Text>
