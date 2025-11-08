@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import * as Device from "expo-device";
 import {
   View,
   Text,
@@ -15,10 +16,11 @@ import {
   Platform,
   ScrollView,
   Dimensions,
+  Modal,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { database } from "../../firebaseConfig";
-import { ref, onValue, get } from "firebase/database";
+import { ref, onValue, set, get, update } from "firebase/database";
 import { LinearGradient } from "expo-linear-gradient";
 import { useFocusEffect } from "@react-navigation/native";
 import MapView, { Marker, Callout, Region } from "react-native-maps";
@@ -26,6 +28,8 @@ import AdBanner from "../components/AdBanner";
 import * as Location from "expo-location";
 import AdCard from "../components/AdCard";
 import { DefaultNavigator } from "expo-router/build/views/Navigator";
+import * as SecureStore from "expo-secure-store";
+import { v4 as uuidv4 } from "uuid";
 
 const defaultFundoLocal = require("../../assets/images/fundo.png");
 
@@ -46,10 +50,10 @@ interface ProdutoComEmpresa {
   empresaId: string;
   nomeEmpresa: string;
   // Localização da Empresa (Default)
-  latitudeEmpresa: number; 
+  latitudeEmpresa: number;
   longitudeEmpresa: number;
   // NOVOS CAMPOS DO PRODUTO (para localizacaoDiferente)
-  latitudeProduto?: number; 
+  latitudeProduto?: number;
   longitudeProduto?: number;
   localizacaoDiferente?: boolean; // NOVO: Flag para usar a lat/lon do produto
   // ---
@@ -58,6 +62,8 @@ interface ProdutoComEmpresa {
   categoria?: string;
   isGeneric?: boolean;
   isAd?: boolean;
+  unlike?: number;
+  like?: number;
 }
 
 // Empresa
@@ -169,11 +175,49 @@ export default function HomeScreen() {
     longitudeDelta: 0.0421,
   });
   const [empresas, setEmpresas] = useState<{ [key: string]: EmpresaData }>({});
-  
-  // 💡 Ref para manipular o MapView
-  const mapRef = useRef<MapView>(null); 
+  const [imagemModalVisivel, setImagemModalVisivel] = useState(false);
+  const [imagemModalUrl, setImagemModalUrl] = useState<string | null>(null);
 
+  // 💡 Ref para manipular o MapView
+  const mapRef = useRef<MapView>(null);
+  const [deviceId, setDeviceId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const getOrCreateDeviceId = async () => {
+      let id = await SecureStore.getItemAsync("device_id");
+      if (!id) {
+        id = uuidv4();
+        await SecureStore.setItemAsync("device_id", id);
+      }
+      setDeviceId(id);
+    };
+    getOrCreateDeviceId();
+  }, []);
   // Carrega empresas
+  const votarProduto = async (produtoId: string, tipo: "like" | "unlike") => {
+    if (!deviceId) {
+      Alert.alert("Erro", "ID do dispositivo não disponível.");
+      return;
+    }  
+    const votoRef = ref(database, `votos/${produtoId}/${deviceId}`);
+    const votoSnapshot = await get(votoRef);
+
+    if (votoSnapshot.exists()) {
+      Alert.alert("Você já votou!", "Só é permitido um voto por produto.");
+      return;
+    }
+
+    // Salva o voto
+    await set(votoRef, { tipo });
+
+    // Atualiza o contador no produto
+    const produtoRef = ref(database, `produtos/${produtoId}`);
+    const produtoSnapshot = await get(produtoRef);
+    const produtoData = produtoSnapshot.val() || {};
+
+    const novoValor = (produtoData[tipo] ?? 0) + 1;
+    await update(produtoRef, { [tipo]: novoValor });
+  };
   useEffect(() => {
     const empresasRef = ref(database, "usuariosEmpresa");
     onValue(empresasRef, (snapshot) => {
@@ -206,29 +250,31 @@ export default function HomeScreen() {
             const empresaId = userSnapshot.key!;
             const empresaInfo = empresas[empresaId];
             if (empresaInfo) {
-                userSnapshot.forEach((produtoSnapshot) => {
-                  const produto = produtoSnapshot.val();
-                  
-                  // 💡 AJUSTE: Mapeando os campos de localização corretamente
-                  const latitudeProduto = produto.latitude || null;
-                  const longitudeProduto = produto.longitude || null;
-                  const localizacaoDiferente = !!produto.localizacaoDiferente; // Garantir que seja booleano
-                  
-                  data.push({
-                    id: produtoSnapshot.key!,
-                    ...produto,
-                    empresaId,
-                    nomeEmpresa: empresaInfo.nomeEmpresa,
-                    latitudeEmpresa: empresaInfo.latitude || 0, // Lat da Empresa (padrão)
-                    longitudeEmpresa: empresaInfo.longitude || 0, // Lon da Empresa (padrão)
-                    latitudeProduto, // Lat do Produto (opcional)
-                    longitudeProduto, // Lon do Produto (opcional)
-                    localizacaoDiferente, // Flag
-                    dataFinalOferta: produto.dataFinalOferta,
-                    destaque: produto.destaque,
-                    palavrasChave: produto.palavrasChave,
-                  });
+              userSnapshot.forEach((produtoSnapshot) => {
+                const produto = produtoSnapshot.val();
+
+                // 💡 AJUSTE: Mapeando os campos de localização corretamente
+                const latitudeProduto = produto.latitude || null;
+                const longitudeProduto = produto.longitude || null;
+                const localizacaoDiferente = !!produto.localizacaoDiferente; // Garantir que seja booleano
+
+                data.push({
+                  id: produtoSnapshot.key!,
+                  ...produto,
+                  empresaId,
+                  nomeEmpresa: empresaInfo.nomeEmpresa,
+                  latitudeEmpresa: empresaInfo.latitude || 0, // Lat da Empresa (padrão)
+                  longitudeEmpresa: empresaInfo.longitude || 0, // Lon da Empresa (padrão)
+                  latitudeProduto, // Lat do Produto (opcional)
+                  longitudeProduto, // Lon do Produto (opcional)
+                  localizacaoDiferente, // Flag
+                  dataFinalOferta: produto.dataFinalOferta,
+                  destaque: produto.destaque,
+                  palavrasChave: produto.palavrasChave,
+                  like: produto.like || 0,
+                  unlike: produto.unlike || 0,
                 });
+              });
             }
           });
         }
@@ -250,7 +296,7 @@ export default function HomeScreen() {
       })();
     }, [empresas])
   );
-  
+
   // 💡 useEffect para ajustar o mapa (zoom) para incluir o usuário e o produto
   useEffect(() => {
     // Apenas ajuste se o mapa estiver visível, a localização do usuário estiver disponível e um local tiver sido selecionado.
@@ -303,7 +349,7 @@ export default function HomeScreen() {
     termoBusca.length >= 3 || categoriaSelecionada
       ? produtosValidos
       : produtosValidos.filter((p) => p.destaque);
-      
+
   // 💡 Determina o título a ser exibido
   const tituloDaLista =
     termoBusca.length >= 3 || categoriaSelecionada
@@ -314,9 +360,9 @@ export default function HomeScreen() {
   // Ordenação
   const produtosOrdenados = [...produtosParaExibir].sort((a, b) => {
     // Função para extrair o preço como número
-    const getPrecoNumerico = (produto: ProdutoComEmpresa) => 
+    const getPrecoNumerico = (produto: ProdutoComEmpresa) =>
       parseFloat(produto.preco.replace("R$", "").replace(",", ".").replace(/\./g, ""));
-    
+
     // Função para calcular a distância
     const getDistancia = (produto: ProdutoComEmpresa) => {
       const location = getProdutoLocation(produto); // Obtém a localização correta (produto ou empresa)
@@ -333,9 +379,9 @@ export default function HomeScreen() {
       // Ordenação Principal: Proximidade
       const distA = getDistancia(a);
       const distB = getDistancia(b);
-      
+
       const diferencaDistancia = distA - distB;
-      
+
       // 💡 NOVO: Se as distâncias forem as mesmas (diferença dentro de uma tolerância pequena, como 0.001km), 
       // ordena por preço.
       if (Math.abs(diferencaDistancia) < 0.001) {
@@ -392,7 +438,7 @@ export default function HomeScreen() {
         empresaId: produto.empresaId,
         produtoId: produto.id,
       });
-      
+
       // 💡 setMapRegion: Define uma região inicial para o mapa
       setMapRegion({
         latitude: location.latitude,
@@ -494,28 +540,28 @@ export default function HomeScreen() {
           {/* Switch de ordenação */}
           <View style={styles.ordenacaoContainer}>
             <Text style={{ color: "#ffffffea", fontWeight: "bold", }}>Ordenar por:</Text>
-            
+
             {/* Texto de Proximidade (Ativo se ordenarPorPreco for FALSE) */}
             <Text style={[
-                styles.ordenacaoText, 
-                !ordenarPorPreco && styles.ordenacaoTextActive
+              styles.ordenacaoText,
+              !ordenarPorPreco && styles.ordenacaoTextActive
             ]}>
-                Proximidade
+              Proximidade
             </Text>
-            
-            <Switch 
-                value={ordenarPorPreco} 
-                onValueChange={setOrdenarPorPreco} 
-                thumbColor={"white"} 
-                trackColor={{ false: "#ccc", true: "#ccc" }} 
+
+            <Switch
+              value={ordenarPorPreco}
+              onValueChange={setOrdenarPorPreco}
+              thumbColor={"white"}
+              trackColor={{ false: "#ccc", true: "#ccc" }}
             />
-            
+
             {/* Texto de Menor Preço (Ativo se ordenarPorPreco for TRUE) */}
             <Text style={[
-                styles.ordenacaoText, 
-                ordenarPorPreco && styles.ordenacaoTextActive
+              styles.ordenacaoText,
+              ordenarPorPreco && styles.ordenacaoTextActive
             ]}>
-                Menor Preço
+              Menor Preço
             </Text>
           </View>
 
@@ -558,12 +604,12 @@ export default function HomeScreen() {
             </ScrollView>
           </View>
         </View>
-        
+
         {/* Título da Lista de Produtos */}
         <View style={styles.listTitleContainer}>
           <Text style={styles.listTitle}>{tituloDaLista}</Text>
         </View>
-        
+
 
         {/* Lista de produtos */}
         {loadingInicial ? (
@@ -596,30 +642,51 @@ export default function HomeScreen() {
               // Se não for anúncio, renderiza o card de produto normal.
               const produtoReal = item as ProdutoComEmpresa;
               const empresaInfo = empresas[produtoReal.empresaId];
-              
+
               // 💡 AJUSTE: Usar a função que determina a localização correta
               const location = getProdutoLocation(produtoReal);
 
               const distancia =
                 userLocation && location
                   ? calcularDistancia(userLocation, {
-                      latitude: location.latitude,
-                      longitude: location.longitude,
-                    })
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                  })
                   : null;
 
               // Variavel de localizacao
               const temLocalizacao = !!location;
-              
+
               return (
                 <View style={styles.cardProduto}>
-                  {produtoReal.imagemUrl && (
-                    <Image
-                      source={{ uri: produtoReal.imagemUrl }}
-                      style={styles.imagemProduto}
-                      resizeMode="cover"
-                    />
-                  )}
+                  <View style={styles.imagemLikeContainer}>
+                    {produtoReal.imagemUrl && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          setImagemModalUrl(produtoReal.imagemUrl || null);
+                          setImagemModalVisivel(true);
+                        }}
+                      >
+                        <Image
+                          source={{ uri: produtoReal.imagemUrl }}
+                          style={styles.imagemProduto}
+                          resizeMode="stretch"
+                        />
+                      </TouchableOpacity>
+
+                    )}
+                    <View style={styles.likeUnlikeContainer}>
+                      <TouchableOpacity onPress={() => votarProduto(produtoReal.id, "like")}>
+                        <Feather name="thumbs-up" size={23} color="#4CAF50" />
+                      </TouchableOpacity>
+                      <Text style={{ color: "green" }}>{produtoReal.like ?? 0}</Text>
+                      <TouchableOpacity onPress={() => votarProduto(produtoReal.id, "unlike")}>
+                        <Feather name="thumbs-down" size={23} color="#F44336" />
+                      </TouchableOpacity>
+                      <Text style={{ color: "red" }}>{produtoReal.unlike ?? 0}</Text>
+                    </View>
+                  </View>
+
                   <Text style={styles.descricao}>{produtoReal.descricao}</Text>
                   <Text style={styles.preco}>
                     {"R$ " +
@@ -733,8 +800,10 @@ export default function HomeScreen() {
                       return (
                         <Marker
                           key={produto.id + produto.empresaId + "_mapmarker"}
-                          coordinate={{ latitude: location!.latitude,
-                            longitude: location!.longitude }}
+                          coordinate={{
+                            latitude: location!.latitude,
+                            longitude: location!.longitude
+                          }}
                           title={produto.nomeEmpresa}
                           description={
                             produto.descricao.substring(0, 40) + "..."
@@ -776,7 +845,7 @@ export default function HomeScreen() {
                   <Text>Carregando mapa...</Text>
                 </View>
               )}
-              
+
               {/* Botão para abrir a rota no Google Maps (dentro do modal) */}
               {isSelectedLocationValid && (
                 <TouchableOpacity
@@ -800,14 +869,42 @@ export default function HomeScreen() {
             </View>
           </View>
         )}
+
+        {/* Modal para exibir imagem em tela cheia (opcional) */}
+        {imagemModalVisivel && imagemModalUrl && (
+          <Modal
+            transparent={true}
+            animationType="fade"
+            visible={imagemModalVisivel}
+            onRequestClose={() => setImagemModalVisivel(false)}
+          >
+            <View style={styles.modalContainer}>
+              <TouchableOpacity style={styles.modalBackground} onPress={() => setImagemModalVisivel(false)}>
+                <Image
+                  source={{ uri: imagemModalUrl }}
+                  style={styles.imagemModal}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
+          </Modal>
+        )}
       </View>
     </ImageBackground>
   );
 }
 
 const styles = StyleSheet.create({
-  // ... (Seus estilos existentes) ...
-
+  imagemLikeContainer: {
+    flexDirection: "row",
+    width: "100%",
+    justifyContent: "center",
+  },
+  likeUnlikeContainer: {
+    margin: 10,
+    alignItems: "center",
+    justifyContent: "space-evenly",
+  },
   // NOVO ESTILO: Badge para localização diferente
   localizacaoDiferenteBadge: {
     backgroundColor: '#ffc107', // Amarelo/laranja de alerta
@@ -896,14 +993,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   // 💡 ESTILO: Texto de ordenação base
-  ordenacaoText: { 
-    marginHorizontal: 5, 
-    color: "#ffffffea" 
+  ordenacaoText: {
+    marginHorizontal: 5,
+    color: "#ffffffea"
   },
   // 💡 ESTILO: Texto de ordenação ativo
-  ordenacaoTextActive: { 
+  ordenacaoTextActive: {
     fontWeight: "bold",
-    textDecorationLine: "underline", 
+    textDecorationLine: "underline",
   },
   productList: { flex: 1 },
   cardRow: {
@@ -1061,11 +1158,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   imagemProduto: {
-    width: "100%",
-    height: 100,
+    width: 100,      // largura fixa
+    height: 100,     // altura fixa igual à largura
     borderRadius: 8,
     marginTop: 5,
-    resizeMode: "cover",
+    resizeMode: "contain",
   },
   mensagemNenhumResultado: {
     textAlign: "center",
@@ -1099,8 +1196,8 @@ const styles = StyleSheet.create({
     padding: 5,
     justifyContent: 'space-between', // Para posicionar o botão externo
   },
-  mapViewStyle: { 
-    flex: 1, 
+  mapViewStyle: {
+    flex: 1,
     borderRadius: 10,
     marginBottom: 10, // Espaço para o botão
   },
@@ -1241,5 +1338,23 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#222",
     textAlign: "center",
+  },
+  // Estilos do Modal de Imagem
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+  },
+  modalBackground: {
+    flex: 1,
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  imagemModal: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 10,
   },
 });
