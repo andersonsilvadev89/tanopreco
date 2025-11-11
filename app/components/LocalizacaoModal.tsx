@@ -113,6 +113,7 @@ const LocalizacaoModal: React.FC<Props> = ({ isVisible, onClose, onSave, initial
             ) : (
                 <MapView
                   style={styles.map}
+                  provider="google"
                   initialRegion={currentRegion}
                   onRegionChangeComplete={(region) => setCurrentRegion(region)}
                   onPress={handleMapPress}
