@@ -80,11 +80,15 @@ const formatarPreco = (valor: string) => {
 
 const categorias = [
   "Alimentação",
+  "Bebidas",
   "Serviços",
   "Moda",
   "Saúde",
   "Tecnologia",
   "Kids",
+  "Imóveis",
+  "Autos",
+  "Utilidades",
   "Outros",
 ];
 
@@ -97,7 +101,6 @@ interface Produto {
   dataFinalOferta?: string;
   destaque?: boolean;
   editavel?: boolean;
-  // 🆕 NOVOS CAMPOS DE LOCALIZAÇÃO
   localizacaoDiferente?: boolean;
   latitude: number | null;
   longitude: number | null;
@@ -124,7 +127,6 @@ export default function CadastroProduto() {
   const [imagemUri, setImagemUri] = useState<string | undefined>();
   const [produtos, setProdutos] = useState<Produto[]>([]);
 
-  // 🆕 NOVOS ESTADOS PARA LOCALIZAÇÃO
   const [localizacaoDiferente, setLocalizacaoDiferente] = useState(false);
   const [modalMapaVisivel, setModalMapaVisivel] = useState(false);
   const [latitude, setLatitude] = useState<number | null>(null);
@@ -142,7 +144,6 @@ export default function CadastroProduto() {
   const [loadingCompanyData, setLoadingCompanyData] = useState(true);
   const [mostrarLista, setMostrarLista] = useState(false);
 
-  // ✅ ESTADOS PARA ARMAZENAR POSIÇÕES Y DOS INPUTS PARA O FOCO
   const [descricaoY, setDescricaoY] = useState(0);
   const [precoY, setPrecoY] = useState(0);
   const [dataFinalOfertaY, setDataFinalOfertaY] = useState(0);
@@ -152,10 +153,8 @@ export default function CadastroProduto() {
   const scrollRef = useRef<ScrollView>(null);
   const userId = auth.currentUser?.uid;
 
-  // ✅ FUNÇÃO PARA ROLAR O SCROLLVIEW ATÉ O INPUT
   const scrollToInput = (y: number) => {
     setTimeout(() => {
-      // Subtrai 50 para deixar o input um pouco mais visível acima do teclado
       scrollRef.current?.scrollTo({ y: y - 50, animated: true });
     }, 300);
   };
@@ -259,7 +258,6 @@ export default function CadastroProduto() {
       return;
     }
 
-    // 🆕 VALIDAÇÃO DA LOCALIZAÇÃO CUSTOMIZADA
     if (
       localizacaoDiferente &&
       (latitude === null || longitude === null)
@@ -277,7 +275,6 @@ export default function CadastroProduto() {
       dataFinalOferta,
       destaque,
       editavel,
-      // 🆕 SALVA NOVOS DADOS DE LOCALIZAÇÃO
       localizacaoDiferente,
       latitude: localizacaoDiferente ? latitude : null,
       longitude: localizacaoDiferente ? longitude : null,

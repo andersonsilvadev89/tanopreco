@@ -122,7 +122,7 @@ const LoginScreen = ({ navigation }: any) => {
       const userData = snapshot.val();
 
       if (userData) {
-        router.replace('/(tabs)/homeScreen');
+        router.replace('/(empresa)/homeScreen');
       } else {
         setError('Usuário não encontrado.');
       }

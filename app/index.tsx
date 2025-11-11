@@ -3,9 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import { ActivityIndicator, View, Text } from "react-native";
 import React, { useEffect, useState } from "react";
 import * as Updates from "expo-updates";
-
-// ⚠️ ADICIONE ESTA IMPORTAÇÃO 
-import mobileAds from 'react-native-google-mobile-ads'; 
+import mobileAds from 'react-native-google-mobile-ads';
 
 export default function Index() {
   const { user, loading } = useAuth();
@@ -18,10 +16,8 @@ export default function Index() {
     console.log("Inicializando Google Mobile Ads SDK...");
     mobileAds()
       .initialize()
-      .then(adapterStatuses => {
-        // A inicialização está completa. Agora você pode carregar anúncios.
+      .then(() => {
         console.log('Mobile Ads SDK inicializado com sucesso.');
-        // Opcional: console.log('Status dos adaptadores:', adapterStatuses);
       })
       .catch(error => {
         console.error("Erro ao inicializar Google Mobile Ads SDK:", error);
@@ -32,6 +28,7 @@ export default function Index() {
     // 2. LÓGICA DE VERIFICAÇÃO DE UPDATES OTA
     // ------------------------------------------
     async function checkForUpdates() {
+      // ... (sua lógica de updates permanece a mesma) ...
       if (!__DEV__) {
         try {
           console.log("Verificando atualizações OTA...");
@@ -39,17 +36,13 @@ export default function Index() {
           console.log("Canal de atualização:", Updates.channel || "indefinido");
 
           setIsUpdating(true);
-
           const update = await Updates.checkForUpdateAsync();
-          console.log("Update disponível?", update.isAvailable);
 
           if (update.isAvailable) {
             console.log("⬇Baixando atualização...");
             await Updates.fetchUpdateAsync();
             console.log("Atualização baixada com sucesso. Recarregando o app...");
             await Updates.reloadAsync();
-          } else {
-            console.log("Nenhuma atualização disponível.");
           }
         } catch (error: any) {
           console.error("Erro ao verificar/baixar atualização OTA:", error?.message || error);
@@ -57,29 +50,40 @@ export default function Index() {
           setIsUpdating(false);
         }
       } else {
-        console.log("Ambiente de desenvolvimento (__DEV__ = true). Ignorando updates OTA.");
-        setIsUpdating(false);
+        console.log("Ambiente de desenvolvimento. Ignorando updates OTA.");
+        setIsUpdating(false); // Garante que saia do estado de loading
       }
     }
+    // ------------------------------------------
 
-    checkForUpdates();
-  }, []); // O useEffect é executado apenas uma vez ao montar o componente
+    // ------------------------------------------
+    // 3. LÓGICA DE CARREGAMENTO DO DEVICE ID
+    // ------------------------------------------
+    async function initializeApp() {
+      await checkForUpdates();
+    }
 
+    initializeApp();
+  }, []);
+
+  // 1. Carregamento do contexto de autenticação (`loading`)
+  // 2. Verificação/Download de atualizações OTA (`isUpdating`)
   if (loading || isUpdating) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
         {isUpdating && <Text style={{ marginTop: 10, color: 'gray' }}>Verificando atualizações OTA...</Text>}
         {loading && <Text style={{ marginTop: 10, color: 'gray' }}>Carregando dados do usuário...</Text>}
+        {!isUpdating && !loading && (
+          <Text style={{ marginTop: 10, color: 'gray' }}>Preparando aplicativo...</Text>
+        )}
       </View>
     );
   }
 
   if (!user) {
-    // Certifique-se de que a rota de login/home para não-logados está correta.
-    return <Redirect href="/(tabs)/homeScreen" />; 
+    return <Redirect href="/(tabs)/homeScreen" />;
   }
-  
-  // Rota para usuários logados.
-  return <Redirect href="/(empresa)/homeScreen" />; 
+
+  return <Redirect href="/(empresa)/homeScreen" />;
 }

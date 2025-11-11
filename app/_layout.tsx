@@ -1,8 +1,9 @@
+import 'react-native-get-random-values';
 import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 import { Stack } from 'expo-router';
-import { AuthProvider } from '../context/AuthContext'; // 1. IMPORTAR
+import { AuthProvider } from '../context/AuthContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -12,18 +13,15 @@ export default function RootLayout() {
   });
 
   useEffect(() => {
-    // Esconder o splash screen apenas quando as fontes estiverem carregadas OU der erro
     if (fontsLoaded || fontError) {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
 
-  // Se as fontes não carregaram ainda, não renderiza nada. O splash screen nativo fica visível.
   if (!fontsLoaded && !fontError) {
     return null;
   }
 
-  // 2. ENVOLVER O STACK COM O AUTHPROVIDER
   return (
     <AuthProvider>
       <Stack screenOptions={{ headerShown: false }} />

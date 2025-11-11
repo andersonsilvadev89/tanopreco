@@ -1,8 +1,8 @@
-import { Tabs, Redirect } from "expo-router";
+import { Tabs } from "expo-router";
 import { auth } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import React, { useState, useEffect } from "react";
-import { FontAwesome5, AntDesign, MaterialCommunityIcons } from "@expo/vector-icons";
+import { FontAwesome5, AntDesign } from "@expo/vector-icons";
 
 export default function TabsLayout() {
   const [user, setUser] = useState<any>(null);

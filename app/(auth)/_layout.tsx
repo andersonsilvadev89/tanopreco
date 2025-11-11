@@ -1,7 +1,7 @@
 import { Stack, Redirect } from 'expo-router';
 import { auth } from '../../firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth'; // Import onAuthStateChanged
-import React, { useState, useEffect } from 'react'; // Import useState and useEffect
+import { onAuthStateChanged } from 'firebase/auth';
+import React, { useState, useEffect } from 'react';
 
 export default function AuthLayout() {
   const [user, setUser] = useState<any>(null);

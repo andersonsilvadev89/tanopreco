@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import * as Device from "expo-device";
 import {
   View,
   Text,
@@ -20,25 +19,28 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { database } from "../../firebaseConfig";
-import { ref, onValue, set, get, update } from "firebase/database";
-import { LinearGradient } from "expo-linear-gradient";
+import { ref, onValue, set, get, update, increment } from "firebase/database";
 import { useFocusEffect } from "@react-navigation/native";
 import MapView, { Marker, Callout, Region } from "react-native-maps";
 import AdBanner from "../components/AdBanner";
 import * as Location from "expo-location";
 import AdCard from "../components/AdCard";
-import { DefaultNavigator } from "expo-router/build/views/Navigator";
-import * as SecureStore from "expo-secure-store";
-import { v4 as uuidv4 } from "uuid";
+import { useAuth } from "../../context/AuthContext";
+
+
+
+// ----------------------------------------------------
+// 1. CONSTANTES E TIPOS
+// ----------------------------------------------------
 
 const defaultFundoLocal = require("../../assets/images/fundo.png");
 
 // Pega a largura da tela para cálculo
 const { width } = Dimensions.get("window");
-const CARD_MARGIN = 8; // Margem para os dois lados do card (4 de cada)
-const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2; // (Largura da tela - margem externa e interna) / 2
-// Altura Mínima Sugerida para igualar o tamanho do AdCard
+const CARD_MARGIN = 8;
+const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2;
 const CARD_MIN_HEIGHT = 300;
+
 
 // Produto
 interface ProdutoComEmpresa {
@@ -49,14 +51,11 @@ interface ProdutoComEmpresa {
   palavrasChave?: string;
   empresaId: string;
   nomeEmpresa: string;
-  // Localização da Empresa (Default)
   latitudeEmpresa: number;
   longitudeEmpresa: number;
-  // NOVOS CAMPOS DO PRODUTO (para localizacaoDiferente)
   latitudeProduto?: number;
   longitudeProduto?: number;
-  localizacaoDiferente?: boolean; // NOVO: Flag para usar a lat/lon do produto
-  // ---
+  localizacaoDiferente?: boolean;
   dataFinalOferta?: string;
   destaque?: boolean;
   categoria?: string;
@@ -79,23 +78,36 @@ interface EmpresaData {
 // Imagens realistas para cada categoria (substitua pelos seus arquivos)
 const categoriaImagens: { [key: string]: any } = {
   Alimentação: require("../../assets/categorias/alimentacao.png"),
+  Bebidas: require("../../assets/categorias/bebidas.png"),
   Serviços: require("../../assets/categorias/servico.png"),
   Moda: require("../../assets/categorias/moda.png"),
   Saúde: require("../../assets/categorias/saude.png"),
   Tecnologia: require("../../assets/categorias/tecnologia.png"),
   Kids: require("../../assets/categorias/kids.png"),
+  Imóveis: require("../../assets/categorias/imoveis.png"),
+  Autos: require("../../assets/categorias/autos.png"),
+  Utilidades: require("../../assets/categorias/utilidades.png"),
   Outros: require("../../assets/categorias/outros.png"),
 };
 
 const categorias = [
   { nome: "Alimentação" },
+  { nome: "Bebidas" },
   { nome: "Moda" },
   { nome: "Saúde" },
   { nome: "Kids" },
   { nome: "Serviços" },
   { nome: "Tecnologia" },
+  { nome: "Imóveis" },
+  { nome: "Autos" },
+  { nome: "Utilidades" },
   { nome: "Outros" },
 ];
+
+
+// ----------------------------------------------------
+// 2. FUNÇÕES AUXILIARES
+// ----------------------------------------------------
 
 function isOfertaValida(dataFinalOferta?: string) {
   if (!dataFinalOferta) return false;
@@ -124,20 +136,17 @@ function calcularDistancia(userLocation: any, empresaLocation: any) {
   return R * c;
 }
 
-// 💡 Placeholder do Anúncio Nativo
 const AD_PLACEHOLDER: ProdutoComEmpresa = {
   id: "ad_placeholder",
   descricao: "Anúncio",
   preco: "R$ 0,00",
   empresaId: "ad",
   nomeEmpresa: "AdMob",
-  latitudeEmpresa: 0, // Ajustado para a nova interface
-  longitudeEmpresa: 0, // Ajustado para a nova interface
-  isAd: true, // Flag para o AdCard
+  latitudeEmpresa: 0,
+  longitudeEmpresa: 0,
+  isAd: true,
 };
 
-// 💡 NOVO: Função para obter a Latitude e Longitude a ser usada.
-// Dá preferência à localização do Produto se a flag estiver true.
 function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; longitude: number; isProdutoLocation: boolean } | null {
   if (produto.localizacaoDiferente && produto.latitudeProduto && produto.longitudeProduto) {
     return {
@@ -154,9 +163,15 @@ function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; lon
   }
   return null;
 }
-// ---
+
+// ----------------------------------------------------
+// 3. COMPONENTE PRINCIPAL (HomeScreen)
+// ----------------------------------------------------
 
 export default function HomeScreen() {
+  const { deviceId } = useAuth();
+    
+
   const [produtosComEmpresa, setProdutosComEmpresa] = useState<ProdutoComEmpresa[]>([]);
   const [termoBusca, setTermoBusca] = useState("");
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null);
@@ -178,46 +193,152 @@ export default function HomeScreen() {
   const [imagemModalVisivel, setImagemModalVisivel] = useState(false);
   const [imagemModalUrl, setImagemModalUrl] = useState<string | null>(null);
 
-  // 💡 Ref para manipular o MapView
+  // Ref para manipular o MapView
   const mapRef = useRef<MapView>(null);
-  const [deviceId, setDeviceId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const getOrCreateDeviceId = async () => {
-      let id = await SecureStore.getItemAsync("device_id");
-      if (!id) {
-        id = uuidv4();
-        await SecureStore.setItemAsync("device_id", id);
-      }
-      setDeviceId(id);
-    };
-    getOrCreateDeviceId();
-  }, []);
-  // Carrega empresas
+  // Votação
   const votarProduto = async (produtoId: string, tipo: "like" | "unlike") => {
     if (!deviceId) {
-      Alert.alert("Erro", "ID do dispositivo não disponível.");
-      return;
-    }  
-    const votoRef = ref(database, `votos/${produtoId}/${deviceId}`);
-    const votoSnapshot = await get(votoRef);
-
-    if (votoSnapshot.exists()) {
-      Alert.alert("Você já votou!", "Só é permitido um voto por produto.");
+      Alert.alert("Erro", "ID do dispositivo não disponível. Tente reiniciar o app.");
       return;
     }
+    
+    const produtoVotado = produtosComEmpresa.find(p => p.id === produtoId);
+    if (!produtoVotado) {
+        Alert.alert("Erro", "Produto não encontrado na lista.");
+        return;
+    }
 
-    // Salva o voto
-    await set(votoRef, { tipo });
+    const empresaId = produtoVotado.empresaId;
+    const votoRef = ref(database, `votos/${produtoId}/${deviceId}`);
+    const votoSnapshot = await get(votoRef);
+    const produtoRef = ref(database, `produtos/${empresaId}/${produtoId}`);
 
-    // Atualiza o contador no produto
-    const produtoRef = ref(database, `produtos/${produtoId}`);
-    const produtoSnapshot = await get(produtoRef);
-    const produtoData = produtoSnapshot.val() || {};
+    if (votoSnapshot.exists()) {
+        const votoAnteriorTipo = votoSnapshot.val().tipo;
+        
+        // Se o usuário está tentando votar com o MESMO tipo, pergunta se ele quer retirar.
+        if (votoAnteriorTipo === tipo) {
+            
+            // --- ALERT PARA RETIRADA DE VOTO ---
+            Alert.alert(
+                "Voto Já Registrado",
+                `Seu voto como '${tipo.toUpperCase()}' já está registrado. Gostaria de **retirar** seu voto?`,
+                [
+                    {
+                        text: "Não, manter voto",
+                        onPress: () => console.log('Voto mantido.'),
+                        style: 'cancel',
+                    },
+                    {
+                        text: "Sim, retirar voto",
+                        onPress: async () => {
+                            try {
+                                // 1. Remove o voto do usuário
+                                await set(votoRef, null); 
 
-    const novoValor = (produtoData[tipo] ?? 0) + 1;
-    await update(produtoRef, { [tipo]: novoValor });
+                                // 2. Decrementa o contador atômico no nó de produtos
+                                await update(produtoRef, {
+                                    [tipo]: increment(-1),
+                                });
+
+                                // 3. Atualiza o estado local imediatamente
+                                setProdutosComEmpresa(prevProdutos => 
+                                    prevProdutos.map(p => {
+                                        if (p.id === produtoId) {
+                                            const novoValorLocal = Math.max(0, (p[tipo] ?? 0) - 1);
+                                            return { 
+                                                ...p, 
+                                                [tipo]: novoValorLocal as number 
+                                            };
+                                        }
+                                        return p;
+                                    })
+                                );
+                                Alert.alert("Sucesso", "Seu voto foi retirado.");
+                            } catch (error) {
+                                console.error("Erro ao retirar voto:", error);
+                                Alert.alert("Erro", "Não foi possível retirar o voto. Tente novamente.");
+                            }
+                        },
+                        style: 'destructive',
+                    },
+                ],
+                { cancelable: true }
+            );
+            return; // Encerra a função após o Alert de retirada
+        }
+      }
+    // --- LÓGICA DE ALERTA ---
+    const titulo = (tipo === 'like') 
+        ? 'CONFIRMAR VOTO POSITIVO?' 
+        : 'CONFIRMAR VOTO NEGATIVO?';
+        
+    const mensagem = 
+        `Seu voto é muito importante e será usado para avaliar a qualidade e veracidade desta oferta para outros usuários. ` +
+        `Confirme apenas se você tem uma opinião séria sobre o item.`;
+
+    // Retorna uma Promise que resolve em true (confirma) ou false (cancela)
+    const confirmar = new Promise<boolean>((resolve) => {
+        Alert.alert(
+            titulo,
+            mensagem,
+            [
+                {
+                    text: "Cancelar",
+                    onPress: () => resolve(false), // Cancela o voto
+                    style: 'cancel',
+                },
+                {
+                    text: "Confirmar",
+                    onPress: () => resolve(true), // Continua o fluxo
+                    style: 'default',
+                },
+            ],
+            { cancelable: false }
+        );
+    });
+
+    const confirmado = await confirmar;
+
+    // Se o usuário cancelou, a função termina aqui.
+    if (!confirmado) {
+        return; 
+    }
+    // --- FIM LÓGICA DE ALERTA ---
+    try {
+          await set(votoRef, { tipo });
+
+    
+    //const produtoSnapshot = await get(produtoRef);
+    //const produtoData = produtoSnapshot.val() || {};
+
+    //const novoValor = (produtoData[tipo] ?? 0) + 1;
+    //await update(produtoRef, { [tipo]: novoValor });
+    await update(produtoRef, {
+            [tipo]: increment(1)
+    });
+
+    setProdutosComEmpresa(prevProdutos => 
+          prevProdutos.map(p => {
+              if (p.id === produtoId) {
+                  // Incrementa o valor localmente (garante feedback imediato)
+                  const novoValorLocal = (p[tipo] ?? 0) + 1;
+                  return { 
+                      ...p, 
+                      [tipo]: novoValorLocal as number 
+                  };
+              }
+              return p;
+          })
+      );
+    } catch (error) {
+      console.error("Erro ao votar ou atualizar contador:", error);
+            Alert.alert("Erro de Votação", "Não foi possível registrar seu voto. Tente novamente.");
+    }
   };
+
+  // Carrega empresas
   useEffect(() => {
     const empresasRef = ref(database, "usuariosEmpresa");
     onValue(empresasRef, (snapshot) => {
@@ -238,10 +359,17 @@ export default function HomeScreen() {
     });
   }, []);
 
-  // Carrega produtos
+  // Carrega produtos e Localização do usuário
   useFocusEffect(
     useCallback(() => {
+      // Se as empresas não carregaram, interrompe (espera o useEffect acima)
+      if (!Object.keys(empresas).length) {
+        return;
+      }
+
       setLoadingInicial(true);
+
+      // 1. Carregamento dos Produtos
       const produtosRef = ref(database, "produtos");
       get(produtosRef).then((snapshot) => {
         const data: ProdutoComEmpresa[] = [];
@@ -253,21 +381,17 @@ export default function HomeScreen() {
               userSnapshot.forEach((produtoSnapshot) => {
                 const produto = produtoSnapshot.val();
 
-                // 💡 AJUSTE: Mapeando os campos de localização corretamente
-                const latitudeProduto = produto.latitude || null;
-                const longitudeProduto = produto.longitude || null;
-                const localizacaoDiferente = !!produto.localizacaoDiferente; // Garantir que seja booleano
-
+                // Mapeamento dos dados do produto...
                 data.push({
                   id: produtoSnapshot.key!,
                   ...produto,
                   empresaId,
                   nomeEmpresa: empresaInfo.nomeEmpresa,
-                  latitudeEmpresa: empresaInfo.latitude || 0, // Lat da Empresa (padrão)
-                  longitudeEmpresa: empresaInfo.longitude || 0, // Lon da Empresa (padrão)
-                  latitudeProduto, // Lat do Produto (opcional)
-                  longitudeProduto, // Lon do Produto (opcional)
-                  localizacaoDiferente, // Flag
+                  latitudeEmpresa: empresaInfo.latitude || 0,
+                  longitudeEmpresa: empresaInfo.longitude || 0,
+                  latitudeProduto: produto.latitude || null,
+                  longitudeProduto: produto.longitude || null,
+                  localizacaoDiferente: !!produto.localizacaoDiferente,
                   dataFinalOferta: produto.dataFinalOferta,
                   destaque: produto.destaque,
                   palavrasChave: produto.palavrasChave,
@@ -278,10 +402,11 @@ export default function HomeScreen() {
             }
           });
         }
-        setProdutosComEmpresa(data.filter(p => isOfertaValida(p.dataFinalOferta))); // Filtro de validade movido aqui (opcional)
+        setProdutosComEmpresa(data.filter(p => isOfertaValida(p.dataFinalOferta)));
         setLoadingInicial(false);
       });
-      // Localização do usuário
+
+      // 2. Localização do usuário
       (async () => {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status === "granted") {
@@ -297,40 +422,31 @@ export default function HomeScreen() {
     }, [empresas])
   );
 
-  // 💡 useEffect para ajustar o mapa (zoom) para incluir o usuário e o produto
+  // Ajuste do mapa
   useEffect(() => {
-    // Apenas ajuste se o mapa estiver visível, a localização do usuário estiver disponível e um local tiver sido selecionado.
     if (mostrarMapa && userLocation && selectedLocation && mapRef.current) {
       const coordinates = [
-        userLocation, // Localização do usuário
-        { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }, // Localização do produto
+        userLocation,
+        { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude },
       ];
-
-      // Dá um pequeno tempo para o MapView ser montado antes de chamar a função
       const timer = setTimeout(() => {
         mapRef.current?.fitToCoordinates(coordinates, {
-          // Ajuste de preenchimento (padding) nas bordas
           edgePadding: { top: 100, right: 50, bottom: 50, left: 50 },
           animated: true,
         });
       }, 300);
-
       return () => clearTimeout(timer);
     }
   }, [mostrarMapa, userLocation, selectedLocation]);
 
-  // Filtra produtos válidos (Opcional: O filtro de validade foi movido para o useFocusEffect)
+  // Filtros
   const produtosValidos = produtosComEmpresa.filter((produto) => {
-    // if (!isOfertaValida(produto.dataFinalOferta)) return false; // REMOVIDO: Já está no useFocusEffect
-
-    // Lógica para filtrar por categoria
     if (categoriaSelecionada) {
       const palavrasChaveLower = produto.palavrasChave?.toLowerCase() || "";
       if (!palavrasChaveLower.includes(categoriaSelecionada.toLowerCase())) {
         return false;
       }
     }
-
     if (termoBusca.length >= 3) {
       const termo = termoBusca.toLowerCase();
       if (
@@ -344,13 +460,11 @@ export default function HomeScreen() {
     return true;
   });
 
-  // Produtos em destaque (quando não está buscando)
   const produtosParaExibir =
     termoBusca.length >= 3 || categoriaSelecionada
       ? produtosValidos
       : produtosValidos.filter((p) => p.destaque);
 
-  // 💡 Determina o título a ser exibido
   const tituloDaLista =
     termoBusca.length >= 3 || categoriaSelecionada
       ? "Resultados da busca"
@@ -359,52 +473,37 @@ export default function HomeScreen() {
 
   // Ordenação
   const produtosOrdenados = [...produtosParaExibir].sort((a, b) => {
-    // Função para extrair o preço como número
     const getPrecoNumerico = (produto: ProdutoComEmpresa) =>
       parseFloat(produto.preco.replace("R$", "").replace(",", ".").replace(/\./g, ""));
 
-    // Função para calcular a distância
     const getDistancia = (produto: ProdutoComEmpresa) => {
-      const location = getProdutoLocation(produto); // Obtém a localização correta (produto ou empresa)
+      const location = getProdutoLocation(produto);
       return (userLocation && location)
         ? (calcularDistancia(userLocation, { latitude: location.latitude, longitude: location.longitude }) ?? Infinity)
         : Infinity;
     }
 
-
     if (ordenarPorPreco) {
-      // Ordenação Principal: Menor Preço
       return getPrecoNumerico(a) - getPrecoNumerico(b);
     } else {
-      // Ordenação Principal: Proximidade
-      const distA = getDistancia(a);
-      const distB = getDistancia(b);
-
-      const diferencaDistancia = distA - distB;
-
-      // 💡 NOVO: Se as distâncias forem as mesmas (diferença dentro de uma tolerância pequena, como 0.001km), 
-      // ordena por preço.
+      const diferencaDistancia = getDistancia(a) - getDistancia(b);
       if (Math.abs(diferencaDistancia) < 0.001) {
-        // Ordenação Secundária: Menor Preço
         return getPrecoNumerico(a) - getPrecoNumerico(b);
       }
-
       return diferencaDistancia;
     }
   });
 
-
-  // 💡 LÓGICA DE INSERÇÃO DO AdCard A CADA 5 PRODUTOS
+  // Inserção de AdCard
   const produtosComAnuncios: ProdutoComEmpresa[] = [];
   let adCounter = 0;
-  const AD_INTERVAL = 5; // Insere anúncio a cada 5 produtos
+  const AD_INTERVAL = 5;
 
   produtosOrdenados.forEach((produto, index) => {
     produtosComAnuncios.push(produto);
     adCounter++;
 
     if (adCounter % AD_INTERVAL === 0) {
-      // Cria um placeholder de AdCard com ID único para inserção regular
       const adItem: ProdutoComEmpresa = {
         ...AD_PLACEHOLDER,
         id: `ad_inserted_${index}_${Math.random()}`,
@@ -413,23 +512,20 @@ export default function HomeScreen() {
     }
   });
 
-  // 💡 LÓGICA DE PREENCHIMENTO FINAL (COM ADCARD)
   let produtosParaRenderizar: ProdutoComEmpresa[] = produtosComAnuncios;
 
-  // Se o número total for ímpar, adiciona UM AdCard no final para preencher o espaço
   if (produtosComAnuncios.length % 2 === 1) {
     const finalAd: ProdutoComEmpresa = {
       ...AD_PLACEHOLDER,
-      id: `ad_final_${Math.random()}`, // ID único para o card de preenchimento
+      id: `ad_final_${Math.random()}`,
     };
     produtosParaRenderizar = [...produtosComAnuncios, finalAd];
   }
 
 
-  // 💡 AJUSTE: Usar a função getProdutoLocation para determinar qual lat/lon usar
+  // Ações de Mapas e Redes Sociais
   const handleVerNoMapa = (produto: ProdutoComEmpresa) => {
     const location = getProdutoLocation(produto);
-
     if (location) {
       setSelectedLocation({
         latitude: location.latitude,
@@ -438,35 +534,23 @@ export default function HomeScreen() {
         empresaId: produto.empresaId,
         produtoId: produto.id,
       });
-
-      // 💡 setMapRegion: Define uma região inicial para o mapa
       setMapRegion({
         latitude: location.latitude,
         longitude: location.longitude,
         latitudeDelta: 0.0922,
         longitudeDelta: 0.0421,
       });
-
       setMostrarMapa(true);
     } else {
-      Alert.alert(
-        "Localização Indisponível",
-        "Esta empresa/produto não possui uma localização cadastrada."
-      );
+      Alert.alert("Localização Indisponível", "Esta empresa/produto não possui uma localização cadastrada.");
     }
   };
-  // ---
 
-  // 💡 Função para abrir a rota no Google Maps (App ou Web)
   const openExternalMapRoute = (latitude: number, longitude: number, label: string) => {
-    // ... (restante da função é o mesmo)
-    // URL universal para Maps com um ponto de destino
     const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
     const url = `${scheme}${latitude},${longitude}(${label})`;
 
-    // Tenta abrir o aplicativo
     Linking.openURL(url).catch(() => {
-      // Se falhar (ex: app não instalado ou Android sem o esquema geo), tenta abrir no Google Maps Web
       const webUrl = `http://maps.google.com/maps?daddr=${latitude},${longitude}`;
       Linking.openURL(webUrl).catch(() => {
         Alert.alert("Erro", "Não foi possível abrir o aplicativo de mapas.");
@@ -475,12 +559,8 @@ export default function HomeScreen() {
   };
 
   const openInstagramProfile = async (username: string | undefined) => {
-    // ... (função é a mesma)
     if (!username) {
-      Alert.alert(
-        "Instagram não informado",
-        "Esta empresa não possui um Instagram cadastrado."
-      );
+      Alert.alert("Instagram não informado", "Esta empresa não possui um Instagram cadastrado.");
       return;
     }
     const user = username.replace("@", "");
@@ -488,41 +568,38 @@ export default function HomeScreen() {
     try {
       await Linking.openURL(webUrl);
     } catch (error) {
-      Alert.alert(
-        "Erro",
-        "Ocorreu um erro inesperado ao tentar abrir o Instagram."
-      );
+      Alert.alert("Erro", "Ocorreu um erro inesperado ao tentar abrir o Instagram.");
     }
   };
 
   const openWhatsApp = (telefone: string | undefined) => {
-    // ... (função é a mesma)
     if (!telefone) {
-      Alert.alert(
-        "WhatsApp não informado",
-        "Esta empresa não possui um telefone cadastrado."
-      );
+      Alert.alert("WhatsApp não informado", "Esta empresa não possui um telefone cadastrado.");
       return;
     }
     const numeroLimpo = telefone.replace(/\D/g, "");
-    const url = `https://wa.me/55${numeroLimpo}`; // Adicionando o código do Brasil
+    const url = `https://wa.me/55${numeroLimpo}`;
     Linking.openURL(url).catch(() => {
       Alert.alert("Erro", "Não foi possível abrir o WhatsApp.");
     });
   };
 
-  // 💡 Variáveis para o botão de Rota no Modal
   const isSelectedLocationValid = selectedLocation && selectedLocation.latitude && selectedLocation.longitude;
   const selectedLat = isSelectedLocationValid ? selectedLocation.latitude : 0;
   const selectedLon = isSelectedLocationValid ? selectedLocation.longitude : 0;
   const selectedName = isSelectedLocationValid ? selectedLocation.nome : "Destino";
+
+
+  // ----------------------------------------------------
+  // 4. RENDERIZAÇÃO
+  // ----------------------------------------------------
 
   return (
     <ImageBackground source={defaultFundoLocal} style={styles.background}>
       <AdBanner />
       <View style={styles.container}>
         <View style={styles.topBarContainer}>
-          {/* Campo de busca com imagem sobreposta no início do campo */}
+          {/* Campo de busca e ordenação */}
           <View style={styles.buscaOverlayContainer}>
             <TextInput
               style={styles.inputBuscaOverlay}
@@ -536,36 +613,23 @@ export default function HomeScreen() {
               style={styles.lupaSobreposta}
             />
           </View>
-
-          {/* Switch de ordenação */}
           <View style={styles.ordenacaoContainer}>
             <Text style={{ color: "#ffffffea", fontWeight: "bold", }}>Ordenar por:</Text>
-
-            {/* Texto de Proximidade (Ativo se ordenarPorPreco for FALSE) */}
-            <Text style={[
-              styles.ordenacaoText,
-              !ordenarPorPreco && styles.ordenacaoTextActive
-            ]}>
+            <Text style={[styles.ordenacaoText, !ordenarPorPreco && styles.ordenacaoTextActive]}>
               Proximidade
             </Text>
-
             <Switch
               value={ordenarPorPreco}
               onValueChange={setOrdenarPorPreco}
               thumbColor={"white"}
               trackColor={{ false: "#ccc", true: "#ccc" }}
             />
-
-            {/* Texto de Menor Preço (Ativo se ordenarPorPreco for TRUE) */}
-            <Text style={[
-              styles.ordenacaoText,
-              ordenarPorPreco && styles.ordenacaoTextActive
-            ]}>
+            <Text style={[styles.ordenacaoText, ordenarPorPreco && styles.ordenacaoTextActive]}>
               Menor Preço
             </Text>
           </View>
 
-          {/* Botões de categorias realistas em linha com rolagem horizontal */}
+          {/* Botões de categorias */}
           <View style={styles.categoriasScrollContainer}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {categorias.map((cat) => (
@@ -573,8 +637,7 @@ export default function HomeScreen() {
                   <TouchableOpacity
                     style={[
                       styles.categoriaBotaoRedondo,
-                      categoriaSelecionada === cat.nome &&
-                      styles.categoriaBotaoSelecionado,
+                      categoriaSelecionada === cat.nome && styles.categoriaBotaoSelecionado,
                     ]}
                     onPress={() =>
                       setCategoriaSelecionada(
@@ -605,11 +668,9 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Título da Lista de Produtos */}
         <View style={styles.listTitleContainer}>
           <Text style={styles.listTitle}>{tituloDaLista}</Text>
         </View>
-
 
         {/* Lista de produtos */}
         {loadingInicial ? (
@@ -630,7 +691,6 @@ export default function HomeScreen() {
             numColumns={2}
             columnWrapperStyle={styles.cardRow}
             renderItem={({ item }) => {
-              // 💡 RENDERIZAÇÃO DO ADCARD NATIVO (PARA INSERÇÃO REGULAR OU PREENCHIMENTO FINAL)
               if (item.isAd) {
                 return (
                   <View style={styles.cardProdutoGenerico}>
@@ -639,22 +699,10 @@ export default function HomeScreen() {
                 );
               }
 
-              // Se não for anúncio, renderiza o card de produto normal.
               const produtoReal = item as ProdutoComEmpresa;
               const empresaInfo = empresas[produtoReal.empresaId];
-
-              // 💡 AJUSTE: Usar a função que determina a localização correta
               const location = getProdutoLocation(produtoReal);
-
-              const distancia =
-                userLocation && location
-                  ? calcularDistancia(userLocation, {
-                    latitude: location.latitude,
-                    longitude: location.longitude,
-                  })
-                  : null;
-
-              // Variavel de localizacao
+              const distancia = userLocation && location ? calcularDistancia(userLocation, { latitude: location.latitude, longitude: location.longitude }) : null;
               const temLocalizacao = !!location;
 
               return (
@@ -676,12 +724,26 @@ export default function HomeScreen() {
 
                     )}
                     <View style={styles.likeUnlikeContainer}>
-                      <TouchableOpacity onPress={() => votarProduto(produtoReal.id, "like")}>
-                        <Feather name="thumbs-up" size={23} color="#4CAF50" />
+                      <TouchableOpacity
+                        disabled={!deviceId}
+                        onPress={() => votarProduto(produtoReal.id, "like")}
+                      >
+                        <Feather
+                          name="thumbs-up"
+                          size={23}
+                          color={deviceId ? "#4CAF50" : "#ccc"}
+                        />
                       </TouchableOpacity>
                       <Text style={{ color: "green" }}>{produtoReal.like ?? 0}</Text>
-                      <TouchableOpacity onPress={() => votarProduto(produtoReal.id, "unlike")}>
-                        <Feather name="thumbs-down" size={23} color="#F44336" />
+                      <TouchableOpacity
+                        disabled={!deviceId}
+                        onPress={() => votarProduto(produtoReal.id, "unlike")}
+                      >
+                        <Feather
+                          name="thumbs-down"
+                          size={23}
+                          color={deviceId ? "#F44336" : "#ccc"}
+                        />
                       </TouchableOpacity>
                       <Text style={{ color: "red" }}>{produtoReal.unlike ?? 0}</Text>
                     </View>
@@ -717,9 +779,7 @@ export default function HomeScreen() {
                       {empresaInfo?.instagram && (
                         <View style={styles.botaoAcaoItem}>
                           <TouchableOpacity
-                            onPress={() =>
-                              openInstagramProfile(empresaInfo.instagram)
-                            }
+                            onPress={() => openInstagramProfile(empresaInfo.instagram)}
                             style={styles.botaoRedondo}
                           >
                             <Image
@@ -767,12 +827,11 @@ export default function HomeScreen() {
           />
         )}
 
-        {/* Mapa */}
+        {/* Mapa e Modal de Imagem */}
         {mostrarMapa && (
           <View style={styles.mapOverlayContainer}>
             <View style={styles.mapDisplayBox}>
               {mapRegion ? (
-                // 💡 Ref para MapView
                 <MapView style={styles.mapViewStyle} region={mapRegion} ref={mapRef}>
                   {userLocation && (
                     <Marker coordinate={userLocation} zIndex={2}>
@@ -782,57 +841,36 @@ export default function HomeScreen() {
                       <Callout tooltip>
                         <View style={styles.calloutView}>
                           <Text style={styles.calloutTitle}>Você</Text>
-                          <Text style={styles.calloutDescription}>
-                            Sua localização atual.
-                          </Text>
+                          <Text style={styles.calloutDescription}>Sua localização atual.</Text>
                         </View>
                       </Callout>
                     </Marker>
                   )}
                   {produtosComEmpresa
-                    .map(p => ({ produto: p, location: getProdutoLocation(p) })) // Obtem a localização correta
-                    .filter(item => item.location) // Filtra apenas produtos com localização válida
+                    .map(p => ({ produto: p, location: getProdutoLocation(p) }))
+                    .filter(item => item.location)
                     .map(({ produto, location }) => {
-                      const isSelected =
-                        selectedLocation &&
-                        produto.empresaId === selectedLocation.empresaId &&
-                        produto.id === selectedLocation.produtoId;
+                      const isSelected = selectedLocation && produto.empresaId === selectedLocation.empresaId && produto.id === selectedLocation.produtoId;
                       return (
                         <Marker
                           key={produto.id + produto.empresaId + "_mapmarker"}
-                          coordinate={{
-                            latitude: location!.latitude,
-                            longitude: location!.longitude
-                          }}
+                          coordinate={{ latitude: location!.latitude, longitude: location!.longitude }}
                           title={produto.nomeEmpresa}
-                          description={
-                            produto.descricao.substring(0, 40) + "..."
-                          }
+                          description={produto.descricao.substring(0, 40) + "..."}
                           pinColor={isSelected ? "red" : "blue"}
                           zIndex={isSelected ? 3 : 1}
                         >
                           {Platform.OS === "ios" ? (
                             <Image
-                              source={{
-                                uri: isSelected
-                                  ? "https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png"
-                                  : "https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png",
-                              }}
-                              style={[
-                                styles.markerImageBase,
-                                isSelected && styles.selectedMarkerImage,
-                              ]}
+                              source={{ uri: isSelected ? "https://maps.gstatic.com/mapfiles/ms2/micons/red-dot.png" : "https://maps.gstatic.com/mapfiles/ms2/micons/blue-dot.png" }}
+                              style={[styles.markerImageBase, isSelected && styles.selectedMarkerImage]}
                               resizeMode="contain"
                             />
                           ) : null}
                           <Callout tooltip>
                             <View style={styles.calloutView}>
-                              <Text style={styles.calloutTitle}>
-                                {produto.nomeEmpresa}
-                              </Text>
-                              <Text style={styles.calloutDescription}>
-                                {produto.descricao.substring(0, 60) + "..."}
-                              </Text>
+                              <Text style={styles.calloutTitle}>{produto.nomeEmpresa}</Text>
+                              <Text style={styles.calloutDescription}>{produto.descricao.substring(0, 60) + "..."}</Text>
                             </View>
                           </Callout>
                         </Marker>
@@ -846,7 +884,6 @@ export default function HomeScreen() {
                 </View>
               )}
 
-              {/* Botão para abrir a rota no Google Maps (dentro do modal) */}
               {isSelectedLocationValid && (
                 <TouchableOpacity
                   style={styles.externalMapButton}
@@ -870,7 +907,7 @@ export default function HomeScreen() {
           </View>
         )}
 
-        {/* Modal para exibir imagem em tela cheia (opcional) */}
+        {/* Modal para exibir imagem em tela cheia */}
         {imagemModalVisivel && imagemModalUrl && (
           <Modal
             transparent={true}
@@ -894,6 +931,10 @@ export default function HomeScreen() {
   );
 }
 
+// ----------------------------------------------------
+// 5. ESTILOS
+// ----------------------------------------------------
+
 const styles = StyleSheet.create({
   imagemLikeContainer: {
     flexDirection: "row",
@@ -905,9 +946,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-evenly",
   },
-  // NOVO ESTILO: Badge para localização diferente
   localizacaoDiferenteBadge: {
-    backgroundColor: '#ffc107', // Amarelo/laranja de alerta
+    backgroundColor: '#ffc107',
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 5,
@@ -919,7 +959,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  // ---
   background: { flex: 1, resizeMode: "cover" },
   container: { flex: 1, },
   buscaRow: {
@@ -992,12 +1031,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  // 💡 ESTILO: Texto de ordenação base
   ordenacaoText: {
     marginHorizontal: 5,
     color: "#ffffffea"
   },
-  // 💡 ESTILO: Texto de ordenação ativo
   ordenacaoTextActive: {
     fontWeight: "bold",
     textDecorationLine: "underline",
@@ -1021,7 +1058,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     width: CARD_WIDTH,
-    minHeight: CARD_MIN_HEIGHT, // Altura mínima para igualar o AdCard
+    minHeight: CARD_MIN_HEIGHT,
   },
   cardProdutoGenerico: {
     backgroundColor: "rgba(255,255,255,0.95)",
@@ -1036,8 +1073,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 3,
     width: CARD_WIDTH,
-    minHeight: CARD_MIN_HEIGHT, // Altura mínima para igualar o AdCard
-    padding: 0, // Removido padding interno para permitir o AdCard ter controle total
+    minHeight: CARD_MIN_HEIGHT,
+    padding: 0,
   },
   descricaoGenerica: {
     fontSize: 15,
@@ -1158,8 +1195,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
   imagemProduto: {
-    width: 100,      // largura fixa
-    height: 100,     // altura fixa igual à largura
+    width: 100,
+    height: 100,
     borderRadius: 8,
     marginTop: 5,
     resizeMode: "contain",
@@ -1194,12 +1231,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     padding: 5,
-    justifyContent: 'space-between', // Para posicionar o botão externo
+    justifyContent: 'space-between',
   },
   mapViewStyle: {
     flex: 1,
     borderRadius: 10,
-    marginBottom: 10, // Espaço para o botão
+    marginBottom: 10,
   },
   closeMapButtonOverlay: {
     position: "absolute",
@@ -1309,9 +1346,8 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     textAlign: "center",
   },
-  // Botão de Rota Externa no Modal
   externalMapButton: {
-    backgroundColor: "#34A853", // Cor do Google
+    backgroundColor: "#34A853",
     paddingVertical: 10,
     paddingHorizontal: 15,
     borderRadius: 8,
@@ -1327,19 +1363,17 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 14,
   },
-  // Container e Texto do Título
   listTitleContainer: {
     paddingHorizontal: 12,
     paddingVertical: 8,
-    backgroundColor: "transparent", // Mantendo transparente para ver o fundo
+    backgroundColor: "transparent",
   },
   listTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
-    color: "#222",
+    color: "#333",
     textAlign: "center",
   },
-  // Estilos do Modal de Imagem
   modalContainer: {
     flex: 1,
     justifyContent: "center",

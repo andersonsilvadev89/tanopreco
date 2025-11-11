@@ -25,6 +25,10 @@ import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 // --- Importar o gerenciador de imagens para o fundo ---
 import { checkAndDownloadImages } from '../../utils/imageManager';
 
+// --- Importar o Modal de Localização ---
+// IMPORTANTE: Assumindo que este componente está no caminho abaixo
+import LocalizacaoModal from '../components/LocalizacaoModal';
+
 // --- URL padrão de fallback para o fundo local ---
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
@@ -61,6 +65,9 @@ const ConfiguracoesEmpresaScreen = () => {
     const [novaImagemUri, setNovaImagemUri] = useState<string | null>(null);
     const [latitude, setLatitude] = useState<number | null>(null);
     const [longitude, setLongitude] = useState<number | null>(null);
+
+    // --- NOVO ESTADO: Visibilidade do Modal de Localização ---
+    const [isLocationModalVisible, setIsLocationModalVisible] = useState(false);
 
     // --- Estados para o carregamento da imagem de fundo dinâmica ---
     const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
@@ -208,6 +215,7 @@ const ConfiguracoesEmpresaScreen = () => {
         }
     };
 
+    // --- FUNÇÃO MODIFICADA: Obter e Salvar Localização Atual ---
     const obterLocalizacaoAtualECadastrar = async () => {
         if (!usuarioId) {
             Alert.alert("Erro", "Usuário não autenticado.");
@@ -225,19 +233,45 @@ const ConfiguracoesEmpresaScreen = () => {
 
             let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
             const { latitude, longitude } = location.coords;
+            
+            // Reutiliza a função de salvar para DRY (Don't Repeat Yourself)
+            await salvarLocalizacao({ latitude, longitude });
 
-            const companyRef = ref(database, `usuariosEmpresa/${usuarioId}`);
-            await update(companyRef, {
-                    latitude,
-                    longitude
-            });
-            setLatitude(latitude);
-            setLongitude(longitude);
             Alert.alert('Sucesso', `Localização atualizada para:\nLatitude: ${latitude.toFixed(5)}\nLongitude: ${longitude.toFixed(5)}`);
 
         } catch (error) {
             console.error("Erro ao obter e cadastrar localização:", error);
             Alert.alert("Erro", "Não foi possível obter ou cadastrar a localização. Verifique se o GPS está ativado e tente novamente.");
+        }
+    };
+
+    // --- NOVA FUNÇÃO: Salvar localização (seja do GPS ou do Modal) no Firebase ---
+    const salvarLocalizacao = async ({ latitude, longitude }: { latitude: number, longitude: number }) => {
+        if (!usuarioId) return;
+        try {
+            const companyRef = ref(database, `usuariosEmpresa/${usuarioId}`);
+            await update(companyRef, {
+                latitude,
+                longitude
+            });
+            setLatitude(latitude);
+            setLongitude(longitude);
+        } catch (error) {
+            console.error("Erro ao salvar localização no Firebase:", error);
+            Alert.alert("Erro", "Não foi possível salvar as coordenadas da localização.");
+            throw error; // Re-lança para ser pego pela função chamadora, se necessário
+        }
+    };
+    
+    // --- NOVA FUNÇÃO: Tratamento ao salvar localização pelo Modal ---
+    const handleSaveLocation = async (coords: { latitude: number; longitude: number }) => {
+        try {
+            await salvarLocalizacao(coords);
+            Alert.alert('Sucesso', `Localização selecionada atualizada para:\nLatitude: ${coords.latitude.toFixed(5)}\nLongitude: ${coords.longitude.toFixed(5)}`);
+            setIsLocationModalVisible(false);
+        } catch (error) {
+            // O erro já foi tratado em salvarLocalizacao, apenas fecha o modal se desejar
+            setIsLocationModalVisible(false);
         }
     };
 
@@ -287,15 +321,9 @@ const ConfiguracoesEmpresaScreen = () => {
                                     ) : null}
                                     {(latitude && longitude) ? (
                                         <View style={styles.detailRow}>
-                                            <Text style={styles.profileDetail}>Latitude: {latitude.toFixed(5)}</Text>
+                                            <Text style={styles.profileDetail}>Lat: {latitude.toFixed(5)}, Lon: {longitude.toFixed(5)}</Text>
                                         </View>
-                                    ) : null}
-                                    {(latitude && longitude) ? (
-                                        <View style={styles.detailRow}>
-                                            <Text style={styles.profileDetail}>Longitude: {longitude.toFixed(5)}</Text>
-                                        </View>
-                                    ) : null}
-                                    {!(latitude && longitude) && (
+                                    ) : (
                                         <View style={styles.detailRow}>
                                             <Text style={styles.profileDetail}>Nenhuma localização cadastrada.</Text>
                                         </View>
@@ -334,15 +362,41 @@ const ConfiguracoesEmpresaScreen = () => {
                         )}
                     </View>
 
+                    {/* --- SEÇÃO DE LOCALIZAÇÃO ATUALIZADA --- */}
                     <View style={styles.card}>
-                        <Text style={styles.sectionTitle}>Localização da Empresa</Text>
-                        <Text style={styles.settingDescription}>Clique no botão abaixo para capturar sua localização atual e permitir que sua empresa apareça no mapa do evento.</Text>
-                        <TouchableOpacity style={styles.updateLocationButton} onPress={obterLocalizacaoAtualECadastrar}>
-                            <Text style={styles.updateLocationButtonText}>Atualizar Localização no Mapa</Text>
+                        <Text style={styles.sectionTitle}>🗺️ Localização da Empresa</Text>
+                        <Text style={styles.settingDescription}>Defina a localização da sua empresa no mapa para que ela possa ser encontrada pelos clientes.</Text>
+                        
+                        {/* NOVO BOTÃO: Abrir Modal para selecionar no Mapa */}
+                        <TouchableOpacity 
+                            style={[styles.updateLocationButton, styles.selectMapButton]} 
+                            onPress={() => setIsLocationModalVisible(true)}
+                        >
+                            <Text style={styles.updateLocationButtonText}>Selecionar Localização no Mapa</Text>
                         </TouchableOpacity>
+                        
+                        {/* Botão Existente: Atualizar via GPS Atual */}
+                        <TouchableOpacity style={styles.updateLocationButton} onPress={obterLocalizacaoAtualECadastrar}>
+                            <Text style={styles.updateLocationButtonText}>Usar Localização GPS Atual</Text>
+                        </TouchableOpacity>
+                        
+                        {(latitude !== null && longitude !== null) && (
+                             <Text style={styles.currentCoordsText}>
+                                 Coordenadas Salvas: Lat: {latitude.toFixed(6)}, Lon: {longitude.toFixed(6)}
+                             </Text>
+                        )}
+
                     </View>
                 </KeyboardAwareScrollView>
             </SafeAreaView>
+
+            {/* --- NOVO COMPONENTE MODAL --- */}
+            <LocalizacaoModal
+                isVisible={isLocationModalVisible}
+                onClose={() => setIsLocationModalVisible(false)}
+                onSave={handleSaveLocation}
+                initialCoords={{ latitude, longitude }}
+            />
         </ImageBackground>
     );
 };
@@ -403,8 +457,21 @@ const styles = StyleSheet.create({
     settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
     settingLabel: { fontSize: 16, color: '#444', flex: 1, marginRight: 10 },
     settingDescription: { fontSize: 13, color: '#666', marginTop: 8, lineHeight: 18, textAlign: 'center' },
-    updateLocationButton: { backgroundColor: '#007BFF', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 15 },
+    updateLocationButton: { backgroundColor: '#4CAF50', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 15 }, // Cor alterada para diferenciar do de seleção
     updateLocationButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
+    
+    // NOVOS ESTILOS PARA O BOTÃO DE SELEÇÃO NO MAPA E COORDENADAS
+    selectMapButton: { 
+        backgroundColor: '#007BFF', // Cor primária para o botão de seleção no mapa
+        marginBottom: 5
+    },
+    currentCoordsText: {
+        fontSize: 14,
+        color: '#333',
+        textAlign: 'center',
+        marginTop: 10,
+        fontStyle: 'italic'
+    }
 });
 
 export default ConfiguracoesEmpresaScreen;
