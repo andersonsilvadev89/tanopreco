@@ -1,13 +1,22 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
+import { View, StyleSheet, Platform } from 'react-native';
 import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
 
-// ⚠️ IMPORTANTE: SUBSTITUA PELO SEU ID DE UNIDADE DE ANÚNCIO DE BANNER DO ADMOB
-// Exemplo: 'ca-app-pub-1234567890123456/1234567890'
-const LIVE_AD_UNIT_ID = 'ca-app-pub-5241782827769638/4392341690'; 
+// ------------------------------------------------------------------
+// 🔧 CONFIGURAÇÃO POR PLATAFORMA (ANDROID / iOS)
+// ------------------------------------------------------------------
 
-// Alterna automaticamente entre o ID de Teste (em desenvolvimento) e o ID Real (em produção)
-const adUnitId = __DEV__ ? TestIds.BANNER : LIVE_AD_UNIT_ID;
+const IOS_AD_UNIT_ID = 'ca-app-pub-5241782827769638/9708550818';
+const ANDROID_AD_UNIT_ID = 'ca-app-pub-5241782827769638/4392341690';
+
+// Se estiver em modo de desenvolvimento, usar o ID de teste do Google
+const adUnitId = __DEV__
+    ? TestIds.BANNER
+    : Platform.select({
+        ios: IOS_AD_UNIT_ID,
+        android: ANDROID_AD_UNIT_ID,
+    })|| TestIds.BANNER;
+
 
 const AdBanner = () => {
   return (

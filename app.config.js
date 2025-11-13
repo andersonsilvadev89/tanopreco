@@ -4,7 +4,7 @@ export default {
   name: "TaNoPreco",
   slug: "TaNoPreco",
   platforms: ["android", "ios"],
-  version: "1.0.0",
+  version: "1.0.1",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   splash: {
@@ -27,7 +27,7 @@ export default {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       }
     },
-    versionCode: 26,
+    versionCode: 27,
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff"
@@ -58,7 +58,6 @@ export default {
     bundleIdentifier: "com.tanopreco",
     buildNumber: "1",
     config: {
-      googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       googleMobileAdsAppId: "ca-app-pub-5241782827769638~8974053643"
     },
     googleServicesFile: process.env.GOOGLE_SERVICES_PLIST ?? './GoogleService-Info.plist',

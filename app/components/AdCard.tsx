@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Image, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Image, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import {
     NativeAd,
     NativeAdView,
@@ -10,8 +10,20 @@ import {
 } from 'react-native-google-mobile-ads';
 import type { NativeAd as NativeAdType } from 'react-native-google-mobile-ads';
 
-// Use NATIVE_ADVANCED para melhor controle de layout
-const AD_UNIT_ID = __DEV__ ? TestIds.NATIVE : 'ca-app-pub-5241782827769638/1260262961';
+// ------------------------------------------------------------------
+// 🔧 CONFIGURAÇÃO POR PLATAFORMA (ANDROID / iOS)
+// ------------------------------------------------------------------
+
+const IOS_AD_UNIT_ID = 'ca-app-pub-5241782827769638/1260262961';
+const ANDROID_AD_UNIT_ID = 'ca-app-pub-5241782827769638/2862164767';
+
+// Se estiver em modo de desenvolvimento, usar o ID de teste do Google
+const AD_UNIT_ID = __DEV__
+    ? TestIds.NATIVE
+    : Platform.select({
+        ios: IOS_AD_UNIT_ID,
+        android: ANDROID_AD_UNIT_ID,
+    })|| TestIds.NATIVE;
 
 const AdCard: React.FC = () => {
     const [nativeAd, setNativeAd] = useState<NativeAdType | null>(null);

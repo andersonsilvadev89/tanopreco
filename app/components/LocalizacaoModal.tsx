@@ -113,7 +113,6 @@ const LocalizacaoModal: React.FC<Props> = ({ isVisible, onClose, onSave, initial
             ) : (
                 <MapView
                   style={styles.map}
-                  provider="google"
                   initialRegion={currentRegion}
                   onRegionChangeComplete={(region) => setCurrentRegion(region)}
                   onPress={handleMapPress}
@@ -124,7 +123,7 @@ const LocalizacaoModal: React.FC<Props> = ({ isVisible, onClose, onSave, initial
                       title="Localização do Produto"
                       draggable
                       onDragEnd={onDragEnd}
-                      pinColor="#04ad20ff" 
+                      pinColor="red" 
                     />
                   )}
                 </MapView>
