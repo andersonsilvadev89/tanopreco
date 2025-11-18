@@ -1,6 +1,6 @@
 import { Redirect } from "expo-router";
 import { useAuth } from "../context/AuthContext";
-import { ActivityIndicator, View, Text } from "react-native";
+import { ActivityIndicator, View, Text, Alert } from "react-native";
 import React, { useEffect, useState } from "react";
 import * as Updates from "expo-updates";
 import mobileAds from 'react-native-google-mobile-ads';
@@ -28,7 +28,6 @@ export default function Index() {
     // 2. LÓGICA DE VERIFICAÇÃO DE UPDATES OTA
     // ------------------------------------------
     async function checkForUpdates() {
-      // ... (sua lógica de updates permanece a mesma) ...
       if (!__DEV__) {
         try {
           console.log("Verificando atualizações OTA...");
@@ -41,8 +40,20 @@ export default function Index() {
           if (update.isAvailable) {
             console.log("⬇Baixando atualização...");
             await Updates.fetchUpdateAsync();
-            console.log("Atualização baixada com sucesso. Recarregando o app...");
-            await Updates.reloadAsync();
+            Alert.alert(
+              "Atualização Importante",
+              "Uma nova versão do aplicativo foi baixada. O app será fechado e você precisará abri-lo novamente para aplicar as mudanças. Toque em OK para continuar.",
+              [
+                {
+                  text: "OK",
+                  onPress: async () => {
+                    console.log("Atualização baixada com sucesso. Recarregando o app...");
+                    await Updates.reloadAsync();
+                  },
+                },
+              ],
+              { cancelable: false }
+            );
           }
         } catch (error: any) {
           console.error("Erro ao verificar/baixar atualização OTA:", error?.message || error);

@@ -6,7 +6,6 @@ import {
     StyleSheet,
     ImageBackground,
     SafeAreaView,
-    ActivityIndicator,
     ScrollView,
     Alert,
     Dimensions,
@@ -15,7 +14,6 @@ import { router } from 'expo-router';
 import {
     FontAwesome5
 } from '@expo/vector-icons';
-import { MaterialCommunityIcons } from '@expo/vector-icons'; // Mantido, mas não usado
 import { database } from '@/firebaseConfig';
 import { ref, onValue } from 'firebase/database';
 import { auth } from '@/firebaseConfig';
@@ -26,8 +24,6 @@ import AdBanner from '../components/AdBanner';
 import AdCard from '../components/AdCard'; // 💡 Novo AdCard importado
 import Header from '../components/Header'; // Mantido
 import { signOut } from "firebase/auth"; // Mantido
-import { checkAndDownloadImages } from '../../utils/imageManager'; // Mantido
-
 
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 const { width } = Dimensions.get('window');
@@ -37,8 +33,6 @@ const DYNAMIC_CARD_WIDTH = (width - CARD_MARGIN * 3) / 4.2; // Calcula a largura
 const HomeScreen = () => {
     const navigate = (path: string) => router.push(path as any);
 
-    const [fundoAppReady, setFundoAppReady] = useState(false);
-    const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
     const [userName, setUserName] = useState('');
 
     const confirmarLogout = () => {
@@ -112,21 +106,6 @@ const HomeScreen = () => {
         }
     }, []);
 
-    useEffect(() => {
-        const loadFundoImage = async () => {
-            try {
-                const { fundoUrl } = await checkAndDownloadImages();
-                setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
-            } catch (error) {
-                console.error("Erro ao carregar imagem de fundo na HomeScreen (Empresarial):", error);
-                setCurrentFundoSource(defaultFundoLocal);
-            } finally {
-                setFundoAppReady(true);
-            }
-        };
-        loadFundoImage();
-    }, []);
-
     // 💡 Organização dos botões para o novo layout
     const options = [
         { label: 'Produtos e Serviços', iconName: 'utensils', iconFamily: FontAwesome5, path: 'crudProdutosServicos' },
@@ -135,17 +114,8 @@ const HomeScreen = () => {
         { label: 'Sair', iconName: 'sign-out-alt', iconFamily: FontAwesome5, onPress: confirmarLogout },
     ];
 
-    if (!fundoAppReady) {
-        return (
-            <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#007BFF" />
-                <Text style={styles.loadingText}>Carregando fundo...</Text>
-            </ImageBackground>
-        );
-    }
-
     return (
-        <ImageBackground source={currentFundoSource} style={styles.background} resizeMode="cover">
+        <ImageBackground source={defaultFundoLocal} style={styles.background} resizeMode="cover">
             <AdBanner />
             <Header
                 title="Área Empresarial"

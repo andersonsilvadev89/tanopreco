@@ -26,11 +26,12 @@ import AdBanner from "../components/AdBanner";
 import * as Location from "expo-location";
 import AdCard from "../components/AdCard";
 import { useAuth } from "../../context/AuthContext";
-
+// 💡 NOVO: Importa o componente do Card de Produto
+import { ProdutoCard } from "../components/ProdutoCard";
 
 
 // ----------------------------------------------------
-// 1. CONSTANTES E TIPOS
+// 1. CONSTANTES, TIPOS E FUNÇÕES AUXILIARES (MOVIDAS PARA O TOPO)
 // ----------------------------------------------------
 
 const defaultFundoLocal = require("../../assets/images/fundo.png");
@@ -59,7 +60,6 @@ interface ProdutoComEmpresa {
   dataFinalOferta?: string;
   destaque?: boolean;
   categoria?: string;
-  isGeneric?: boolean;
   isAd?: boolean;
   unlike?: number;
   like?: number;
@@ -67,7 +67,6 @@ interface ProdutoComEmpresa {
 
 // Empresa
 interface EmpresaData {
-  nome: string;
   nomeEmpresa: string;
   latitude?: number;
   longitude?: number;
@@ -104,16 +103,13 @@ const categorias = [
   { nome: "Outros" },
 ];
 
-
-// ----------------------------------------------------
-// 2. FUNÇÕES AUXILIARES
-// ----------------------------------------------------
-
 function isOfertaValida(dataFinalOferta?: string) {
   if (!dataFinalOferta) return false;
   const [dia, mes, ano] = dataFinalOferta.split("/");
   const dataFinal = new Date(`${ano}-${mes}-${dia}`);
   const hoje = new Date();
+  hoje.setHours(12, 0, 0, 0);
+  dataFinal.setHours(12, 0, 0, 0);
   return dataFinal >= hoje;
 }
 
@@ -165,12 +161,12 @@ function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; lon
 }
 
 // ----------------------------------------------------
-// 3. COMPONENTE PRINCIPAL (HomeScreen)
+// 2. COMPONENTE PRINCIPAL (HomeScreen)
 // ----------------------------------------------------
 
 export default function HomeScreen() {
   const { deviceId } = useAuth();
-    
+
 
   const [produtosComEmpresa, setProdutosComEmpresa] = useState<ProdutoComEmpresa[]>([]);
   const [termoBusca, setTermoBusca] = useState("");
@@ -196,17 +192,76 @@ export default function HomeScreen() {
   // Ref para manipular o MapView
   const mapRef = useRef<MapView>(null);
 
-  // Votação
-  const votarProduto = async (produtoId: string, tipo: "like" | "unlike") => {
+  // Funções de Ação (movidas para o topo para serem passadas como props)
+
+  // 💡 Callback para abrir modal de imagem
+  const handleImagePress = useCallback((url: string) => {
+    setImagemModalUrl(url);
+    setImagemModalVisivel(true);
+  }, []);
+
+  // 💡 Função Traçar Rota / Ver no Mapa
+  const handleVerNoMapa = useCallback((produto: ProdutoComEmpresa) => {
+    const location = getProdutoLocation(produto);
+    if (location) {
+      setSelectedLocation({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        nome: produto.nomeEmpresa,
+        empresaId: produto.empresaId,
+        produtoId: produto.id,
+      });
+      setMapRegion({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+      setMostrarMapa(true);
+    } else {
+      Alert.alert("Localização Indisponível", "Esta empresa/produto não possui uma localização cadastrada.");
+    }
+  }, []);
+
+  // 💡 Função Abrir Instagram
+  const openInstagramProfile = useCallback(async (username: string | undefined) => {
+    if (!username) {
+      Alert.alert("Instagram não informado", "Esta empresa não possui um Instagram cadastrado.");
+      return;
+    }
+    const user = username.replace("@", "");
+    const webUrl = `https://www.instagram.com/${user}`;
+    try {
+      await Linking.openURL(webUrl);
+    } catch (error) {
+      Alert.alert("Erro", "Ocorreu um erro inesperado ao tentar abrir o Instagram.");
+    }
+  }, []);
+
+  // 💡 Função Abrir WhatsApp
+  const openWhatsApp = useCallback((telefone: string | undefined) => {
+    if (!telefone) {
+      Alert.alert("WhatsApp não informado", "Esta empresa não possui um telefone cadastrado.");
+      return;
+    }
+    const numeroLimpo = telefone.replace(/\D/g, "");
+    const url = `https://wa.me/55${numeroLimpo}`;
+    Linking.openURL(url).catch(() => {
+      Alert.alert("Erro", "Não foi possível abrir o WhatsApp.");
+    });
+  }, []);
+
+  // 💡 Função Votar (mantida para reuso no Card)
+  const votarProduto = useCallback(async (produtoId: string, tipo: "like" | "unlike") => {
     if (!deviceId) {
       Alert.alert("Erro", "ID do dispositivo não disponível. Tente reiniciar o app.");
       return;
     }
-    
+
     const produtoVotado = produtosComEmpresa.find(p => p.id === produtoId);
     if (!produtoVotado) {
-        Alert.alert("Erro", "Produto não encontrado na lista.");
-        return;
+      Alert.alert("Erro", "Produto não encontrado na lista.");
+      return;
     }
 
     const empresaId = produtoVotado.empresaId;
@@ -215,130 +270,116 @@ export default function HomeScreen() {
     const produtoRef = ref(database, `produtos/${empresaId}/${produtoId}`);
 
     if (votoSnapshot.exists()) {
-        const votoAnteriorTipo = votoSnapshot.val().tipo;
-        
-        // Se o usuário está tentando votar com o MESMO tipo, pergunta se ele quer retirar.
-        if (votoAnteriorTipo === tipo) {
-            
-            // --- ALERT PARA RETIRADA DE VOTO ---
-            Alert.alert(
-                "Voto Já Registrado",
-                `Seu voto como '${tipo.toUpperCase()}' já está registrado. Gostaria de **retirar** seu voto?`,
-                [
-                    {
-                        text: "Não, manter voto",
-                        onPress: () => console.log('Voto mantido.'),
-                        style: 'cancel',
-                    },
-                    {
-                        text: "Sim, retirar voto",
-                        onPress: async () => {
-                            try {
-                                // 1. Remove o voto do usuário
-                                await set(votoRef, null); 
+      const votoAnteriorTipo = votoSnapshot.val().tipo;
 
-                                // 2. Decrementa o contador atômico no nó de produtos
-                                await update(produtoRef, {
-                                    [tipo]: increment(-1),
-                                });
+      if (votoAnteriorTipo === tipo) {
 
-                                // 3. Atualiza o estado local imediatamente
-                                setProdutosComEmpresa(prevProdutos => 
-                                    prevProdutos.map(p => {
-                                        if (p.id === produtoId) {
-                                            const novoValorLocal = Math.max(0, (p[tipo] ?? 0) - 1);
-                                            return { 
-                                                ...p, 
-                                                [tipo]: novoValorLocal as number 
-                                            };
-                                        }
-                                        return p;
-                                    })
-                                );
-                                Alert.alert("Sucesso", "Seu voto foi retirado.");
-                            } catch (error) {
-                                console.error("Erro ao retirar voto:", error);
-                                Alert.alert("Erro", "Não foi possível retirar o voto. Tente novamente.");
-                            }
-                        },
-                        style: 'destructive',
-                    },
-                ],
-                { cancelable: true }
-            );
-            return; // Encerra a função após o Alert de retirada
-        }
-      }
-    // --- LÓGICA DE ALERTA ---
-    const titulo = (tipo === 'like') 
-        ? 'CONFIRMAR VOTO POSITIVO?' 
-        : 'CONFIRMAR VOTO NEGATIVO?';
-        
-    const mensagem = 
-        `Seu voto é muito importante e será usado para avaliar a qualidade e veracidade desta oferta para outros usuários. ` +
-        `Confirme apenas se você tem uma opinião séria sobre o item.`;
-
-    // Retorna uma Promise que resolve em true (confirma) ou false (cancela)
-    const confirmar = new Promise<boolean>((resolve) => {
         Alert.alert(
-            titulo,
-            mensagem,
-            [
-                {
-                    text: "Cancelar",
-                    onPress: () => resolve(false), // Cancela o voto
-                    style: 'cancel',
-                },
-                {
-                    text: "Confirmar",
-                    onPress: () => resolve(true), // Continua o fluxo
-                    style: 'default',
-                },
-            ],
-            { cancelable: false }
+          "Voto Já Registrado",
+          `Seu voto como '${tipo.toUpperCase()}' já está registrado. Gostaria de **retirar** seu voto?`,
+          [
+            {
+              text: "Não, manter voto",
+              onPress: () => console.log('Voto mantido.'),
+              style: 'cancel',
+            },
+            {
+              text: "Sim, retirar voto",
+              onPress: async () => {
+                try {
+                  await set(votoRef, null);
+                  await update(produtoRef, {
+                    [tipo]: increment(-1),
+                  });
+
+                  setProdutosComEmpresa(prevProdutos =>
+                    prevProdutos.map(p => {
+                      if (p.id === produtoId) {
+                        const novoValorLocal = Math.max(0, (p[tipo] ?? 0) - 1);
+                        return {
+                          ...p,
+                          [tipo]: novoValorLocal as number
+                        };
+                      }
+                      return p;
+                    })
+                  );
+                  Alert.alert("Sucesso", "Seu voto foi retirado.");
+                } catch (error) {
+                  console.error("Erro ao retirar voto:", error);
+                  Alert.alert("Erro", "Não foi possível retirar o voto. Tente novamente.");
+                }
+              },
+              style: 'destructive',
+            },
+          ],
+          { cancelable: true }
         );
+        return;
+      }
+    }
+
+    const titulo = (tipo === 'like')
+      ? 'CONFIRMAR VOTO POSITIVO?'
+      : 'CONFIRMAR VOTO NEGATIVO?';
+
+    const mensagem =
+      `Seu voto é muito importante e será usado para avaliar a qualidade e veracidade desta oferta para outros usuários. ` +
+      `Confirme apenas se você tem uma opinião séria sobre o item.`;
+
+    const confirmar = new Promise<boolean>((resolve) => {
+      Alert.alert(
+        titulo,
+        mensagem,
+        [
+          {
+            text: "Cancelar",
+            onPress: () => resolve(false),
+            style: 'cancel',
+          },
+          {
+            text: "Confirmar",
+            onPress: () => resolve(true),
+            style: 'default',
+          },
+        ],
+        { cancelable: false }
+      );
     });
 
     const confirmado = await confirmar;
 
-    // Se o usuário cancelou, a função termina aqui.
     if (!confirmado) {
-        return; 
+      return;
     }
-    // --- FIM LÓGICA DE ALERTA ---
     try {
-          await set(votoRef, { tipo });
+      await set(votoRef, { tipo });
 
-    
-    //const produtoSnapshot = await get(produtoRef);
-    //const produtoData = produtoSnapshot.val() || {};
 
-    //const novoValor = (produtoData[tipo] ?? 0) + 1;
-    //await update(produtoRef, { [tipo]: novoValor });
-    await update(produtoRef, {
-            [tipo]: increment(1)
-    });
+      await update(produtoRef, {
+        [tipo]: increment(1)
+      });
 
-    setProdutosComEmpresa(prevProdutos => 
-          prevProdutos.map(p => {
-              if (p.id === produtoId) {
-                  // Incrementa o valor localmente (garante feedback imediato)
-                  const novoValorLocal = (p[tipo] ?? 0) + 1;
-                  return { 
-                      ...p, 
-                      [tipo]: novoValorLocal as number 
-                  };
-              }
-              return p;
-          })
+      setProdutosComEmpresa(prevProdutos =>
+        prevProdutos.map(p => {
+          if (p.id === produtoId) {
+            const novoValorLocal = (p[tipo] ?? 0) + 1;
+            return {
+              ...p,
+              [tipo]: novoValorLocal as number
+            };
+          }
+          return p;
+        })
       );
     } catch (error) {
       console.error("Erro ao votar ou atualizar contador:", error);
-            Alert.alert("Erro de Votação", "Não foi possível registrar seu voto. Tente novamente.");
+      Alert.alert("Erro de Votação", "Não foi possível registrar seu voto. Tente novamente.");
     }
-  };
+  }, [deviceId, produtosComEmpresa]); // Dependências do useCallback
 
-  // Carrega empresas
+  // Carrega empresas e Localização (sem alterações)
+  // ... (useEffect para empresas)
   useEffect(() => {
     const empresasRef = ref(database, "usuariosEmpresa");
     onValue(empresasRef, (snapshot) => {
@@ -347,7 +388,6 @@ export default function HomeScreen() {
         const empresaId = empresaSnap.key!;
         const empresa = empresaSnap.val();
         data[empresaId] = {
-          nome: empresa.nome,
           nomeEmpresa: empresa.nomeEmpresa,
           latitude: empresa.latitude,
           longitude: empresa.longitude,
@@ -359,17 +399,15 @@ export default function HomeScreen() {
     });
   }, []);
 
-  // Carrega produtos e Localização do usuário
+  // ... (useFocusEffect para produtos e localização)
   useFocusEffect(
     useCallback(() => {
-      // Se as empresas não carregaram, interrompe (espera o useEffect acima)
       if (!Object.keys(empresas).length) {
         return;
       }
 
       setLoadingInicial(true);
 
-      // 1. Carregamento dos Produtos
       const produtosRef = ref(database, "produtos");
       get(produtosRef).then((snapshot) => {
         const data: ProdutoComEmpresa[] = [];
@@ -381,7 +419,6 @@ export default function HomeScreen() {
               userSnapshot.forEach((produtoSnapshot) => {
                 const produto = produtoSnapshot.val();
 
-                // Mapeamento dos dados do produto...
                 data.push({
                   id: produtoSnapshot.key!,
                   ...produto,
@@ -406,7 +443,6 @@ export default function HomeScreen() {
         setLoadingInicial(false);
       });
 
-      // 2. Localização do usuário
       (async () => {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status === "granted") {
@@ -422,7 +458,7 @@ export default function HomeScreen() {
     }, [empresas])
   );
 
-  // Ajuste do mapa
+  // ... (useEffect para ajuste do mapa - sem alterações)
   useEffect(() => {
     if (mostrarMapa && userLocation && selectedLocation && mapRef.current) {
       const coordinates = [
@@ -439,7 +475,8 @@ export default function HomeScreen() {
     }
   }, [mostrarMapa, userLocation, selectedLocation]);
 
-  // Filtros
+  // Filtros, Ordenação e Inserção de AdCard (mantidos)
+  // ... (O restante da lógica de filtro e ordenação)
   const produtosValidos = produtosComEmpresa.filter((produto) => {
     if (categoriaSelecionada) {
       const palavrasChaveLower = produto.palavrasChave?.toLowerCase() || "";
@@ -523,29 +560,7 @@ export default function HomeScreen() {
   }
 
 
-  // Ações de Mapas e Redes Sociais
-  const handleVerNoMapa = (produto: ProdutoComEmpresa) => {
-    const location = getProdutoLocation(produto);
-    if (location) {
-      setSelectedLocation({
-        latitude: location.latitude,
-        longitude: location.longitude,
-        nome: produto.nomeEmpresa,
-        empresaId: produto.empresaId,
-        produtoId: produto.id,
-      });
-      setMapRegion({
-        latitude: location.latitude,
-        longitude: location.longitude,
-        latitudeDelta: 0.0922,
-        longitudeDelta: 0.0421,
-      });
-      setMostrarMapa(true);
-    } else {
-      Alert.alert("Localização Indisponível", "Esta empresa/produto não possui uma localização cadastrada.");
-    }
-  };
-
+  // Ações de Mapas (rotas externas)
   const openExternalMapRoute = (latitude: number, longitude: number, label: string) => {
     const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
     const url = `${scheme}${latitude},${longitude}(${label})`;
@@ -558,37 +573,40 @@ export default function HomeScreen() {
     });
   };
 
-  const openInstagramProfile = async (username: string | undefined) => {
-    if (!username) {
-      Alert.alert("Instagram não informado", "Esta empresa não possui um Instagram cadastrado.");
-      return;
-    }
-    const user = username.replace("@", "");
-    const webUrl = `https://www.instagram.com/${user}`;
-    try {
-      await Linking.openURL(webUrl);
-    } catch (error) {
-      Alert.alert("Erro", "Ocorreu um erro inesperado ao tentar abrir o Instagram.");
-    }
-  };
-
-  const openWhatsApp = (telefone: string | undefined) => {
-    if (!telefone) {
-      Alert.alert("WhatsApp não informado", "Esta empresa não possui um telefone cadastrado.");
-      return;
-    }
-    const numeroLimpo = telefone.replace(/\D/g, "");
-    const url = `https://wa.me/55${numeroLimpo}`;
-    Linking.openURL(url).catch(() => {
-      Alert.alert("Erro", "Não foi possível abrir o WhatsApp.");
-    });
-  };
-
   const isSelectedLocationValid = selectedLocation && selectedLocation.latitude && selectedLocation.longitude;
   const selectedLat = isSelectedLocationValid ? selectedLocation.latitude : 0;
   const selectedLon = isSelectedLocationValid ? selectedLocation.longitude : 0;
   const selectedName = isSelectedLocationValid ? selectedLocation.nome : "Destino";
 
+
+  // 💡 RenderItem Otimizado - Chama o ProdutoCard
+  const renderProdutoItem = useCallback(({ item }: { item: ProdutoComEmpresa }) => {
+    if (item.isAd) {
+      return (
+        <View style={styles.cardProdutoGenerico}>
+          <AdCard />
+        </View>
+      );
+    }
+
+    const empresaInfo = empresas[item.empresaId];
+
+    if (!empresaInfo) return null;
+
+    return (
+      <ProdutoCard
+        produto={item}
+        empresaInfo={empresaInfo}
+        userLocation={userLocation}
+        deviceId={deviceId}
+        votarProduto={votarProduto}
+        handleVerNoMapa={handleVerNoMapa}
+        openInstagramProfile={openInstagramProfile}
+        openWhatsApp={openWhatsApp}
+        onImagePress={handleImagePress}
+      />
+    );
+  }, [empresas, userLocation, deviceId, votarProduto, handleVerNoMapa, openInstagramProfile, openWhatsApp, handleImagePress]);
 
   // ----------------------------------------------------
   // 4. RENDERIZAÇÃO
@@ -690,139 +708,10 @@ export default function HomeScreen() {
             }
             numColumns={2}
             columnWrapperStyle={styles.cardRow}
-            renderItem={({ item }) => {
-              if (item.isAd) {
-                return (
-                  <View style={styles.cardProdutoGenerico}>
-                    <AdCard />
-                  </View>
-                );
-              }
-
-              const produtoReal = item as ProdutoComEmpresa;
-              const empresaInfo = empresas[produtoReal.empresaId];
-              const location = getProdutoLocation(produtoReal);
-              const distancia = userLocation && location ? calcularDistancia(userLocation, { latitude: location.latitude, longitude: location.longitude }) : null;
-              const temLocalizacao = !!location;
-
-              return (
-                <View style={styles.cardProduto}>
-                  <View style={styles.imagemLikeContainer}>
-                    {produtoReal.imagemUrl && (
-                      <TouchableOpacity
-                        onPress={() => {
-                          setImagemModalUrl(produtoReal.imagemUrl || null);
-                          setImagemModalVisivel(true);
-                        }}
-                      >
-                        <Image
-                          source={{ uri: produtoReal.imagemUrl }}
-                          style={styles.imagemProduto}
-                          resizeMode="stretch"
-                        />
-                      </TouchableOpacity>
-
-                    )}
-                    <View style={styles.likeUnlikeContainer}>
-                      <TouchableOpacity
-                        disabled={!deviceId}
-                        onPress={() => votarProduto(produtoReal.id, "like")}
-                      >
-                        <Feather
-                          name="thumbs-up"
-                          size={23}
-                          color={deviceId ? "#4CAF50" : "#ccc"}
-                        />
-                      </TouchableOpacity>
-                      <Text style={{ color: "green" }}>{produtoReal.like ?? 0}</Text>
-                      <TouchableOpacity
-                        disabled={!deviceId}
-                        onPress={() => votarProduto(produtoReal.id, "unlike")}
-                      >
-                        <Feather
-                          name="thumbs-down"
-                          size={23}
-                          color={deviceId ? "#F44336" : "#ccc"}
-                        />
-                      </TouchableOpacity>
-                      <Text style={{ color: "red" }}>{produtoReal.unlike ?? 0}</Text>
-                    </View>
-                  </View>
-
-                  <Text style={styles.descricao}>{produtoReal.descricao}</Text>
-                  <Text style={styles.preco}>
-                    {"R$ " +
-                      parseFloat(
-                        produtoReal.preco
-                          .replace("R$", "")
-                          .replace(/\./g, "")
-                          .replace(",", ".")
-                      ).toLocaleString("pt-BR", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                  </Text>
-                  <Text style={styles.dataOferta}>
-                    Oferta válida até: {produtoReal.dataFinalOferta}
-                  </Text>
-                  {distancia !== null && (
-                    <Text style={styles.distancia}>
-                      Distância: {distancia.toFixed(2)} km
-                    </Text>
-                  )}
-                  <View style={styles.empresaContainer}>
-                    <Text style={styles.confiraOferta}>
-                      Confira a oferta direto na empresa:
-                    </Text>
-                    <Text style={styles.nomeEmpresa}>{empresaInfo?.nomeEmpresa}</Text>
-                    <View style={styles.botoesAcaoLinha}>
-                      {empresaInfo?.instagram && (
-                        <View style={styles.botaoAcaoItem}>
-                          <TouchableOpacity
-                            onPress={() => openInstagramProfile(empresaInfo.instagram)}
-                            style={styles.botaoRedondo}
-                          >
-                            <Image
-                              source={require("../../assets/botoes/instagram.png")}
-                              style={styles.imagemBotaoRedondo}
-                            />
-                          </TouchableOpacity>
-                          <Text style={styles.legendaBotao}>Instagram</Text>
-                        </View>
-                      )}
-                      {empresaInfo?.telefone && (
-                        <View style={styles.botaoAcaoItem}>
-                          <TouchableOpacity
-                            onPress={() => openWhatsApp(empresaInfo.telefone)}
-                            style={styles.botaoRedondo}
-                          >
-                            <Image
-                              source={require("../../assets/botoes/whatsapp.png")}
-                              style={styles.imagemBotaoRedondo}
-                            />
-                          </TouchableOpacity>
-                          <Text style={styles.legendaBotao}>WhatsApp</Text>
-                        </View>
-                      )}
-                      {temLocalizacao && (
-                        <View style={styles.botaoAcaoItem}>
-                          <TouchableOpacity
-                            style={styles.botaoRedondo}
-                            onPress={() => handleVerNoMapa(produtoReal)}
-                          >
-                            <Image
-                              source={require("../../assets/botoes/rota.png")}
-                              style={styles.imagemBotaoRedondo}
-                            />
-                          </TouchableOpacity>
-                          <Text style={styles.legendaBotao}>Traçar rota</Text>
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </View>
-              );
-            }}
+            initialNumToRender={8}
+            maxToRenderPerBatch={4}
+            windowSize={10}
+            renderItem={renderProdutoItem} // 💡 Chamando a função de renderização otimizada
             style={styles.productList}
           />
         )}
@@ -932,68 +821,13 @@ export default function HomeScreen() {
 }
 
 // ----------------------------------------------------
-// 5. ESTILOS
+// 5. ESTILOS (Mantenha APENAS os estilos não relacionados ao ProdutoCard)
 // ----------------------------------------------------
 
 const styles = StyleSheet.create({
-  imagemLikeContainer: {
-    flexDirection: "row",
-    width: "100%",
-    justifyContent: "center",
-  },
-  likeUnlikeContainer: {
-    margin: 10,
-    alignItems: "center",
-    justifyContent: "space-evenly",
-  },
-  localizacaoDiferenteBadge: {
-    backgroundColor: '#ffc107',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 5,
-    marginTop: 5,
-    marginBottom: 5,
-  },
-  localizacaoDiferenteText: {
-    fontSize: 10,
-    fontWeight: 'bold',
-    color: '#333',
-  },
   background: { flex: 1, resizeMode: "cover" },
   container: { flex: 1, },
-  buscaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  buscaContainer: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ccc",
-    paddingHorizontal: 10,
-    height: 44,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 2,
-  },
-  inputBusca: {
-    flex: 1,
-    fontSize: 16,
-    color: "#333",
-    backgroundColor: "transparent",
-    borderWidth: 0,
-    paddingVertical: 0,
-  },
-  lupaIcon: {
-    width: 50,
-    height: 50,
-    marginRight: -5,
-  },
+  // ... (estilos de busca e ordenação)
   categoriasScrollContainer: {
     height: 100,
   },
@@ -1044,27 +878,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 12,
-  },
-  cardProduto: {
-    backgroundColor: "rgba(255,255,255,0.95)",
-    borderRadius: 10,
-    padding: 10,
-    marginBottom: 12,
-    marginHorizontal: 4,
-    elevation: 3,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 3,
-    width: CARD_WIDTH,
-    minHeight: CARD_MIN_HEIGHT,
+    paddingHorizontal: CARD_MARGIN / 2,
   },
   cardProdutoGenerico: {
     backgroundColor: "rgba(255,255,255,0.95)",
     borderRadius: 10,
     marginBottom: 12,
-    marginHorizontal: 4,
+    marginHorizontal: CARD_MARGIN / 2,
     elevation: 3,
     alignItems: "center",
     justifyContent: "center",
@@ -1075,131 +895,6 @@ const styles = StyleSheet.create({
     width: CARD_WIDTH,
     minHeight: CARD_MIN_HEIGHT,
     padding: 0,
-  },
-  descricaoGenerica: {
-    fontSize: 15,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 5,
-    color: "#666",
-  },
-  imagemGenerica: {
-    width: "100%",
-    height: 100,
-    borderRadius: 8,
-    marginTop: 5,
-  },
-  nomeEmpresa: {
-    fontSize: 12,
-    color: "#0056b3",
-    fontWeight: "bold",
-    marginBottom: 5,
-    textAlign: "center",
-  },
-  botoesAcaoLinha: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    width: "100%",
-    minHeight: 22,
-    marginBottom: 5,
-    marginTop: 8,
-  },
-  botaoAcaoItem: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginHorizontal: 8,
-  },
-  botaoRedondo: {
-    width: 30,
-    height: 30,
-    borderRadius: 25,
-    backgroundColor: "#fff",
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: "#eee",
-  },
-  imagemBotaoRedondo: {
-    width: 40,
-    height: 40,
-  },
-  legendaBotao: {
-    color: "#333",
-    fontSize: 8,
-    marginTop: 4,
-    textAlign: "center",
-    fontWeight: "bold",
-  },
-  instagramButton: {
-    paddingVertical: 3,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    minWidth: 90,
-    minHeight: 20,
-    marginRight: 6,
-  },
-  instagramButtonText: { color: "#FFFFFF", fontSize: 12, fontWeight: "bold" },
-  whatsappButton: {
-    paddingVertical: 3,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    justifyContent: "center",
-    alignItems: "center",
-    minWidth: 90,
-    minHeight: 20,
-    marginLeft: 6,
-  },
-  whatsappButtonText: { color: "#FFFFFF", fontSize: 12, fontWeight: "bold" },
-  descricao: {
-    fontSize: 15,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginBottom: 5,
-    borderRadius: 5,
-    padding: 2,
-  },
-  preco: {
-    fontSize: 22,
-    color: "green",
-    fontWeight: "600",
-    textAlign: "center",
-    marginBottom: 2,
-  },
-  dataOferta: {
-    fontSize: 13,
-    color: "#888",
-    marginBottom: 2,
-    textAlign: "center",
-  },
-  distancia: {
-    fontSize: 13,
-    color: "#007BFF",
-    marginBottom: 2,
-    textAlign: "center",
-  },
-  botaoRota: {
-    backgroundColor: "#007BFF",
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 18,
-    marginTop: 5,
-    marginBottom: 5,
-  },
-  botaoRotaTexto: {
-    color: "white",
-    fontWeight: "bold",
-    fontSize: 13,
-  },
-  imagemProduto: {
-    width: 100,
-    height: 100,
-    borderRadius: 8,
-    marginTop: 5,
-    resizeMode: "contain",
   },
   mensagemNenhumResultado: {
     textAlign: "center",
@@ -1330,21 +1025,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     zIndex: 2,
-  },
-  empresaContainer: {
-    width: "100%",
-    backgroundColor: "#f7f7f7",
-    borderRadius: 8,
-    padding: 8,
-    marginTop: 8,
-    alignItems: "center",
-  },
-  confiraOferta: {
-    fontSize: 12,
-    color: "#555",
-    fontWeight: "bold",
-    marginBottom: 2,
-    textAlign: "center",
   },
   externalMapButton: {
     backgroundColor: "#34A853",

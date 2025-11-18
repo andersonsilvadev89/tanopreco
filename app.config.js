@@ -4,7 +4,7 @@ export default {
   name: "TaNoPreco",
   slug: "TaNoPreco",
   platforms: ["android", "ios"],
-  version: "1.0.1",
+  version: "1.0.2",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   splash: {
@@ -27,7 +27,7 @@ export default {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       }
     },
-    versionCode: 27,
+    versionCode: 28,
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff"
@@ -56,18 +56,16 @@ export default {
   },
   ios: {
     bundleIdentifier: "com.tanopreco",
-    buildNumber: "1",
+    buildNumber: "4",
     config: {
       googleMobileAdsAppId: "ca-app-pub-5241782827769638~8974053643"
     },
     googleServicesFile: process.env.GOOGLE_SERVICES_PLIST ?? './GoogleService-Info.plist',
     infoPlist: {
       "ITSAppUsesNonExemptEncryption": false,
-      NSPhotoLibraryUsageDescription: "Precisamos de acesso à sua galeria de fotos.",
+      NSPhotoLibraryUsageDescription: "Precisamos de acesso à sua galeria de fotos. Para você selecionar sua foto de perfil e/ou postar fotos de produtos.",
       NSCameraUsageDescription: "Precisamos de acesso à sua câmera para você tirar uma foto de perfil.",
-      NSLocationWhenInUseUsageDescription: "Precisamos da sua localização para mostrar seus amigos no mapa.",
-      NSLocationAlwaysAndWhenInUseUsageDescription: "Precisamos da sua localização em segundo plano para que seus amigos possam te encontrar mesmo com o app fechado. É importante salientar que a sua localização só será vista caso você esteja próximo ou no local e na hora do evento",
-      NSLocationAlwaysUsageDescription: "Precisamos da sua localização em segundo plano para que seus amigos possam te encontrar mesmo com o app fechado."
+      NSLocationWhenInUseUsageDescription: "Sua localização é usada para buscar e exibir os preços e ofertas de lojas que estão mais próximas de você, garantindo a relevância dos resultados."
     },
     supportsTablet: true
   },

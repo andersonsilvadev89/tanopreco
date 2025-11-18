@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -17,26 +17,19 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import * as Location from 'expo-location';
 import { ref, set, get, update, remove } from 'firebase/database';
 import { auth, database } from '../../firebaseConfig';
+import { useNavigation } from '@react-navigation/native';
+
 import AdBanner from '../components/AdBanner';
-
-// --- Imports de ícones do Vector Icons ---
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
-
-// --- Importar o gerenciador de imagens para o fundo ---
 import { checkAndDownloadImages } from '../../utils/imageManager';
-
-// --- Importar o Modal de Localização ---
-// IMPORTANTE: Assumindo que este componente está no caminho abaixo
 import LocalizacaoModal from '../components/LocalizacaoModal';
 
-// --- URL padrão de fallback para o fundo local ---
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
-// --- CONSTANTES ---
+// --- CONSTANTES CLOUDINARY ---
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dvekhdfgc/image/upload';
 const UPLOAD_PRESET = 'tanopreco';
 
-// --- INTERFACES ---
 interface CompanyProfile {
     nomeEmpresa: string;
     nome: string;
@@ -49,10 +42,10 @@ interface CompanyProfile {
     longitude: number;
 }
 
-// --- TELA DE CONFIGURAÇÕES DA EMPRESA ---
 const ConfiguracoesEmpresaScreen = () => {
-    // --- ESTADOS (States) ---
-    const [carregando, setCarregando] = useState(true); // Controla o carregamento dos DADOS DA EMPRESA
+    const navigation = useNavigation<any>();
+
+    const [carregando, setCarregando] = useState(true);
     const [editando, setEditando] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [nomeEmpresa, setNomeEmpresa] = useState('');
@@ -66,15 +59,14 @@ const ConfiguracoesEmpresaScreen = () => {
     const [latitude, setLatitude] = useState<number | null>(null);
     const [longitude, setLongitude] = useState<number | null>(null);
 
-    // --- NOVO ESTADO: Visibilidade do Modal de Localização ---
     const [isLocationModalVisible, setIsLocationModalVisible] = useState(false);
-
-    // --- Estados para o carregamento da imagem de fundo dinâmica ---
     const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
     const usuarioId = auth.currentUser?.uid;
 
-    // useEffect para carregar os DADOS DA EMPRESA
+    // --------------------------------------------------------------------
+    // 🔥 CARREGAR DADOS DA EMPRESA
+    // --------------------------------------------------------------------
     useEffect(() => {
         const loadCompanyData = async () => {
             if (!usuarioId) {
@@ -96,15 +88,71 @@ const ConfiguracoesEmpresaScreen = () => {
                     setLatitude(data.latitude || null);
                     setLongitude(data.longitude || null);
                 }
-            } catch (error) {
-                console.error("Erro ao carregar dados da empresa:", error);
-                Alert.alert("Erro", "Não foi possível carregar as configurações da sua empresa.");
+            } catch {
+                Alert.alert("Erro", "Não foi possível carregar os dados.");
             } finally {
                 setCarregando(false);
             }
         };
         loadCompanyData();
     }, [usuarioId]);
+
+    // --------------------------------------------------------------------
+    // 🔥 FUNÇÃO DE EXCLUSÃO DE CONTA (ATENDE ÀS EXIGÊNCIAS DA APPLE)
+    // --------------------------------------------------------------------
+    const handleDeleteAccount = () => {
+        Alert.alert(
+            "Excluir conta",
+            "A exclusão é permanente e todos os dados associados serão removidos. Deseja continuar?",
+            [
+                { text: "Cancelar", style: "cancel" },
+                { text: "Sim, excluir", style: "destructive", onPress: confirmarExclusaoConta }
+            ]
+        );
+    };
+
+    const confirmarExclusaoConta = async () => {
+        if (!usuarioId) {
+            Alert.alert("Erro", "Usuário não autenticado.");
+            return;
+        }
+
+        try {
+            // 1️⃣ Remove dados do Realtime Database
+            const userRef = ref(database, `usuariosEmpresa/${usuarioId}`);
+            await remove(userRef);
+
+            // 2️⃣ Remove a conta da autenticação Firebase
+            const user = auth.currentUser;
+            if (user) {
+                await user.delete();
+            }
+
+            Alert.alert("Conta excluída", "Sua conta foi removida com sucesso.");
+
+            // 3️⃣ Resetar navegação para "(tabs)" → homeScreem
+            navigation.reset({
+                index: 0,
+                routes: [{ name: "(tabs)" }],
+            });
+
+        } catch (error: any) {
+            console.error(error);
+
+            if (error.code === "auth/requires-recent-login") {
+                Alert.alert(
+                    "Reautenticação necessária",
+                    "Entre novamente para poder excluir sua conta."
+                );
+            } else {
+                Alert.alert("Erro", "Não foi possível excluir a conta.");
+            }
+        }
+    };
+
+    // --------------------------------------------------------------------
+    // FUNÇÕES ORIGINAIS (UPLOAD, LOCALIZAÇÃO, EDIÇÃO...)
+    // --------------------------------------------------------------------
 
     const uploadCompanyImage = async (uri: string): Promise<string | null> => {
         const formData = new FormData();
@@ -129,22 +177,16 @@ const ConfiguracoesEmpresaScreen = () => {
             });
 
             if (!response.ok) {
-                const errorData = await response.json();
-                console.error('Erro no upload para Cloudinary (imagem da empresa):', errorData);
-                Alert.alert("Erro no Upload", `Não foi possível enviar a imagem da empresa: ${errorData.error.message || 'Erro desconhecido'}`);
                 return null;
             }
 
             const data = await response.json();
-            console.log('Upload Cloudinary Sucesso (imagem da empresa):', data);
             return data.secure_url;
-        } catch (error) {
-            console.error('Erro na requisição de upload (imagem da empresa):', error);
-            Alert.alert("Erro de Conexão", "Não foi possível conectar ao serviço de upload de imagem da empresa.");
+
+        } catch {
             return null;
         }
     };
-
     const handleSalvarDadosEmpresa = async () => {
         if (!usuarioId) return;
         setIsSaving(true);
@@ -177,11 +219,12 @@ const ConfiguracoesEmpresaScreen = () => {
         try {
             const companyRef = ref(database, `usuariosEmpresa/${usuarioId}`);
             await update(companyRef, {
+                nome,
                 nomeEmpresa,
                 palavrasChave,
                 telefoneContato: telefone || null,
                 emailContato: email || null,
-                linkInstagram: processedInstagram,
+                instagram: processedInstagram,
                 imagem: finalImageUrl,
             });
             setImagem(finalImageUrl);
@@ -195,91 +238,72 @@ const ConfiguracoesEmpresaScreen = () => {
             setIsSaving(false);
         }
     };
-
     const handleSelecionarFoto = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Permissão necessária', 'Precisamos da permissão para acessar sua galeria de fotos.');
+        if (status !== "granted") {
+            Alert.alert("Permissão necessária", "Precisamos acessar sua galeria.");
             return;
         }
 
-        let result = await ImagePicker.launchImageLibraryAsync({
+        const result = await ImagePicker.launchImageLibraryAsync({
             mediaTypes: ImagePicker.MediaTypeOptions.Images,
             allowsEditing: true,
             aspect: [4, 3],
             quality: 1,
         });
 
-        if (!result.canceled && result.assets && result.assets.length > 0) {
+        if (!result.canceled && result.assets.length > 0) {
             setNovaImagemUri(result.assets[0].uri);
         }
     };
 
-    // --- FUNÇÃO MODIFICADA: Obter e Salvar Localização Atual ---
-    const obterLocalizacaoAtualECadastrar = async () => {
-        if (!usuarioId) {
-            Alert.alert("Erro", "Usuário não autenticado.");
-            return;
-        }
+    const salvarLocalizacao = async ({ latitude, longitude }: { latitude: number, longitude: number }) => {
+        if (!usuarioId) return;
 
+        const refUser = ref(database, `usuariosEmpresa/${usuarioId}`);
+        await update(refUser, { latitude, longitude });
+
+        setLatitude(latitude);
+        setLongitude(longitude);
+    };
+
+    const obterLocalizacaoAtualECadastrar = async () => {
         try {
             let { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Permissão de Localização', 'Para atualizar a localização, precisamos da sua permissão para acessar o GPS do dispositivo.');
+
+            if (status !== "granted") {
+                Alert.alert("Permissão negada", "Ative o GPS.");
                 return;
             }
 
-            Alert.alert("Obtendo Localização", "Por favor, aguarde enquanto tentamos obter sua localização atual...", [], { cancelable: false });
-
             let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-            const { latitude, longitude } = location.coords;
-            
-            // Reutiliza a função de salvar para DRY (Don't Repeat Yourself)
-            await salvarLocalizacao({ latitude, longitude });
-
-            Alert.alert('Sucesso', `Localização atualizada para:\nLatitude: ${latitude.toFixed(5)}\nLongitude: ${longitude.toFixed(5)}`);
-
-        } catch (error) {
-            console.error("Erro ao obter e cadastrar localização:", error);
-            Alert.alert("Erro", "Não foi possível obter ou cadastrar a localização. Verifique se o GPS está ativado e tente novamente.");
-        }
-    };
-
-    // --- NOVA FUNÇÃO: Salvar localização (seja do GPS ou do Modal) no Firebase ---
-    const salvarLocalizacao = async ({ latitude, longitude }: { latitude: number, longitude: number }) => {
-        if (!usuarioId) return;
-        try {
-            const companyRef = ref(database, `usuariosEmpresa/${usuarioId}`);
-            await update(companyRef, {
-                latitude,
-                longitude
+            await salvarLocalizacao({
+                latitude: location.coords.latitude,
+                longitude: location.coords.longitude
             });
-            setLatitude(latitude);
-            setLongitude(longitude);
-        } catch (error) {
-            console.error("Erro ao salvar localização no Firebase:", error);
-            Alert.alert("Erro", "Não foi possível salvar as coordenadas da localização.");
-            throw error; // Re-lança para ser pego pela função chamadora, se necessário
+
+            Alert.alert("Sucesso", "Localização atualizada!");
+
+        } catch {
+            Alert.alert("Erro", "Não foi possível obter sua localização.");
         }
     };
-    
-    // --- NOVA FUNÇÃO: Tratamento ao salvar localização pelo Modal ---
+
     const handleSaveLocation = async (coords: { latitude: number; longitude: number }) => {
-        try {
-            await salvarLocalizacao(coords);
-            Alert.alert('Sucesso', `Localização selecionada atualizada para:\nLatitude: ${coords.latitude.toFixed(5)}\nLongitude: ${coords.longitude.toFixed(5)}`);
-            setIsLocationModalVisible(false);
-        } catch (error) {
-            // O erro já foi tratado em salvarLocalizacao, apenas fecha o modal se desejar
-            setIsLocationModalVisible(false);
-        }
+        await salvarLocalizacao(coords);
+        Alert.alert("Sucesso", "Localização atualizada!");
+        setIsLocationModalVisible(false);
     };
+
+    // --------------------------------------------------------------------
+    // UI PRINCIPAL
+    // --------------------------------------------------------------------
 
     if (carregando) {
         return (
             <ImageBackground source={currentFundoSource} style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#FFFFFF" />
-                <Text style={styles.loadingText}>Carregando dados da empresa...</Text>
+                <ActivityIndicator size="large" color="#fff" />
+                <Text style={styles.loadingText}>Carregando...</Text>
             </ImageBackground>
         );
     }
@@ -291,6 +315,8 @@ const ConfiguracoesEmpresaScreen = () => {
             <AdBanner />
             <SafeAreaView style={styles.safeArea}>
                 <KeyboardAwareScrollView contentContainerStyle={styles.scrollContainer} enableOnAndroid>
+
+                    {/* CARD PRINCIPAL */}
                     <View style={styles.card}>
                         {!editando ? (
                             <View style={styles.profileDisplayContainer}>
@@ -314,20 +340,11 @@ const ConfiguracoesEmpresaScreen = () => {
                                     ) : null}
 
                                     {instagram ? (
-                                        <TouchableOpacity style={styles.detailRow} onPress={() => Linking.openURL(`https://instagram.com/${instagram}`)}>
+                                        <TouchableOpacity style={styles.detailRow}>
                                             <MaterialCommunityIcons name="instagram" size={16} color="#444" />
-                                            <Text style={[styles.profileDetail, styles.linkText]}>@{instagram}</Text>
+                                            <Text style={styles.profileDetail}>@{instagram}</Text>
                                         </TouchableOpacity>
                                     ) : null}
-                                    {(latitude && longitude) ? (
-                                        <View style={styles.detailRow}>
-                                            <Text style={styles.profileDetail}>Lat: {latitude.toFixed(5)}, Lon: {longitude.toFixed(5)}</Text>
-                                        </View>
-                                    ) : (
-                                        <View style={styles.detailRow}>
-                                            <Text style={styles.profileDetail}>Nenhuma localização cadastrada.</Text>
-                                        </View>
-                                    )}
                                 </View>
 
                                 <TouchableOpacity style={styles.editButton} onPress={() => setEditando(true)}>
@@ -336,20 +353,18 @@ const ConfiguracoesEmpresaScreen = () => {
                             </View>
                         ) : (
                             <View style={styles.profileEditContainer}>
-                                
                                 <TouchableOpacity onPress={handleSelecionarFoto}>
-                                    <View>
-                                        <Image source={displayImageSource} style={styles.profileImage} />
-                                    </View>
+                                    <Image source={displayImageSource} style={styles.profileImage} />
                                     <Text style={styles.changePhotoText}>Alterar Imagem de Capa</Text>
                                 </TouchableOpacity>
-                                
+
                                 <TextInput style={styles.input} value={nomeEmpresa} onChangeText={setNomeEmpresa} placeholder="Nome da Empresa" />
                                 <TextInput style={styles.input} value={nome} onChangeText={setNome} placeholder="Nome Completo" />
                                 <TextInput style={styles.input} value={palavrasChave} onChangeText={setPalavrasChave} placeholder="Palavras-chave" multiline />
-                                <TextInput style={styles.input} value={telefone} onChangeText={setTelefone} placeholder="Telefone de Contato" keyboardType="phone-pad" />
-                                <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="E-mail de Contato" keyboardType="email-address" />
-                                <TextInput style={styles.input} value={instagram} onChangeText={setInstagram} placeholder="Usuário do Instagram (sem @)" />
+                                <TextInput style={styles.input} value={telefone} onChangeText={setTelefone} placeholder="Telefone" keyboardType="phone-pad" />
+                                <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" />
+                                <TextInput style={styles.input} value={instagram} onChangeText={setInstagram} placeholder="Instagram (sem @)" />
+
                                 <View style={styles.editActionsContainer}>
                                     <TouchableOpacity style={[styles.actionButton, styles.saveButton]} onPress={handleSalvarDadosEmpresa} disabled={isSaving}>
                                         {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionButtonText}>Salvar</Text>}
@@ -362,35 +377,43 @@ const ConfiguracoesEmpresaScreen = () => {
                         )}
                     </View>
 
-                    {/* --- SEÇÃO DE LOCALIZAÇÃO ATUALIZADA --- */}
+                    {/* CARD DE LOCALIZAÇÃO */}
                     <View style={styles.card}>
-                        <Text style={styles.sectionTitle}>🗺️ Localização da Empresa</Text>
-                        <Text style={styles.settingDescription}>Defina a localização da sua empresa no mapa para que ela possa ser encontrada pelos clientes.</Text>
-                        
-                        {/* NOVO BOTÃO: Abrir Modal para selecionar no Mapa */}
-                        <TouchableOpacity 
-                            style={[styles.updateLocationButton, styles.selectMapButton]} 
+                        <Text style={styles.sectionTitle}>📍 Localização da Empresa</Text>
+
+                        <TouchableOpacity
+                            style={[styles.updateLocationButton, styles.selectMapButton]}
                             onPress={() => setIsLocationModalVisible(true)}
                         >
-                            <Text style={styles.updateLocationButtonText}>Selecionar Localização no Mapa</Text>
+                            <Text style={styles.updateLocationButtonText}>Selecionar no Mapa</Text>
                         </TouchableOpacity>
-                        
-                        {/* Botão Existente: Atualizar via GPS Atual */}
-                        <TouchableOpacity style={styles.updateLocationButton} onPress={obterLocalizacaoAtualECadastrar}>
-                            <Text style={styles.updateLocationButtonText}>Usar Localização GPS Atual</Text>
-                        </TouchableOpacity>
-                        
-                        {(latitude !== null && longitude !== null) && (
-                             <Text style={styles.currentCoordsText}>
-                                 Coordenadas Salvas: Lat: {latitude.toFixed(6)}, Lon: {longitude.toFixed(6)}
-                             </Text>
-                        )}
 
+                        <TouchableOpacity style={styles.updateLocationButton} onPress={obterLocalizacaoAtualECadastrar}>
+                            <Text style={styles.updateLocationButtonText}>Usar GPS Atual</Text>
+                        </TouchableOpacity>
+
+                        {latitude && longitude ? (
+                            <Text style={styles.currentCoordsText}>
+                                Lat: {latitude.toFixed(6)} | Lon: {longitude.toFixed(6)}
+                            </Text>
+                        ) : null}
                     </View>
+
+                    {/* CARD DE EXCLUSÃO DE CONTA */}
+                    <View style={styles.card}>
+                        <Text style={styles.sectionTitle}>⚠️ Conta</Text>
+                        <Text style={styles.settingDescription}>
+                            Excluir sua conta apagará permanentemente todos os seus dados.
+                        </Text>
+
+                        <TouchableOpacity style={styles.deleteAccountButton} onPress={handleDeleteAccount}>
+                            <Text style={styles.deleteAccountButtonText}>Excluir minha conta</Text>
+                        </TouchableOpacity>
+                    </View>
+
                 </KeyboardAwareScrollView>
             </SafeAreaView>
 
-            {/* --- NOVO COMPONENTE MODAL --- */}
             <LocalizacaoModal
                 isVisible={isLocationModalVisible}
                 onClose={() => setIsLocationModalVisible(false)}
@@ -401,76 +424,90 @@ const ConfiguracoesEmpresaScreen = () => {
     );
 };
 
+// ---------------------------------------------------------------------
+// ESTILOS
+// ---------------------------------------------------------------------
+
 const styles = StyleSheet.create({
-    background: { flex: 1, marginBottom: 0 },
-    safeArea: { flex: 1},
+    background: { flex: 1 },
+    safeArea: { flex: 1 },
     scrollContainer: { padding: 10 },
     loadingContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
+        flex: 1, justifyContent: 'center', alignItems: 'center'
     },
     loadingText: {
-        marginTop: 10,
-        color: '#FFFFFF',
-        fontSize: 16,
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
+        marginTop: 10, color: '#fff', fontSize: 16
     },
-    card: { backgroundColor: 'rgba(255, 255, 255, 0.95)', borderRadius:12, padding: 15, marginBottom: 20 },
-    profileDisplayContainer: { alignItems: 'center'},
-    profileImage: { width: 120, height: 120, borderRadius: 100, marginBottom: 5, backgroundColor: '#e0e0e0', alignSelf: 'center' },
-    profileName: { fontSize: 24, fontWeight: 'bold', color: '#333', textAlign: 'center' },
-    profileDescription: { fontSize: 16, color: '#666', textAlign: 'center', fontStyle: 'italic' },
-    detailsSection: {
-        alignItems: 'flex-start',
+    card: {
+        backgroundColor: 'rgba(255,255,255,0.95)',
+        borderRadius: 12,
+        padding: 15,
+        marginBottom: 20
+    },
+    profileDisplayContainer: { alignItems: 'center' },
+    profileImage: {
+        width: 120, height: 120, borderRadius: 100,
+        marginBottom: 5, backgroundColor: '#eee', alignSelf: 'center'
+    },
+    profileName: { fontSize: 24, fontWeight: 'bold', color: '#333' },
+    profileDescription: { fontSize: 16, color: '#666', fontStyle: 'italic' },
+    detailsSection: { width: '100%', marginTop: 10 },
+    detailRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
+    profileDetail: { marginLeft: 10, fontSize: 16, color: '#333' },
+
+    editButton: {
+        backgroundColor: '#007BFF',
+        paddingVertical: 10,
+        paddingHorizontal: 25,
+        borderRadius: 10,
+        marginTop: 10
+    },
+    editButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+
+    profileEditContainer: { width: '100%', alignItems: 'center' },
+    changePhotoText: { color: '#007BFF', marginBottom: 10 },
+    input: {
         width: '100%',
-        borderTopWidth: 1,
-        borderTopColor: '#eee',
-        paddingTop: 15
+        backgroundColor: '#fff',
+        borderWidth: 1,
+        borderColor: '#ddd',
+        borderRadius: 8,
+        paddingHorizontal: 15,
+        marginBottom: 10
     },
-    detailRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 5,
-    },
-    profileDetail: {
-        fontSize: 16,
-        color: '#333',
-        marginLeft: 10,
-    },
-    linkText: {
-        color: '#007BFF',
-    },
-    editButton: { backgroundColor: '#007BFF', paddingVertical: 10, paddingHorizontal: 25, borderRadius: 10, marginTop: 10 },
-    editButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-    profileEditContainer: { flex: 1, alignItems: 'center' },
-    changePhotoText: { color: '#007BFF', fontSize: 16, marginBottom: 5 },
-    input: { backgroundColor: '#fff', width: '100%', borderWidth: 1, borderColor: '#ddd', borderRadius: 8, padding: 5, paddingHorizontal: 15, fontSize: 16, marginBottom: 5 },
-    editActionsContainer: { flexDirection: 'row', justifyContent: 'space-around', width: '100%' },
-    actionButton: { paddingVertical: 8, borderRadius: 8, alignItems: 'center', width: '48%' },
+    editActionsContainer: { flexDirection: 'row', width: '100%', justifyContent: 'space-between' },
+    actionButton: { flex: 1, paddingVertical: 10, marginHorizontal: 5, borderRadius: 8 },
     saveButton: { backgroundColor: '#4CAF50' },
     cancelButton: { backgroundColor: '#f44336' },
-    actionButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-    sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 0, textAlign: 'center' },
-    settingItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10 },
-    settingLabel: { fontSize: 16, color: '#444', flex: 1, marginRight: 10 },
-    settingDescription: { fontSize: 13, color: '#666', marginTop: 8, lineHeight: 18, textAlign: 'center' },
-    updateLocationButton: { backgroundColor: '#4CAF50', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 15 }, // Cor alterada para diferenciar do de seleção
-    updateLocationButtonText: { color: 'white', fontSize: 16, fontWeight: 'bold' },
-    
-    // NOVOS ESTILOS PARA O BOTÃO DE SELEÇÃO NO MAPA E COORDENADAS
-    selectMapButton: { 
-        backgroundColor: '#007BFF', // Cor primária para o botão de seleção no mapa
-        marginBottom: 5
+    actionButtonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+
+    sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', textAlign: 'center' },
+    settingDescription: { textAlign: 'center', color: '#666', marginTop: 5 },
+
+    updateLocationButton: {
+        backgroundColor: '#4CAF50',
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginTop: 12
     },
-    currentCoordsText: {
-        fontSize: 14,
-        color: '#333',
-        textAlign: 'center',
-        marginTop: 10,
-        fontStyle: 'italic'
+    updateLocationButtonText: {
+        color: '#fff', fontSize: 16, fontWeight: 'bold'
+    },
+    selectMapButton: { backgroundColor: '#007BFF' },
+    currentCoordsText: { textAlign: 'center', color: '#333', marginTop: 10 },
+
+    deleteAccountButton: {
+        backgroundColor: '#d9534f',
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        marginTop: 15
+    },
+    deleteAccountButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: 'bold'
     }
 });
 
