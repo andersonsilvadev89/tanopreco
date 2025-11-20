@@ -83,7 +83,7 @@ export default function Index() {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
-        {isUpdating && <Text style={{ marginTop: 10, color: 'gray' }}>Verificando atualizações OTA...</Text>}
+        {isUpdating && <Text style={{ marginTop: 10, color: 'gray' }}>Verificando atualizações...</Text>}
         {loading && <Text style={{ marginTop: 10, color: 'gray' }}>Carregando dados do usuário...</Text>}
         {!isUpdating && !loading && (
           <Text style={{ marginTop: 10, color: 'gray' }}>Preparando aplicativo...</Text>

@@ -15,7 +15,6 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { auth, database, adminDatabase } from '../../firebaseConfig'; 
 import { ref, get, push, serverTimestamp, onValue } from 'firebase/database';
 import AdBanner from '../components/AdBanner'; 
-import AdCard from '../components/AdCard'; 
 
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 
@@ -26,10 +25,7 @@ const TARGET_APP_NAME = "TaNoPreco"; // Nome do App cujas configurações querem
 export default function Sobre() {
   const [sugestao, setSugestao] = useState('');
   const [enviandoFeedback, setEnviandoFeedback] = useState(false);
-  const [sponsors, setSponsors] = useState<any[]>([]);
-  const [sponsorsLoading, setSponsorsLoading] = useState(true);
-  const [sponsorsError, setSponsorsError] = useState<string | null>(null);
-
+  
   // === ESTADOS PARA O TEXTO "SOBRE O APP" ===
   const [sobreAppTexto, setSobreAppTexto] = useState('');
   const [loadingSobreAppTexto, setLoadingSobreAppTexto] = useState(true);
@@ -37,8 +33,6 @@ export default function Sobre() {
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollOffsetRef = useRef(0);
   const animationFrameIdRef = useRef<number | null>(null);
-  const [measuredContentWidth, setMeasuredContentWidth] = useState(0);
-  const [isUserInteractingWithSponsors, setIsUserInteractingWithSponsors] = useState(false);
   const screenWidth = Dimensions.get('window').width;
   
   // === useEffect para buscar o texto "Sobre o App" do Firebase (CORRIGIDO) ===
@@ -81,84 +75,6 @@ export default function Sobre() {
     return () => unsubscribe(); // Limpa o listener ao desmontar o componente
   }, []);
 
-  const fetchSponsors = async () => {
-    setSponsorsLoading(true);
-    setSponsorsError(null);
-    try {
-      const sponsorsRef = ref(database, 'patrocinadores');
-      const snapshot = await get(sponsorsRef);
-      if (snapshot.exists()) {
-        const sponsorsData = snapshot.val();
-        const sponsorsList = Object.keys(sponsorsData).map(key => ({
-          id: key,
-          ...sponsorsData[key],
-        }));
-        setSponsors(sponsorsList);
-      } else {
-        setSponsors([]);
-      }
-    } catch (err: any) {
-      console.error("Erro ao buscar patrocinadores:", err);
-      setSponsorsError('Não foi possível carregar os apoiadores.');
-    } finally {
-      setSponsorsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSponsors();
-  }, []);
-
-  // Lógica de animação de scroll dos patrocinadores (inalterada)
-  useEffect(() => {
-    if (animationFrameIdRef.current) {
-      cancelAnimationFrame(animationFrameIdRef.current);
-      animationFrameIdRef.current = null;
-    }
-
-    if (sponsors.length === 0 || !scrollViewRef.current || isUserInteractingWithSponsors || measuredContentWidth <= screenWidth) {
-      if (measuredContentWidth <= screenWidth && scrollOffsetRef.current !== 0 && scrollViewRef.current) {
-        scrollViewRef.current.scrollTo({ x: 0, animated: false });
-        scrollOffsetRef.current = 0;
-      }
-      return;
-    }
-
-    let lastTimestamp = 0;
-    const scrollSpeed = 20;
-
-    const animate = (timestamp: number) => {
-      if (!lastTimestamp) {
-        lastTimestamp = timestamp;
-      }
-      const deltaTimeInSeconds = (timestamp - lastTimestamp) / 1000;
-      lastTimestamp = timestamp;
-      scrollOffsetRef.current += scrollSpeed * deltaTimeInSeconds;
-      if (scrollOffsetRef.current >= measuredContentWidth) {
-        scrollOffsetRef.current = scrollOffsetRef.current % measuredContentWidth;
-      }
-      scrollViewRef.current?.scrollTo({ x: scrollOffsetRef.current, animated: false });
-      animationFrameIdRef.current = requestAnimationFrame(animate);
-    };
-    animationFrameIdRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (animationFrameIdRef.current) {
-        cancelAnimationFrame(animationFrameIdRef.current);
-        animationFrameIdRef.current = null;
-      }
-    };
-  }, [sponsors, screenWidth, measuredContentWidth, isUserInteractingWithSponsors]);
-
-  const handleSponsorsScrollBeginDrag = () => setIsUserInteractingWithSponsors(true);
-  const handleSponsorsScrollEndDrag = (event: any) => {
-    scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
-    setIsUserInteractingWithSponsors(false);
-  };
-  const handleSponsorsMomentumScrollEnd = (event: any) => {
-    scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
-    setTimeout(() => setIsUserInteractingWithSponsors(false), 100);
-  };
-
   const handleEnviarSugestao = async () => {
     if (sugestao.trim() === '') {
       Alert.alert("Campo Vazio", "Por favor, escreva sua sugestão ou reclamação.");
@@ -173,7 +89,7 @@ export default function Sobre() {
 
     setEnviandoFeedback(true);
     try {
-      const feedbackRef = ref(adminDatabase, 'sugestoesReclamacoes'); // adminDatabase para dados de admin
+      const feedbackRef = ref(adminDatabase, 'sugestoesReclamacoes');
       await push(feedbackRef, {
         texto: sugestao.trim(),
         uidUsuario: user ? user.uid : 'anonimo',
@@ -191,7 +107,6 @@ export default function Sobre() {
     }
   };
 
-  // --- Condição de carregamento geral: Espera o fundo E o texto "Sobre o App" estarem prontos ---
   if (loadingSobreAppTexto) { 
     return (
       <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
@@ -279,7 +194,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#007BFF',
+    color: '#01060aff',
     fontSize: 16,
     textShadowColor: 'rgba(0, 0, 0, 0.75)', 
     textShadowOffset: { width: 1, height: 1 },

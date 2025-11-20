@@ -63,6 +63,7 @@ interface ProdutoComEmpresa {
   isAd?: boolean;
   unlike?: number;
   like?: number;
+  ordemAleatoria?: number;
 }
 
 // Empresa
@@ -82,9 +83,11 @@ const categoriaImagens: { [key: string]: any } = {
   Moda: require("../../assets/categorias/moda.png"),
   Saúde: require("../../assets/categorias/saude.png"),
   Tecnologia: require("../../assets/categorias/tecnologia.png"),
+  Móveis: require("../../assets/categorias/moveis.png"),
   Kids: require("../../assets/categorias/kids.png"),
   Imóveis: require("../../assets/categorias/imoveis.png"),
   Autos: require("../../assets/categorias/autos.png"),
+  Mercado: require("../../assets/categorias/mercado.png"),
   Utilidades: require("../../assets/categorias/utilidades.png"),
   Outros: require("../../assets/categorias/outros.png"),
 };
@@ -97,11 +100,20 @@ const categorias = [
   { nome: "Kids" },
   { nome: "Serviços" },
   { nome: "Tecnologia" },
+  { nome: "Móveis" },
   { nome: "Imóveis" },
   { nome: "Autos" },
+  { nome: "Mercado" },
   { nome: "Utilidades" },
   { nome: "Outros" },
 ];
+
+function removerAcentos(texto: string) {
+  return texto
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
 
 function isOfertaValida(dataFinalOferta?: string) {
   if (!dataFinalOferta) return false;
@@ -167,7 +179,8 @@ function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; lon
 export default function HomeScreen() {
   const { deviceId } = useAuth();
 
-
+  // NOVO: Começa falso, indicando que o usuário ainda não mexeu na ordem
+  const [ordenacaoManual, setOrdenacaoManual] = useState(false);
   const [produtosComEmpresa, setProdutosComEmpresa] = useState<ProdutoComEmpresa[]>([]);
   const [termoBusca, setTermoBusca] = useState("");
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null);
@@ -434,6 +447,7 @@ export default function HomeScreen() {
                   palavrasChave: produto.palavrasChave,
                   like: produto.like || 0,
                   unlike: produto.unlike || 0,
+                  ordemAleatoria: Math.random(),
                 });
               });
             }
@@ -478,18 +492,31 @@ export default function HomeScreen() {
   // Filtros, Ordenação e Inserção de AdCard (mantidos)
   // ... (O restante da lógica de filtro e ordenação)
   const produtosValidos = produtosComEmpresa.filter((produto) => {
+    // 1. Filtro de Categoria
     if (categoriaSelecionada) {
-      const palavrasChaveLower = produto.palavrasChave?.toLowerCase() || "";
-      if (!palavrasChaveLower.includes(categoriaSelecionada.toLowerCase())) {
+      const palavrasChaveLimpa = removerAcentos(produto.palavrasChave || "");
+      const categoriaLimpa = removerAcentos(categoriaSelecionada);
+      
+      if (!palavrasChaveLimpa.includes(categoriaLimpa)) {
         return false;
       }
     }
+
+    // 2. Filtro de Busca por Texto (Com ou Sem Acento)
     if (termoBusca.length >= 3) {
-      const termo = termoBusca.toLowerCase();
+      // Removemos acentos do que o usuário digitou
+      const termoLimpo = removerAcentos(termoBusca); 
+
+      // Removemos acentos dos campos do produto para comparar
+      const descricaoLimpa = removerAcentos(produto.descricao || "");
+      const palavrasChaveLimpa = removerAcentos(produto.palavrasChave || "");
+      const nomeEmpresaLimpa = removerAcentos(produto.nomeEmpresa || "");
+
+      // Verifica se o termo existe em algum dos campos limpos
       if (
-        !produto.descricao?.toLowerCase()?.includes(termo) &&
-        !(produto.palavrasChave && produto.palavrasChave?.toLowerCase()?.includes(termo)) &&
-        !produto.nomeEmpresa?.toLowerCase()?.includes(termo)
+        !descricaoLimpa.includes(termoLimpo) &&
+        !palavrasChaveLimpa.includes(termoLimpo) &&
+        !nomeEmpresaLimpa.includes(termoLimpo)
       ) {
         return false;
       }
@@ -509,7 +536,16 @@ export default function HomeScreen() {
 
 
   // Ordenação
+  // Ordenação Inteligente
   const produtosOrdenados = [...produtosParaExibir].sort((a, b) => {
+    
+    // 1. Se o usuário NÃO mexeu no switch e NÃO está buscando (é a tela inicial de Destaques)
+    // Mantém aleatório para dar chance a todos
+    if (!ordenacaoManual && termoBusca.length < 3 && !categoriaSelecionada) {
+      return (a.ordemAleatoria || 0) - (b.ordemAleatoria || 0);
+    }
+
+    // Funções auxiliares de preço e distância (já existiam no seu código)
     const getPrecoNumerico = (produto: ProdutoComEmpresa) =>
       parseFloat(produto.preco.replace("R$", "").replace(",", ".").replace(/\./g, ""));
 
@@ -520,6 +556,7 @@ export default function HomeScreen() {
         : Infinity;
     }
 
+    // 2. Se o usuário mexeu, respeita a escolha dele (Preço ou Distância)
     if (ordenarPorPreco) {
       return getPrecoNumerico(a) - getPrecoNumerico(b);
     } else {
@@ -638,7 +675,10 @@ export default function HomeScreen() {
             </Text>
             <Switch
               value={ordenarPorPreco}
-              onValueChange={setOrdenarPorPreco}
+              onValueChange={(valor) => {
+                setOrdenarPorPreco(valor); // Atualiza se é preço ou distância
+                setOrdenacaoManual(true);  // <--- O PULO DO GATO: Avisa que o usuário assumiu o controle!
+              }}
               thumbColor={"white"}
               trackColor={{ false: "#ccc", true: "#ccc" }}
             />

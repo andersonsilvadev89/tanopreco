@@ -9,7 +9,6 @@ import {
   ActivityIndicator,
   ImageBackground,
   Image,
-  ScrollView,
   Dimensions,
   Platform,
   Keyboard,
@@ -24,7 +23,6 @@ import {
 import { router } from 'expo-router';
 import { ref, get } from 'firebase/database';
 import { Feather } from "@expo/vector-icons";
-import { checkAndDownloadImages } from '../../utils/imageManager';
 
 const defaultLogoLocal = require('../../assets/images/logoEvento.png');
 const defaultFundoLocal = require('../../assets/images/fundo.png');
@@ -36,16 +34,8 @@ const LoginScreen = ({ navigation }: any) => {
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<any>(null);
 
-  const [appImagesReady, setAppImagesReady] = useState(false);
-  const [currentLogoSource, setCurrentLogoSource] = useState<any>(defaultLogoLocal);
-  const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
-
   const [authLoading, setAuthLoading] = useState(true);
   const [mostrarSenha, setMostrarSenha] = useState(false);
-
-  const [sponsors, setSponsors] = useState<any[]>([]);
-  const [sponsorsLoading, setSponsorsLoading] = useState(true);
-  const [sponsorsError, setSponsorsError] = useState<string | null>(null);
 
   const screenWidth = Dimensions.get('window').width;
 
@@ -62,54 +52,6 @@ const LoginScreen = ({ navigation }: any) => {
     const unsubscribe = auth.onAuthStateChanged(handleAuthStateChanged);
     return () => unsubscribe();
   }, [handleAuthStateChanged]);
-
-  useEffect(() => {
-    const initializeAppImages = async () => {
-      try {
-        const { logoUrl, fundoUrl } = await checkAndDownloadImages();
-
-        setCurrentLogoSource(logoUrl ? { uri: logoUrl } : defaultLogoLocal);
-        setCurrentFundoSource(fundoUrl ? { uri: fundoUrl } : defaultFundoLocal);
-      } catch (error) {
-        console.error("Erro ao inicializar imagens do app na LoginScreen:", error);
-        Alert.alert("Erro de Carregamento", "Não foi possível carregar alguns recursos visuais do aplicativo.");
-        setCurrentLogoSource(defaultLogoLocal);
-        setCurrentFundoSource(defaultFundoLocal);
-      } finally {
-        setAppImagesReady(true);
-      }
-    };
-
-    initializeAppImages();
-  }, []);
-
-  const fetchSponsors = async () => {
-    setSponsorsLoading(true);
-    setSponsorsError(null);
-    try {
-      const sponsorsRef = ref(database, 'patrocinadores');
-      const snapshot = await get(sponsorsRef);
-      if (snapshot.exists()) {
-        const sponsorsData = snapshot.val();
-        const sponsorsList = Object.keys(sponsorsData).map(key => ({
-          id: key,
-          ...sponsorsData[key],
-        }));
-        setSponsors(sponsorsList);
-      } else {
-        setSponsors([]);
-      }
-    } catch (err: any) {
-      console.error("Erro ao buscar patrocinadores:", err);
-      setSponsorsError('Não foi possível carregar os apoiadores.');
-    } finally {
-      setSponsorsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchSponsors();
-  }, []);
 
   const handleLogin = async () => {
     setLoading(true);
@@ -162,74 +104,9 @@ const LoginScreen = ({ navigation }: any) => {
     }
   };
 
-  const scrollViewRef = useRef<ScrollView>(null);
-  const scrollOffsetRef = useRef(0);
-  const animationFrameIdRef = useRef<number | null>(null);
-  const [measuredContentWidth, setMeasuredContentWidth] = useState(0);
-  const [isUserInteractingWithSponsors, setIsUserInteractingWithSponsors] = useState(false);
-
-  useEffect(() => {
-    if (animationFrameIdRef.current) {
-      cancelAnimationFrame(animationFrameIdRef.current);
-      animationFrameIdRef.current = null;
-    }
-
-    if (sponsors.length === 0 || !scrollViewRef.current || isUserInteractingWithSponsors || measuredContentWidth <= screenWidth) {
-      if (measuredContentWidth <= screenWidth && scrollOffsetRef.current !== 0 && scrollViewRef.current) {
-        scrollViewRef.current.scrollTo({ x: 0, animated: false });
-        scrollOffsetRef.current = 0;
-      }
-      return;
-    }
-
-    let lastTimestamp = 0;
-    const scrollSpeed = 20;
-
-    const animate = (timestamp: number) => {
-      if (!lastTimestamp) {
-        lastTimestamp = timestamp;
-      }
-      const deltaTimeInSeconds = (timestamp - lastTimestamp) / 1000;
-      lastTimestamp = timestamp;
-
-      scrollOffsetRef.current += scrollSpeed * deltaTimeInSeconds;
-
-      if (scrollOffsetRef.current >= measuredContentWidth) {
-        scrollOffsetRef.current = scrollOffsetRef.current % measuredContentWidth;
-      }
-
-      scrollViewRef.current?.scrollTo({ x: scrollOffsetRef.current, animated: false });
-      animationFrameIdRef.current = requestAnimationFrame(animate);
-    };
-
-    animationFrameIdRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationFrameIdRef.current) {
-        cancelAnimationFrame(animationFrameIdRef.current);
-        animationFrameIdRef.current = null;
-      }
-    };
-  }, [sponsors, screenWidth, measuredContentWidth, isUserInteractingWithSponsors]);
-
-  const handleSponsorsScrollBeginDrag = () => {
-    setIsUserInteractingWithSponsors(true);
-  };
-
-  const handleSponsorsScrollEndDrag = (event: any) => {
-    scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
-    setIsUserInteractingWithSponsors(false);
-  };
-  const handleSponsorsMomentumScrollEnd = (event: any) => {
-    scrollOffsetRef.current = event.nativeEvent.contentOffset.x;
-    setTimeout(() => {
-      setIsUserInteractingWithSponsors(false);
-    }, 100);
-  };
-
-  if (!appImagesReady || authLoading) {
+  if (authLoading) {
     return (
-      <ImageBackground source={currentFundoSource} style={styles.loadingContainer}>
+      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#007BFF" />
         <Text style={styles.loadingText}>Carregando recursos...</Text>
       </ImageBackground>
@@ -237,7 +114,7 @@ const LoginScreen = ({ navigation }: any) => {
   }
 
   return (
-    <ImageBackground source={currentFundoSource} style={styles.background}>
+    <ImageBackground source={defaultFundoLocal} style={styles.background}>
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -245,7 +122,7 @@ const LoginScreen = ({ navigation }: any) => {
         >
           <View style={styles.logoContainer}>
             <Image
-              source={currentLogoSource}
+              source={defaultLogoLocal}
               style={styles.logo}
               resizeMode="contain"
             />
@@ -288,7 +165,7 @@ const LoginScreen = ({ navigation }: any) => {
               onPress={handleLogin}
               disabled={loading}
             >
-              {loading && !sponsorsLoading ? (
+              {loading? (
                 <ActivityIndicator color="#fff" />
               ) : (
                 <Text style={styles.entrarText}>Entrar</Text>
@@ -331,7 +208,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: '#007BFF',
+    color: '#020d1aff',
     fontSize: 16,
   },
   logoContainer: {

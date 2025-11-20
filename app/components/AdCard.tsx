@@ -171,11 +171,10 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         textAlign: 'center',
         marginBottom: 5,
-        // Outras margens devem ser 0 para evitar estouro
         marginVertical: 0,
     },
     simulatedPrice: {
-        fontSize: 22,
+        fontSize: 15,
         color: 'green', // Cor do 'preco' do produto
         fontWeight: '600',
         textAlign: 'center',

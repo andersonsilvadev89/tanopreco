@@ -1,9 +1,11 @@
-import React, { memo } from 'react';
-import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions, Platform, Alert, Linking } from 'react-native';
+import React, { memo, useState } from 'react';
+import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Feather } from "@expo/vector-icons";
 
-// Tipos devem ser importados ou copiados se não estiverem centralizados
-// Assumindo que você tem acesso a esses tipos no escopo do projeto:
+// ----------------------------------------------------------------------
+// TIPOS E INTERFACES
+// ----------------------------------------------------------------------
+
 interface ProdutoComEmpresa {
     id: string;
     descricao: string;
@@ -33,7 +35,6 @@ interface EmpresaData {
     telefone?: string;
 }
 
-// O ProdutoCard requer as funções e dados que antes estavam no HomeScreen
 interface ProdutoCardProps {
     produto: ProdutoComEmpresa;
     empresaInfo: EmpresaData;
@@ -47,14 +48,14 @@ interface ProdutoCardProps {
 }
 
 // ----------------------------------------------------------------------
-// CONSTANTES DE ESTILO (Copie do HomeScreen.tsx)
+// CONSTANTES E FUNÇÕES AUXILIARES
 // ----------------------------------------------------------------------
-const { width } = Dimensions.get("window");
-const CARD_MARGIN = 8;
-const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2;
-const CARD_MIN_HEIGHT = 300;
 
-// Funções Auxiliares (Apenas para calcular a distância e localização)
+const { width } = Dimensions.get("window");
+const CARD_MARGIN = 12;
+const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2;
+const CARD_MIN_HEIGHT = 200;
+
 function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; longitude: number; isProdutoLocation: boolean } | null {
     if (produto.localizacaoDiferente && produto.latitudeProduto && produto.longitudeProduto) {
         return {
@@ -71,6 +72,7 @@ function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; lon
     }
     return null;
 }
+
 function calcularDistancia(userLocation: any, empresaLocation: any) {
     if (!userLocation || !empresaLocation) return null;
     const toRad = (value: number) => (value * Math.PI) / 180;
@@ -90,9 +92,8 @@ function calcularDistancia(userLocation: any, empresaLocation: any) {
     return R * c;
 }
 
-
 // ----------------------------------------------------------------------
-// COMPONENTE PRODUTOCARD (Memoizado)
+// COMPONENTE PRODUTOCARD
 // ----------------------------------------------------------------------
 
 const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
@@ -106,12 +107,17 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
     openWhatsApp,
     onImagePress,
 }) => {
+    // ESTADOS LOCAIS PARA CONTROLE DE EXPANSÃO
+    const [expandidoDescricao, setExpandidoDescricao] = useState(false);
+    const [expandidoEmpresa, setExpandidoEmpresa] = useState(false);
+
     const location = getProdutoLocation(produto);
     const distancia = userLocation && location ? calcularDistancia(userLocation, { latitude: location.latitude, longitude: location.longitude }) : null;
     const temLocalizacao = !!location;
 
     return (
         <View style={styles.cardProduto}>
+            {/* IMAGEM E BOTÕES DE LIKE/UNLIKE */}
             <View style={styles.imagemLikeContainer}>
                 {produto.imagemUrl ? (
                     <TouchableOpacity
@@ -124,7 +130,6 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
                         />
                     </TouchableOpacity>
                 ) : (
-                    // Placeholder para imagem ausente, se necessário
                     <View style={styles.imagemProdutoPlaceholder}>
                         <Feather name="image" size={50} color="#ccc" />
                     </View>
@@ -156,7 +161,21 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
                 </View>
             </View>
 
-            <Text style={styles.descricao}>{produto.descricao}</Text>
+            {/* DESCRIÇÃO EXPANSÍVEL */}
+            <TouchableOpacity 
+                onPress={() => setExpandidoDescricao(!expandidoDescricao)}
+                activeOpacity={0.7}
+                style={{ width: '100%', paddingHorizontal: 5 }}
+            >
+                <Text 
+                    style={styles.descricao} 
+                    numberOfLines={expandidoDescricao ? undefined : 1}
+                >
+                    {produto.descricao}
+                </Text>
+            </TouchableOpacity>
+
+            {/* PREÇO, DATA E DISTÂNCIA */}
             <Text style={styles.preco}>
                 {"R$ " +
                     parseFloat(
@@ -178,65 +197,88 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
                 </Text>
             )}
 
+            {/* EMPRESA CONTAINER (ACORDEÃO) */}
             <View style={styles.empresaContainer}>
-                <Text style={styles.confiraOferta}>
-                    Confira a oferta direto na empresa:
-                </Text>
-                <Text style={styles.nomeEmpresa}>{empresaInfo?.nomeEmpresa}</Text>
-                <View style={styles.botoesAcaoLinha}>
-                    {empresaInfo?.instagram && (
-                        <View style={styles.botaoAcaoItem}>
-                            <TouchableOpacity
-                                onPress={() => openInstagramProfile(empresaInfo.instagram)}
-                                style={styles.botaoRedondo}
-                            >
-                                <Image
-                                    source={require("../../assets/botoes/instagram.png")}
-                                    style={styles.imagemBotaoRedondo}
-                                />
-                            </TouchableOpacity>
-                            <Text style={styles.legendaBotao}>Instagram</Text>
+                
+                {/* HEADER CLICÁVEL: Texto + Icone na mesma linha */}
+                <TouchableOpacity 
+                    style={styles.headerEmpresaClickable} 
+                    onPress={() => setExpandidoEmpresa(!expandidoEmpresa)}
+                    activeOpacity={0.6}
+                >
+                    <View style={styles.linhaTituloEmpresa}>
+                        <Text style={styles.confiraOferta}>
+                            Confira a oferta direto na empresa:
+                        </Text>
+                        <Feather 
+                            name={expandidoEmpresa ? "chevron-up" : "chevron-down"} 
+                            size={18} 
+                            color="#555" 
+                            style={{ marginLeft: 2, marginTop: 2 }}
+                        />
+                    </View>
+                </TouchableOpacity>
+
+                {/* CONTEÚDO EXPANSÍVEL: NOME + BOTÕES */}
+                {expandidoEmpresa && (
+                    <>
+                        <Text style={styles.nomeEmpresa}>{empresaInfo?.nomeEmpresa}</Text>
+
+                        <View style={styles.botoesAcaoLinha}>
+                            {empresaInfo?.instagram && (
+                                <View style={styles.botaoAcaoItem}>
+                                    <TouchableOpacity
+                                        onPress={() => openInstagramProfile(empresaInfo.instagram)}
+                                        style={styles.botaoRedondo}
+                                    >
+                                        <Image
+                                            source={require("../../assets/botoes/instagram.png")}
+                                            style={styles.imagemBotaoRedondo}
+                                        />
+                                    </TouchableOpacity>
+                                    <Text style={styles.legendaBotao}>Instagram</Text>
+                                </View>
+                            )}
+                            {empresaInfo?.telefone && (
+                                <View style={styles.botaoAcaoItem}>
+                                    <TouchableOpacity
+                                        onPress={() => openWhatsApp(empresaInfo.telefone)}
+                                        style={styles.botaoRedondo}
+                                    >
+                                        <Image
+                                            source={require("../../assets/botoes/whatsapp.png")}
+                                            style={styles.imagemBotaoRedondo}
+                                        />
+                                    </TouchableOpacity>
+                                    <Text style={styles.legendaBotao}>WhatsApp</Text>
+                                </View>
+                            )}
+                            {temLocalizacao && (
+                                <View style={styles.botaoAcaoItem}>
+                                    <TouchableOpacity
+                                        style={styles.botaoRedondo}
+                                        onPress={() => handleVerNoMapa(produto)}
+                                    >
+                                        <Image
+                                            source={require("../../assets/botoes/rota.png")}
+                                            style={styles.imagemBotaoRedondo}
+                                        />
+                                    </TouchableOpacity>
+                                    <Text style={styles.legendaBotao}>Rota</Text>
+                                </View>
+                            )}
                         </View>
-                    )}
-                    {empresaInfo?.telefone && (
-                        <View style={styles.botaoAcaoItem}>
-                            <TouchableOpacity
-                                onPress={() => openWhatsApp(empresaInfo.telefone)}
-                                style={styles.botaoRedondo}
-                            >
-                                <Image
-                                    source={require("../../assets/botoes/whatsapp.png")}
-                                    style={styles.imagemBotaoRedondo}
-                                />
-                            </TouchableOpacity>
-                            <Text style={styles.legendaBotao}>WhatsApp</Text>
-                        </View>
-                    )}
-                    {temLocalizacao && (
-                        <View style={styles.botaoAcaoItem}>
-                            <TouchableOpacity
-                                style={styles.botaoRedondo}
-                                onPress={() => handleVerNoMapa(produto)}
-                            >
-                                <Image
-                                    source={require("../../assets/botoes/rota.png")}
-                                    style={styles.imagemBotaoRedondo}
-                                />
-                            </TouchableOpacity>
-                            <Text style={styles.legendaBotao}>Traçar rota</Text>
-                        </View>
-                    )}
-                </View>
+                    </>
+                )}
             </View>
         </View>
     );
 };
 
-// Memoiza o componente para otimização do FlatList
 export const ProdutoCard = memo(ProdutoCardComponent);
 
 // ----------------------------------------------------------------------
-// ESTILOS (Copie APENAS os estilos do card e seus elementos internos do seu HomeScreen.tsx)
+// ESTILOS
 // ----------------------------------------------------------------------
 
 const styles = StyleSheet.create({
@@ -251,9 +293,9 @@ const styles = StyleSheet.create({
         justifyContent: "space-evenly",
     },
     cardProduto: {
-        backgroundColor: "rgba(255,255,255,0.95)",
+        backgroundColor: "rgba(255, 255, 255, 0.95)",
         borderRadius: 10,
-        padding: 10,
+        padding: 5,
         marginBottom: 12,
         marginHorizontal: CARD_MARGIN / 2,
         elevation: 3,
@@ -266,68 +308,84 @@ const styles = StyleSheet.create({
         minHeight: CARD_MIN_HEIGHT,
     },
     descricao: {
-        fontSize: 15,
+        fontSize: 13,
         fontWeight: "bold",
         textAlign: "center",
-        marginBottom: 5,
+        marginBottom: 2,
         borderRadius: 5,
         padding: 2,
     },
     preco: {
-        fontSize: 22,
+        fontSize: 20,
         color: "green",
         fontWeight: "600",
         textAlign: "center",
         marginBottom: 2,
     },
     dataOferta: {
-        fontSize: 13,
+        fontSize: 12,
         color: "#888",
         marginBottom: 2,
         textAlign: "center",
     },
     distancia: {
-        fontSize: 13,
+        fontSize: 12,
         color: "#007BFF",
         marginBottom: 2,
         textAlign: "center",
     },
     imagemProduto: {
-        width: 100,
-        height: 100,
+        width: 120,
+        height: 120,
         borderRadius: 8,
         marginTop: 5,
         resizeMode: "contain",
     },
-    imagemProdutoPlaceholder: { // Estilo para caso a imagem esteja ausente
-        width: 100,
-        height: 100,
+    imagemProdutoPlaceholder: {
+        width: 120,
+        height: 120,
         borderRadius: 8,
         marginTop: 5,
         backgroundColor: '#f0f0f0',
         justifyContent: 'center',
         alignItems: 'center',
     },
+    
+    // --- ESTILOS DO CONTAINER DA EMPRESA ---
     empresaContainer: {
         width: "100%",
         backgroundColor: "#f7f7f7",
         borderRadius: 8,
-        padding: 8,
-        marginTop: 8,
+        paddingVertical: 4, 
+        paddingHorizontal: 2,
+        marginTop: 2,
         alignItems: "center",
     },
+    headerEmpresaClickable: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
+        paddingVertical: 4, // Área de toque um pouco melhor
+    },
+    linhaTituloEmpresa: {
+        flexDirection: 'row', 
+        alignItems: 'center', 
+        justifyContent: 'center', 
+        flexWrap: 'wrap', // Permite quebra de linha mantendo ícone perto
+        paddingHorizontal: 4
+    },
     confiraOferta: {
-        fontSize: 12,
+        fontSize: 12, 
         color: "#555",
         fontWeight: "bold",
-        marginBottom: 2,
         textAlign: "center",
     },
     nomeEmpresa: {
         fontSize: 12,
         color: "#0056b3",
         fontWeight: "bold",
-        marginBottom: 5,
+        marginBottom: 2,
+        marginTop: 4,
         textAlign: "center",
     },
     botoesAcaoLinha: {
@@ -337,7 +395,7 @@ const styles = StyleSheet.create({
         width: "100%",
         minHeight: 22,
         marginBottom: 5,
-        marginTop: 8,
+        marginTop: 4,
     },
     botaoAcaoItem: {
         alignItems: "center",

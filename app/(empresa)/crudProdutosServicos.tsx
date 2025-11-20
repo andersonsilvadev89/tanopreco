@@ -85,9 +85,11 @@ const categorias = [
   "Moda",
   "Saúde",
   "Tecnologia",
+  "Móveis",
   "Kids",
   "Imóveis",
   "Autos",
+  "Mercado",
   "Utilidades",
   "Outros",
 ];
@@ -223,8 +225,16 @@ export default function CadastroProduto() {
       Alert.alert("Erro", "A descrição é obrigatória.");
       return;
     }
+    // ✅ NOVO BLOQUEIO: Limite de categorias
+    if (categoriasSelecionadas.length > 2) {
+      Alert.alert(
+        "Atenção",
+        "Você pode selecionar no máximo 2 categorias para um produto."
+      );
+      return;
+    }
     if (categoriasSelecionadas.length === 0) {
-      Alert.alert("Selecione pelo menos uma categoria.");
+      Alert.alert("Erro", "Selecione pelo menos uma categoria.");
       return;
     }
     if (!userId) return;
@@ -271,7 +281,14 @@ export default function CadastroProduto() {
       descricao: descricao,
       preco,
       imagemUrl,
-      palavrasChave: palavrasChave,
+      // Garante que as palavras-chave incluam apenas as categorias selecionadas e as digitadas
+      palavrasChave: [
+        ...categoriasSelecionadas,
+        ...palavrasChave
+          .split(",")
+          .map((w) => w.trim())
+          .filter((w) => w.length > 0 && !categorias.includes(w)), // Filtra as palavras-chave para não repetir as categorias
+      ].join(", "),
       dataFinalOferta,
       destaque,
       editavel,
@@ -411,7 +428,6 @@ export default function CadastroProduto() {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 3],
       quality: 0.5,
     });
 
@@ -460,10 +476,27 @@ export default function CadastroProduto() {
     );
   });
 
+  // ✅ ALTERAÇÃO: Adiciona a regra de limite de 2 categorias.
   const toggleCategoria = (cat: string) => {
-    setCategoriasSelecionadas((prev) =>
-      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
-    );
+    setCategoriasSelecionadas((prev) => {
+      if (prev.includes(cat)) {
+        // Se já está selecionada, remove
+        return prev.filter((c) => c !== cat);
+      } else {
+        // Se não está selecionada
+        if (prev.length < 2) {
+          // Se o limite de 2 ainda não foi atingido, adiciona
+          return [...prev, cat];
+        } else {
+          // Se o limite foi atingido, alerta o usuário e não adiciona
+          Alert.alert(
+            "Atenção",
+            "Você pode selecionar no máximo 2 categorias."
+          );
+          return prev;
+        }
+      }
+    });
   };
 
   // 🆕 LÓGICA DE ABRIR MODAL AO ATIVAR SWITCH
