@@ -11,24 +11,29 @@ import {
     Dimensions,
 } from 'react-native';
 import { router } from 'expo-router';
+// 💡 Importando as mesmas famílias de ícones usadas no TabsLayout
 import {
-    FontAwesome5
+    FontAwesome5,
+    MaterialCommunityIcons,
+    AntDesign
 } from '@expo/vector-icons';
 import { database } from '@/firebaseConfig';
 import { ref, onValue } from 'firebase/database';
 import { auth } from '@/firebaseConfig';
 import * as WebBrowser from 'expo-web-browser';
+import { signOut } from "firebase/auth";
 
 // Importações de componentes de Ads
 import AdBanner from '../components/AdBanner';
-import AdCard from '../components/AdCard'; // 💡 Novo AdCard importado
-import Header from '../components/Header'; // Mantido
-import { signOut } from "firebase/auth"; // Mantido
+import AdCard from '../components/AdCard';
+import Header from '../components/Header';
 
 const defaultFundoLocal = require('../../assets/images/fundo.png');
 const { width } = Dimensions.get('window');
-const CARD_MARGIN = 10;
-const DYNAMIC_CARD_WIDTH = (width - CARD_MARGIN * 3) / 4.2; // Calcula a largura para 2 cards por linha
+const SCREEN_PADDING = 20;
+
+// Calculando tamanho para 4 itens por linha (aprox)
+const ITEM_WIDTH = (width - (SCREEN_PADDING * 2)) / 4; 
 
 const HomeScreen = () => {
     const navigate = (path: string) => router.push(path as any);
@@ -49,10 +54,7 @@ const HomeScreen = () => {
                             await signOut(auth);
                         } catch (error) {
                             console.error("Erro ao fazer logout: ", error);
-                            Alert.alert(
-                                "Erro ao Sair",
-                                "Não foi possível sair. Tente novamente."
-                            );
+                            Alert.alert("Erro", "Não foi possível sair.");
                         }
                     },
                 },
@@ -66,15 +68,13 @@ const HomeScreen = () => {
     const handleBuyPackages = async () => {
         const user = auth.currentUser;
         if (!user) {
-            Alert.alert("Erro", "Usuário não autenticado. Tente fazer login novamente.");
+            Alert.alert("Erro", "Usuário não autenticado.");
             return;
         }
-
         const userId = user.uid;
         const paymentUrl = `${PACKAGES_HOSTING_URL}/index.html?uid=${userId}`;
 
         try {
-            // Abre o navegador web do Expo com a URL
             await WebBrowser.openBrowserAsync(paymentUrl);
         } catch (error) {
             console.error("Erro ao abrir navegador:", error);
@@ -93,10 +93,9 @@ const HomeScreen = () => {
                     setUserName(snapshot.val().nome);
                 } else {
                     setUserName("Usuário");
-                    console.log("Documento do usuário não encontrado no Realtime Database!");
                 }
             }, (error) => {
-                console.error("Erro ao buscar nome do usuário:", error);
+                console.error("Erro ao buscar nome:", error);
                 setUserName("Usuário");
             });
 
@@ -106,12 +105,38 @@ const HomeScreen = () => {
         }
     }, []);
 
-    // 💡 Organização dos botões para o novo layout
+    // 💡 Organização atualizada com os mesmos ícones das Tabs
     const options = [
-        { label: 'Produtos e Serviços', iconName: 'utensils', iconFamily: FontAwesome5, path: 'crudProdutosServicos' },
-        { label: 'Configurações', iconName: 'cog', iconFamily: FontAwesome5, path: 'configuracoesScreen' },
-        { label: 'Obter Pacotes', iconName: 'box', iconFamily: FontAwesome5, onPress: handleBuyPackages }, // Icone ajustado
-        { label: 'Sair', iconName: 'sign-out-alt', iconFamily: FontAwesome5, onPress: confirmarLogout },
+        { 
+            label: 'Produtos', 
+            // Mesmo ícone da Tab "Produtos"
+            iconName: 'food-fork-drink', 
+            iconFamily: MaterialCommunityIcons, 
+            path: 'crudProdutosServicos',
+            color: '#064ec7' // Azul padrão
+        },
+        { 
+            label: 'Config', 
+            // Mesmo ícone da Tab "Config"
+            iconName: 'setting', 
+            iconFamily: AntDesign, 
+            path: 'configuracoesScreen',
+            color: '#064ec7'
+        },
+        { 
+            label: 'Pacotes', 
+            iconName: 'box', 
+            iconFamily: FontAwesome5, 
+            onPress: handleBuyPackages,
+            color: '#064ec7'
+        },
+        { 
+            label: 'Sair', 
+            iconName: 'logout', // Ícone mais comum para sair no Material
+            iconFamily: MaterialCommunityIcons, 
+            onPress: confirmarLogout,
+            color: '#d32f2f' // Vermelho para destaque de sair
+        },
     ];
 
     return (
@@ -126,22 +151,28 @@ const HomeScreen = () => {
             <SafeAreaView style={styles.safeAreaContent}>
                 <ScrollView contentContainerStyle={styles.scrollViewContent}>
 
-                    {/* 💡 CONTAINER PARA OS BOTÕES (Flex Row) */}
-                    <View style={styles.buttonsRowContainer}>
-                        {options.map(({ label, iconName, iconFamily: Icon, path, onPress }, index) => (
+                    {/* Container dos Ícones de Menu */}
+                    <View style={styles.menuGrid}>
+                        {options.map(({ label, iconName, iconFamily: Icon, path, onPress, color }, index) => (
                             <TouchableOpacity
                                 key={index}
-                                style={styles.card}
-                                activeOpacity={0.8}
+                                style={styles.menuItem}
+                                activeOpacity={0.7}
                                 onPress={onPress || (path ? () => navigate(path) : undefined)}
                             >
-                                <Icon name={iconName} size={25} color="#007aff" />
-                                <Text style={styles.cardText}>{label}</Text>
+                                {/* O Círculo do Botão */}
+                                <View style={styles.iconCircle}>
+                                    <Icon name={iconName as any} size={40} color={color} />
+                                </View>
+                                {/* O Texto abaixo do botão */}
+                                <Text style={styles.menuText} numberOfLines={2}>
+                                    {label}
+                                </Text>
                             </TouchableOpacity>
                         ))}
                     </View>
 
-                    {/* 💡 ADCARD NATIVO ABAIXO DOS BOTÕES */}
+                    {/* AdCard Container */}
                     <View style={styles.adCardContainer}>
                         <AdCard />
                     </View>
@@ -159,52 +190,58 @@ const styles = StyleSheet.create({
     },
     safeAreaContent: {
         flex: 1,
-        paddingHorizontal: CARD_MARGIN, // Usando a margem para o SafeAreaView
     },
     scrollViewContent: {
-        paddingVertical: 40, // Espaçamento vertical para o conteúdo
+        paddingVertical: 40,
+        paddingHorizontal: SCREEN_PADDING,
         flexGrow: 1,
     },
-    // 💡 NOVO: Container para dispor os botões em linha
-    buttonsRowContainer: {
+    // 💡 GRID DO MENU
+    menuGrid: {
         flexDirection: "row",
-        flexWrap: 'wrap', // Permite quebrar para a próxima linha
-        justifyContent: 'space-between', // Espaço entre os botões
-        alignItems: 'flex-start',
-        marginBottom: 10, // Espaço entre os botões e o AdCard
+        flexWrap: 'wrap',
+        justifyContent: 'space-between', // Distribui os itens uniformemente
+        marginBottom: 20,
     },
-    // 💡 NOVO: Container para o AdCard para garantir largura total
+    menuItem: {
+        width: ITEM_WIDTH, // Define a largura de cada coluna
+        alignItems: 'center',
+        marginBottom: 15,
+    },
+    iconCircle: {
+        width: 70,
+        height: 70,
+        borderRadius: 50, // Totalmente redondo
+        backgroundColor: '#fff',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 8, // Espaço entre o círculo e o texto
+        
+        // Sombra para dar destaque
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.2,
+        shadowRadius: 3,
+        elevation: 4,
+    },
+    menuText: {
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#333',
+        textAlign: 'center',
+        width: '100%', // Garante que o texto centralize na largura do item
+    },
+    
+    // Container do AdCard
     adCardContainer: {
         width: '100%',
         marginTop: 10,
         backgroundColor: 'rgba(255, 255, 255, 1)',
-        // O AdCard interno já tem margem/padding/elevação
-        borderRadius: 10, // Alterado de 100 para 10 para parecer mais com um card
-        
+        borderRadius: 10,
+        overflow: 'hidden', // Garante que o conteúdo respeite as bordas arredondadas
     },
-    card: {
-        backgroundColor: 'rgba(255, 255, 255, 0.94)',
-        borderRadius: 100, // Alterado de 100 para 10 para parecer mais com um card
-        width: DYNAMIC_CARD_WIDTH, // Usando a largura calculada
-        height: DYNAMIC_CARD_WIDTH, // Mantendo a proporção 1:1 (quadrado)
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 5,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.15,
-        shadowRadius: 4,
-        elevation: 3,
-        margin: 1 // Espaço entre as linhas de botões
-    },
-    cardText: {
-        fontSize: 10, // Ajustado para caber melhor
-        fontWeight: '600',
-        color: '#333',
-        textAlign: 'center',
-        marginTop: 10,
-    },
-    // ... (Mantive o restante dos seus estilos originais, mas os removi daqui para brevidade)
+    
+    // Estilos de loading (caso precise no futuro)
     loadingContainer: {
         flex: 1,
         justifyContent: 'center',
@@ -214,9 +251,6 @@ const styles = StyleSheet.create({
         marginTop: 10,
         color: '#007BFF',
         fontSize: 16,
-        textShadowColor: 'rgba(0, 0, 0, 0.75)',
-        textShadowOffset: { width: 1, height: 1 },
-        textShadowRadius: 2,
     },
 });
 

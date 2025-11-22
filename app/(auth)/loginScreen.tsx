@@ -23,6 +23,8 @@ import {
 import { router } from 'expo-router';
 import { ref, get } from 'firebase/database';
 import { Feather } from "@expo/vector-icons";
+import AdBanner from "../components/AdBanner";
+
 
 const defaultLogoLocal = require('../../assets/images/logoEvento.png');
 const defaultFundoLocal = require('../../assets/images/fundo.png');
@@ -115,6 +117,7 @@ const LoginScreen = ({ navigation }: any) => {
 
   return (
     <ImageBackground source={defaultFundoLocal} style={styles.background}>
+      <AdBanner />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -218,7 +221,7 @@ const styles = StyleSheet.create({
   },
   logo: {
     width: '100%',
-    height: 300, // Defina uma altura fixa ou remova a altura para o resizeMode funcionar
+    height: 300,
   },
   formContainer: {
     padding: 20,

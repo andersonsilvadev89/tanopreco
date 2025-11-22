@@ -77,6 +77,7 @@ const styles = StyleSheet.create({
         alignItems: 'center', 
         marginVertical: 1, 
         minHeight: BANNER_HEIGHT,
+        marginTop: Platform.OS === 'ios' ? 30 : 0,
     },
     // Novo estilo: Container para o Banner Ad
     adWrapper: {

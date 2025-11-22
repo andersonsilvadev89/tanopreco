@@ -32,8 +32,7 @@ import { auth, database } from "../../firebaseConfig";
 import AdBanner from "../components/AdBanner";
 import { Feather } from "@expo/vector-icons";
 
-// ➡️ NOVO COMPONENTE: LocalizacaoModal
-import LocalizacaoModal from "../components/LocalizacaoModal"; // ⚠️ Ajuste o caminho conforme a sua estrutura
+import LocalizacaoModal from "../components/LocalizacaoModal";
 
 const defaultFundoLocal = require("../../assets/images/fundo.png");
 const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dvekhdfgc/image/upload";
@@ -70,6 +69,28 @@ const formatarData = (text: string) => {
   return formattedDate.substring(0, 10);
 };
 
+// ✅ FUNÇÃO NOVA PARA VERIFICAR SE VENCEU
+const isOfertaVencida = (dataString?: string) => {
+  if (!dataString) return false;
+  
+  const parts = dataString.split('/');
+  if (parts.length !== 3) return false;
+  
+  // DD/MM/AAAA -> Date(AAAA, MM-1, DD)
+  const dia = parseInt(parts[0], 10);
+  const mes = parseInt(parts[1], 10) - 1;
+  const ano = parseInt(parts[2], 10);
+  
+  const dataOferta = new Date(ano, mes, dia);
+  
+  // Zera a hora de hoje para comparar apenas a data
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  // Se data da oferta for menor que hoje, venceu
+  return dataOferta < hoje;
+};
+
 const formatarPreco = (valor: string) => {
   const cleaned = valor.replace(/\D/g, "");
   let num = parseInt(cleaned, 10);
@@ -83,6 +104,7 @@ const categorias = [
   "Bebidas",
   "Serviços",
   "Moda",
+  "Beleza",
   "Saúde",
   "Tecnologia",
   "Móveis",
@@ -101,6 +123,7 @@ interface Produto {
   imagemUrl?: string;
   palavrasChave?: string;
   dataFinalOferta?: string;
+  enquantoDurarEstoque?: boolean; 
   destaque?: boolean;
   editavel?: boolean;
   localizacaoDiferente?: boolean;
@@ -123,6 +146,9 @@ export default function CadastroProduto() {
   const [dataFinalOferta, setDataFinalOferta] = useState(
     getThirtyDaysFromNow()
   );
+  
+  const [enquantoDurarEstoque, setEnquantoDurarEstoque] = useState(false);
+
   const [destaque, setDestaque] = useState(false);
   const [editavel, setEditavel] = useState(false);
   const [imagemUrl, setImagemUrl] = useState<string | undefined>();
@@ -136,6 +162,10 @@ export default function CadastroProduto() {
 
   const [loadingUpload, setLoadingUpload] = useState(false);
   const [termoBusca, setTermoBusca] = useState("");
+  
+  // ✅ NOVO ESTADO DE FILTRO
+  const [filtroData, setFiltroData] = useState<'todos' | 'vencidos' | 'em_dia'>('todos');
+
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [produtosDisponiveis, setProdutosDisponiveis] = useState<number | null>(
     null
@@ -150,7 +180,6 @@ export default function CadastroProduto() {
   const [precoY, setPrecoY] = useState(0);
   const [dataFinalOfertaY, setDataFinalOfertaY] = useState(0);
   const [palavrasChaveY, setPalavrasChaveY] = useState(0);
-  // --------------------------------------------------
 
   const scrollRef = useRef<ScrollView>(null);
   const userId = auth.currentUser?.uid;
@@ -225,7 +254,7 @@ export default function CadastroProduto() {
       Alert.alert("Erro", "A descrição é obrigatória.");
       return;
     }
-    // ✅ NOVO BLOQUEIO: Limite de categorias
+
     if (categoriasSelecionadas.length > 2) {
       Alert.alert(
         "Atenção",
@@ -281,15 +310,15 @@ export default function CadastroProduto() {
       descricao: descricao,
       preco,
       imagemUrl,
-      // Garante que as palavras-chave incluam apenas as categorias selecionadas e as digitadas
       palavrasChave: [
         ...categoriasSelecionadas,
         ...palavrasChave
           .split(",")
           .map((w) => w.trim())
-          .filter((w) => w.length > 0 && !categorias.includes(w)), // Filtra as palavras-chave para não repetir as categorias
+          .filter((w) => w.length > 0 && !categorias.includes(w)),
       ].join(", "),
       dataFinalOferta,
+      enquantoDurarEstoque, 
       destaque,
       editavel,
       localizacaoDiferente,
@@ -324,11 +353,11 @@ export default function CadastroProduto() {
     setPalavrasChave("");
     setCategoriasSelecionadas([]);
     setDataFinalOferta(getThirtyDaysFromNow());
+    setEnquantoDurarEstoque(false); 
     setImagemUrl(undefined);
     setImagemUri(undefined);
     setEditandoId(null);
     setDestaque(false);
-    // 🆕 LIMPA ESTADOS DE LOCALIZAÇÃO
     setLocalizacaoDiferente(false);
     setLatitude(null);
     setLongitude(null);
@@ -382,10 +411,12 @@ export default function CadastroProduto() {
     setCategoriasSelecionadas(categoriasDoProduto);
     setPalavrasChave(outrasPalavras.join(", "));
     setDataFinalOferta(produto.dataFinalOferta || getThirtyDaysFromNow());
+    
+    setEnquantoDurarEstoque(!!produto.enquantoDurarEstoque);
+
     setImagemUrl(produto.imagemUrl);
     setEditandoId(produto.id || null);
     setDestaque(!!produto.destaque);
-    // 🆕 CARREGA NOVOS DADOS DE LOCALIZAÇÃO
     setLocalizacaoDiferente(!!produto.localizacaoDiferente);
     setLatitude(produto.latitude);
     setLongitude(produto.longitude);
@@ -467,28 +498,39 @@ export default function CadastroProduto() {
     }
   };
 
+  // ✅ LÓGICA DE FILTRO ATUALIZADA
   const produtosFiltrados = produtos.filter((p) => {
-    if (termoBusca.length < 3) return true;
-    const termo = termoBusca.toLowerCase();
-    return (
-      p.descricao.toLowerCase().includes(termo) ||
-      p.palavrasChave?.toLowerCase().includes(termo)
-    );
+    // 1. Busca por texto
+    let correspondeBusca = true;
+    if (termoBusca.length >= 3) {
+        const termo = termoBusca.toLowerCase();
+        correspondeBusca = (
+            p.descricao.toLowerCase().includes(termo) ||
+            (p.palavrasChave && p.palavrasChave.toLowerCase().includes(termo)) || false
+        );
+    }
+
+    // 2. Filtro por data
+    let correspondeFiltroData = true;
+    const estaVencida = isOfertaVencida(p.dataFinalOferta);
+
+    if (filtroData === 'vencidos') {
+        correspondeFiltroData = estaVencida;
+    } else if (filtroData === 'em_dia') {
+        correspondeFiltroData = !estaVencida;
+    }
+
+    return correspondeBusca && correspondeFiltroData;
   });
 
-  // ✅ ALTERAÇÃO: Adiciona a regra de limite de 2 categorias.
   const toggleCategoria = (cat: string) => {
     setCategoriasSelecionadas((prev) => {
       if (prev.includes(cat)) {
-        // Se já está selecionada, remove
         return prev.filter((c) => c !== cat);
       } else {
-        // Se não está selecionada
         if (prev.length < 2) {
-          // Se o limite de 2 ainda não foi atingido, adiciona
           return [...prev, cat];
         } else {
-          // Se o limite foi atingido, alerta o usuário e não adiciona
           Alert.alert(
             "Atenção",
             "Você pode selecionar no máximo 2 categorias."
@@ -499,14 +541,11 @@ export default function CadastroProduto() {
     });
   };
 
-  // 🆕 LÓGICA DE ABRIR MODAL AO ATIVAR SWITCH
   const handleToggleLocalizacaoDiferente = (value: boolean) => {
     setLocalizacaoDiferente(value);
     if (value) {
-      // Abre o modal automaticamente ao ativar o switch
       setModalMapaVisivel(true);
     } else {
-      // Limpa a localização se for desativado (usa a localização da empresa)
       setLatitude(null);
       setLongitude(null);
     }
@@ -582,7 +621,6 @@ export default function CadastroProduto() {
               placeholder="Descrição do produto"
               style={styles.input}
               accessibilityLabel="Campo para inserir a descrição do produto"
-              // ✅ FOCO AUTOMÁTICO
               onLayout={(event) => {
                 setDescricaoY(event.nativeEvent.layout.y);
               }}
@@ -596,7 +634,6 @@ export default function CadastroProduto() {
               keyboardType="numeric"
               style={styles.input}
               accessibilityLabel="Campo para inserir o preço do produto"
-              // ✅ FOCO AUTOMÁTICO
               onLayout={(event) => {
                 setPrecoY(event.nativeEvent.layout.y);
               }}
@@ -611,12 +648,23 @@ export default function CadastroProduto() {
               style={styles.input}
               maxLength={10}
               accessibilityLabel="Campo para inserir a data final da oferta"
-              // ✅ FOCO AUTOMÁTICO
               onLayout={(event) => {
                 setDataFinalOfertaY(event.nativeEvent.layout.y);
               }}
               onFocus={() => scrollToInput(dataFinalOfertaY)}
             />
+
+            <View style={styles.switchContainer}>
+              <Text style={styles.switchLabel}>Enquanto durar o estoque</Text>
+              <Switch
+                trackColor={{ false: "#767577", true: "#81b0ff" }}
+                thumbColor={enquantoDurarEstoque ? "#f5dd4b" : "#f4f3f4"}
+                ios_backgroundColor="#3e3e3e"
+                onValueChange={setEnquantoDurarEstoque}
+                value={enquantoDurarEstoque}
+              />
+            </View>
+
             <Text style={{ marginBottom: 5, fontWeight: "bold" }}>
               Categorias *
             </Text>
@@ -651,14 +699,12 @@ export default function CadastroProduto() {
               style={styles.input}
               accessibilityLabel="Campo para inserir palavras-chave relacionadas ao produto"
               editable={true}
-              // ✅ FOCO AUTOMÁTICO
               onLayout={(event) => {
                 setPalavrasChaveY(event.nativeEvent.layout.y);
               }}
               onFocus={() => scrollToInput(palavrasChaveY)}
             />
 
-            {/* 🆕 SWITCH DE LOCALIZAÇÃO */}
             <View style={styles.switchContainer}>
               <Text style={styles.switchLabel}>
                 Usar localização diferente:
@@ -677,16 +723,13 @@ export default function CadastroProduto() {
                 onPress={() => setModalMapaVisivel(true)}
               >
                 <Feather name="map-pin" size={16} color="white" />
-                {/* ✅ CORREÇÃO APLICADA: Verifica se é número antes de chamar toFixed() */}
                 <Text style={styles.localizacaoBotaoTexto}>
                   {typeof latitude === 'number' && typeof longitude === 'number' && latitude !== null && longitude !== null
                     ? `Localização Selecionada: Lat ${latitude.toFixed(4)}, Lon ${longitude.toFixed(4)}`
                     : "Selecionar Localização no Mapa *"}
                 </Text>
-                {/* ------------------------------------------- */}
               </TouchableOpacity>
             )}
-            {/* --------------------------- */}
 
             <View style={styles.switchContainer}>
               <Text style={styles.switchLabel}>Marcar como Destaque</Text>
@@ -758,6 +801,7 @@ export default function CadastroProduto() {
               >
                 <Feather name="x" size={24} color="#333" />
               </TouchableOpacity>
+              
               <TextInput
                 value={termoBusca}
                 onChangeText={setTermoBusca}
@@ -765,6 +809,32 @@ export default function CadastroProduto() {
                 style={styles.input}
                 accessibilityLabel="Campo para buscar produtos cadastrados"
               />
+
+              {/* ✅ BOTÕES DE FILTRO */}
+              <View style={styles.filterContainer}>
+                <TouchableOpacity 
+                  style={[styles.filterButton, filtroData === 'todos' && styles.filterButtonActive]}
+                  onPress={() => setFiltroData('todos')}
+                >
+                  <Text style={[styles.filterText, filtroData === 'todos' && styles.filterTextActive]}>Todos</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.filterButton, filtroData === 'em_dia' && styles.filterButtonActive]}
+                  onPress={() => setFiltroData('em_dia')}
+                >
+                  <Text style={[styles.filterText, filtroData === 'em_dia' && styles.filterTextActive]}>Em Dia</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity 
+                  style={[styles.filterButton, filtroData === 'vencidos' && styles.filterButtonActive]}
+                  onPress={() => setFiltroData('vencidos')}
+                >
+                  <Text style={[styles.filterText, filtroData === 'vencidos' && styles.filterTextActive]}>Vencidos</Text>
+                </TouchableOpacity>
+              </View>
+              {/* --------------------- */}
+
               <Text style={styles.sectionTitle}>
                 Produtos Cadastrados ({produtos.length}{" "}
                 {produtosDisponiveis !== null ? `/ ${produtosDisponiveis}` : ""})
@@ -792,21 +862,40 @@ export default function CadastroProduto() {
                             Preço: {item.preco}
                           </Text>
                         )}
+                        
+                        {/* Exibir se está vencido na lista para fácil identificação */}
+                        {isOfertaVencida(item.dataFinalOferta) ? (
+                            <Text style={[styles.listItemText, {color: 'red', fontWeight: 'bold'}]}>
+                                Oferta Vencida: {item.dataFinalOferta}
+                            </Text>
+                        ) : (
+                            item.dataFinalOferta && (
+                                <Text style={styles.listItemText}>
+                                    Válido até: {item.dataFinalOferta}
+                                </Text>
+                            )
+                        )}
+
                         {item.palavrasChave && (
                           <Text style={styles.listItemText}>
                             Tags: {item.palavrasChave}
                           </Text>
                         )}
+                        
+                        {item.enquantoDurarEstoque && (
+                          <Text style={[styles.listItemText, {color: '#e67e22', fontSize: 12, fontWeight: 'bold'}]}>
+                             ⚠️ Enquanto durar o estoque
+                          </Text>
+                        )}
+                        
                         {item.destaque && (
                           <Text style={styles.ofertaFlag}>Destaque!</Text>
                         )}
-                        {/* 🆕 EXIBE LOCALIZAÇÃO CUSTOMIZADA NA LISTA */}
                         {item.localizacaoDiferente && item.latitude && item.longitude && (
                           <Text style={styles.localizacaoText}>
                             📍 Local Customizada
                           </Text>
                         )}
-                        {/* --------------------------------------------- */}
                       </View>
                       <View style={styles.buttonColumn}>
                         <Button
@@ -833,7 +922,6 @@ export default function CadastroProduto() {
           </KeyboardAvoidingView>
         )}
 
-        {/* 🆕 CHAMA O MODAL DO MAPA */}
         <LocalizacaoModal
           isVisible={modalMapaVisivel}
           onClose={() => setModalMapaVisivel(false)}
@@ -942,15 +1030,16 @@ const styles = StyleSheet.create({
   listItemTextBold: {
     fontWeight: "bold",
     marginBottom: 5,
+    fontSize: 12,
   },
   listItemText: {
-    marginBottom: 3,
+    marginBottom: 1,
+    fontSize: 10,
   },
-  // 🆕 ESTILO PARA EXIBIR LOCALIZAÇÃO NA LISTA
   localizacaoText: {
-    fontSize: 12,
+    fontSize: 10,
     color: "#007BFF",
-    marginTop: 5,
+    marginTop: 2,
     fontWeight: 'bold',
   },
   buttonColumn: {
@@ -1109,7 +1198,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // 🆕 ESTILOS DO BOTÃO DE LOCALIZAÇÃO
   localizacaoBotao: {
     backgroundColor: "#007BFF",
     padding: 10,
@@ -1123,5 +1211,32 @@ const styles = StyleSheet.create({
   localizacaoBotaoTexto: {
     color: "white",
     fontWeight: "bold",
+  },
+  // ✅ NOVOS ESTILOS PARA OS BOTÕES DE FILTRO
+  filterContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+    gap: 5,
+  },
+  filterButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#007BFF',
+    borderRadius: 20,
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  filterButtonActive: {
+    backgroundColor: '#007BFF',
+  },
+  filterText: {
+    color: '#007BFF',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  filterTextActive: {
+    color: '#fff',
   },
 });

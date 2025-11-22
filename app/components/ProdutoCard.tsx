@@ -20,6 +20,8 @@ interface ProdutoComEmpresa {
     longitudeProduto?: number;
     localizacaoDiferente?: boolean;
     dataFinalOferta?: string;
+    // ✅ ADICIONADO: Campo opcional para controle de estoque
+    enquantoDurarEstoque?: boolean;
     destaque?: boolean;
     categoria?: string;
     isAd?: boolean;
@@ -162,13 +164,13 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
             </View>
 
             {/* DESCRIÇÃO EXPANSÍVEL */}
-            <TouchableOpacity 
+            <TouchableOpacity
                 onPress={() => setExpandidoDescricao(!expandidoDescricao)}
                 activeOpacity={0.7}
                 style={{ width: '100%', paddingHorizontal: 5 }}
             >
-                <Text 
-                    style={styles.descricao} 
+                <Text
+                    style={styles.descricao}
                     numberOfLines={expandidoDescricao ? undefined : 1}
                 >
                     {produto.descricao}
@@ -188,9 +190,6 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
                         maximumFractionDigits: 2,
                     })}
             </Text>
-            <Text style={styles.dataOferta}>
-                Oferta válida até: {produto.dataFinalOferta}
-            </Text>
             {distancia !== null && (
                 <Text style={styles.distancia}>
                     Distância: {distancia.toFixed(2)} km
@@ -199,10 +198,10 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
 
             {/* EMPRESA CONTAINER (ACORDEÃO) */}
             <View style={styles.empresaContainer}>
-                
+
                 {/* HEADER CLICÁVEL: Texto + Icone na mesma linha */}
-                <TouchableOpacity 
-                    style={styles.headerEmpresaClickable} 
+                <TouchableOpacity
+                    style={styles.headerEmpresaClickable}
                     onPress={() => setExpandidoEmpresa(!expandidoEmpresa)}
                     activeOpacity={0.6}
                 >
@@ -210,11 +209,11 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
                         <Text style={styles.confiraOferta}>
                             Confira a oferta direto na empresa:
                         </Text>
-                        <Feather 
-                            name={expandidoEmpresa ? "chevron-up" : "chevron-down"} 
-                            size={18} 
-                            color="#555" 
-                            style={{ marginLeft: 2, marginTop: 2 }}
+                        <Feather
+                            name={expandidoEmpresa ? "chevron-up" : "chevron-down"}
+                            size={20}
+                            color="#555"
+                            style={{ marginLeft: 4, marginTop: 2 }}
                         />
                     </View>
                 </TouchableOpacity>
@@ -223,6 +222,17 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
                 {expandidoEmpresa && (
                     <>
                         <Text style={styles.nomeEmpresa}>{empresaInfo?.nomeEmpresa}</Text>
+                        
+                        <Text style={styles.dataOferta}>
+                            Oferta válida até: {produto.dataFinalOferta}
+                        </Text>
+
+                        {/* ✅ INSERÇÃO DA INFORMAÇÃO DE ESTOQUE AQUI */}
+                        {produto.enquantoDurarEstoque && (
+                            <Text style={styles.estoqueText}>
+                                Ou enquanto durar o estoque
+                            </Text>
+                        )}
 
                         <View style={styles.botoesAcaoLinha}>
                             {empresaInfo?.instagram && (
@@ -311,9 +321,7 @@ const styles = StyleSheet.create({
         fontSize: 13,
         fontWeight: "bold",
         textAlign: "center",
-        marginBottom: 2,
-        borderRadius: 5,
-        padding: 2,
+        paddingTop: 2,
     },
     preco: {
         fontSize: 20,
@@ -323,10 +331,18 @@ const styles = StyleSheet.create({
         marginBottom: 2,
     },
     dataOferta: {
-        fontSize: 12,
+        fontSize: 11,
         color: "#888",
-        marginBottom: 2,
+        marginBottom: 2, // Diminuí um pouco a margem pois pode vir o texto de estoque abaixo
         textAlign: "center",
+    },
+    // ✅ NOVO ESTILO PARA O TEXTO DE ESTOQUE
+    estoqueText: {
+        fontSize: 11,
+        color: "#e67e22", // Laranja alerta
+        fontWeight: "bold",
+        textAlign: "center",
+        marginBottom: 5,
     },
     distancia: {
         fontSize: 12,
@@ -350,13 +366,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    
+
     // --- ESTILOS DO CONTAINER DA EMPRESA ---
     empresaContainer: {
         width: "100%",
         backgroundColor: "#f7f7f7",
         borderRadius: 8,
-        paddingVertical: 4, 
+        paddingVertical: 4,
         paddingHorizontal: 2,
         marginTop: 2,
         alignItems: "center",
@@ -365,20 +381,21 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%',
-        paddingVertical: 4, // Área de toque um pouco melhor
+        paddingVertical: 4,
     },
     linhaTituloEmpresa: {
-        flexDirection: 'row', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        flexWrap: 'wrap', // Permite quebra de linha mantendo ícone perto
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: '100%',
         paddingHorizontal: 4
     },
     confiraOferta: {
-        fontSize: 12, 
+        fontSize: 12,
         color: "#555",
         fontWeight: "bold",
         textAlign: "center",
+        flexShrink: 1
     },
     nomeEmpresa: {
         fontSize: 12,
