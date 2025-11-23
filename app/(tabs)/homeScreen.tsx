@@ -367,15 +367,50 @@ export default function HomeScreen() {
   const tituloDaLista = termoBusca.length >= 3 || categoriaSelecionada ? `Resultados da busca (${categoriaSelecionada})` : "Produtos em Destaque";
 
   const produtosOrdenados = [...produtosParaExibir].sort((a, b) => {
-    if (!ordenacaoManual && termoBusca.length < 3 && !categoriaSelecionada) return (a.ordemAleatoria || 0) - (b.ordemAleatoria || 0);
-    const getPreco = (p: ProdutoComEmpresa) => parseFloat(p.preco.replace("R$", "").replace(",", ".").replace(/\./g, ""));
+    // 1. Se for ordenação aleatória inicial (sem busca e sem categoria)
+    if (!ordenacaoManual && termoBusca.length < 3 && !categoriaSelecionada) {
+      return (a.ordemAleatoria || 0) - (b.ordemAleatoria || 0);
+    }
+
+    // 2. Helpers para pegar os valores limpos
+    const getPreco = (p: ProdutoComEmpresa) => {
+      // CORREÇÃO DE PARSE: Remove R$, depois remove PONTOS de milhar, depois troca VÍRGULA por PONTO decimal
+      const valorLimpo = p.preco.replace("R$", "").replace(/\./g, "").replace(",", ".");
+      return parseFloat(valorLimpo.trim());
+    };
+
     const getDist = (p: ProdutoComEmpresa) => {
       const loc = getProdutoLocation(p);
+      // Se não tiver location do user ou do produto, joga para o final (Infinity)
       return (userLocation && loc) ? (calcularDistancia(userLocation, loc) ?? Infinity) : Infinity;
     };
-    if (ordenarPorPreco) return getPreco(a) - getPreco(b);
-    const diff = getDist(a) - getDist(b);
-    return Math.abs(diff) < 0.001 ? getPreco(a) - getPreco(b) : diff;
+
+    const precoA = getPreco(a);
+    const precoB = getPreco(b);
+    const distA = getDist(a);
+    const distB = getDist(b);
+
+    // 3. Lógica de Ordenação com Desempate
+    if (ordenarPorPreco) {
+      // PRIMÁRIO: Menor Preço
+      if (precoA !== precoB) {
+        return precoA - precoB;
+      }
+      // SECUNDÁRIO (Desempate): Menor Distância
+      return distA - distB;
+    } else {
+      // PRIMÁRIO: Menor Distância
+      // Usamos uma pequena margem de erro para floats, mas geralmente a subtração direta funciona
+      const diffDist = distA - distB;
+      
+      // Se a diferença de distância for significativa (maior que 5 metros, ex: 0.005km), ordena por distância
+      if (Math.abs(diffDist) > 0.005) {
+        return diffDist;
+      }
+      
+      // SECUNDÁRIO (Desempate): Se estiverem na "mesma" distância, ordena pelo Menor Preço
+      return precoA - precoB;
+    }
   });
 
   const produtosFinal = [];
