@@ -31,6 +31,7 @@ import {
 import { auth, database } from "../../firebaseConfig";
 import AdBanner from "../components/AdBanner";
 import { Feather } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker"; // ✅ IMPORTADO
 
 import LocalizacaoModal from "../components/LocalizacaoModal";
 
@@ -69,25 +70,20 @@ const formatarData = (text: string) => {
   return formattedDate.substring(0, 10);
 };
 
-// ✅ FUNÇÃO NOVA PARA VERIFICAR SE VENCEU
 const isOfertaVencida = (dataString?: string) => {
   if (!dataString) return false;
   
   const parts = dataString.split('/');
   if (parts.length !== 3) return false;
   
-  // DD/MM/AAAA -> Date(AAAA, MM-1, DD)
   const dia = parseInt(parts[0], 10);
   const mes = parseInt(parts[1], 10) - 1;
   const ano = parseInt(parts[2], 10);
   
   const dataOferta = new Date(ano, mes, dia);
-  
-  // Zera a hora de hoje para comparar apenas a data
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
 
-  // Se data da oferta for menor que hoje, venceu
   return dataOferta < hoje;
 };
 
@@ -140,15 +136,13 @@ export default function CadastroProduto() {
   const [descricao, setDescricao] = useState("");
   const [preco, setPreco] = useState("");
   const [palavrasChave, setPalavrasChave] = useState("");
-  const [categoriasSelecionadas, setCategoriasSelecionadas] = useState<string[]>(
-    []
-  );
-  const [dataFinalOferta, setDataFinalOferta] = useState(
-    getThirtyDaysFromNow()
-  );
+  const [categoriasSelecionadas, setCategoriasSelecionadas] = useState<string[]>([]);
+  const [dataFinalOferta, setDataFinalOferta] = useState(getThirtyDaysFromNow());
   
-  const [enquantoDurarEstoque, setEnquantoDurarEstoque] = useState(false);
+  // ✅ NOVO ESTADO PARA CONTROLAR O CALENDÁRIO
+  const [showDatePicker, setShowDatePicker] = useState(false);
 
+  const [enquantoDurarEstoque, setEnquantoDurarEstoque] = useState(false);
   const [destaque, setDestaque] = useState(false);
   const [editavel, setEditavel] = useState(false);
   const [imagemUrl, setImagemUrl] = useState<string | undefined>();
@@ -162,17 +156,11 @@ export default function CadastroProduto() {
 
   const [loadingUpload, setLoadingUpload] = useState(false);
   const [termoBusca, setTermoBusca] = useState("");
-  
-  // ✅ NOVO ESTADO DE FILTRO
   const [filtroData, setFiltroData] = useState<'todos' | 'vencidos' | 'em_dia'>('todos');
 
   const [editandoId, setEditandoId] = useState<string | null>(null);
-  const [produtosDisponiveis, setProdutosDisponiveis] = useState<number | null>(
-    null
-  );
-  const [destaquesDisponiveis, setDestaquesDisponiveis] = useState<
-    number | null
-  >(null);
+  const [produtosDisponiveis, setProdutosDisponiveis] = useState<number | null>(null);
+  const [destaquesDisponiveis, setDestaquesDisponiveis] = useState<number | null>(null);
   const [loadingCompanyData, setLoadingCompanyData] = useState(true);
   const [mostrarLista, setMostrarLista] = useState(false);
 
@@ -248,6 +236,30 @@ export default function CadastroProduto() {
     ];
     setPalavrasChave(allPalavrasChave.join(", "));
   }, [categoriasSelecionadas]);
+
+  // ✅ CONVERTER STRING 'DD/MM/AAAA' PARA OBJETO DATE (Para o picker abrir na data certa)
+  const getDateObject = (dateString: string) => {
+    if (!dateString || dateString.length !== 10) return new Date();
+    const parts = dateString.split('/');
+    const dia = parseInt(parts[0], 10);
+    const mes = parseInt(parts[1], 10) - 1;
+    const ano = parseInt(parts[2], 10);
+    return new Date(ano, mes, dia);
+  };
+
+  // ✅ FUNÇÃO CHAMADA AO ESCOLHER A DATA NO CALENDÁRIO
+  const onChangeDatePicker = (event: any, selectedDate?: Date) => {
+    setShowDatePicker(Platform.OS === 'ios'); // No iOS pode manter aberto, no Android fecha
+    if (event.type === "set" && selectedDate) {
+        setShowDatePicker(false);
+        const dia = String(selectedDate.getDate()).padStart(2, "0");
+        const mes = String(selectedDate.getMonth() + 1).padStart(2, "0");
+        const ano = selectedDate.getFullYear();
+        setDataFinalOferta(`${dia}/${mes}/${ano}`);
+    } else if (event.type === "dismissed") {
+        setShowDatePicker(false);
+    }
+  };
 
   const salvarProduto = async () => {
     if (!descricao.trim()) {
@@ -498,9 +510,7 @@ export default function CadastroProduto() {
     }
   };
 
-  // ✅ LÓGICA DE FILTRO ATUALIZADA
   const produtosFiltrados = produtos.filter((p) => {
-    // 1. Busca por texto
     let correspondeBusca = true;
     if (termoBusca.length >= 3) {
         const termo = termoBusca.toLowerCase();
@@ -510,7 +520,6 @@ export default function CadastroProduto() {
         );
     }
 
-    // 2. Filtro por data
     let correspondeFiltroData = true;
     const estaVencida = isOfertaVencida(p.dataFinalOferta);
 
@@ -639,22 +648,43 @@ export default function CadastroProduto() {
               }}
               onFocus={() => scrollToInput(precoY)}
             />
-            <Text>Data Final da Oferta</Text>
-            <TextInput
-              value={dataFinalOferta}
-              onChangeText={(text) => setDataFinalOferta(formatarData(text))}
-              placeholder="DD/MM/AAAA"
-              keyboardType="numeric"
-              style={styles.input}
-              maxLength={10}
-              accessibilityLabel="Campo para inserir a data final da oferta"
-              onLayout={(event) => {
-                setDataFinalOfertaY(event.nativeEvent.layout.y);
-              }}
-              onFocus={() => scrollToInput(dataFinalOfertaY)}
-            />
 
-            <View style={styles.switchContainer}>
+            {/* ✅ BLOCO DE DATA COM CALENDÁRIO ATUALIZADO */}
+            <Text>Data Final da Oferta</Text>
+            <View style={styles.dateInputContainer}>
+                <TextInput
+                    value={dataFinalOferta}
+                    onChangeText={(text) => setDataFinalOferta(formatarData(text))}
+                    placeholder="DD/MM/AAAA"
+                    keyboardType="numeric"
+                    style={[styles.input, { flex: 1, marginBottom: 0 }]} // flex 1 para ocupar espaço e sem margem bottom interna
+                    maxLength={10}
+                    accessibilityLabel="Campo para inserir a data final da oferta"
+                    onLayout={(event) => {
+                        setDataFinalOfertaY(event.nativeEvent.layout.y);
+                    }}
+                    onFocus={() => scrollToInput(dataFinalOfertaY)}
+                />
+                <TouchableOpacity 
+                    style={styles.calendarButton} 
+                    onPress={() => setShowDatePicker(true)}
+                >
+                    <Feather name="calendar" size={24} color="#007BFF" />
+                </TouchableOpacity>
+            </View>
+            
+            {showDatePicker && (
+                <DateTimePicker
+                    value={getDateObject(dataFinalOferta)}
+                    mode="date"
+                    display="default"
+                    onChange={onChangeDatePicker}
+                    minimumDate={new Date()} // Não permite datas passadas
+                />
+            )}
+            {/* ------------------------------------------- */}
+
+            <View style={[styles.switchContainer, {marginTop: 10}]}>
               <Text style={styles.switchLabel}>Enquanto durar o estoque</Text>
               <Switch
                 trackColor={{ false: "#767577", true: "#81b0ff" }}
@@ -810,7 +840,6 @@ export default function CadastroProduto() {
                 accessibilityLabel="Campo para buscar produtos cadastrados"
               />
 
-              {/* ✅ BOTÕES DE FILTRO */}
               <View style={styles.filterContainer}>
                 <TouchableOpacity 
                   style={[styles.filterButton, filtroData === 'todos' && styles.filterButtonActive]}
@@ -833,7 +862,6 @@ export default function CadastroProduto() {
                   <Text style={[styles.filterText, filtroData === 'vencidos' && styles.filterTextActive]}>Vencidos</Text>
                 </TouchableOpacity>
               </View>
-              {/* --------------------- */}
 
               <Text style={styles.sectionTitle}>
                 Produtos Cadastrados ({produtos.length}{" "}
@@ -863,7 +891,6 @@ export default function CadastroProduto() {
                           </Text>
                         )}
                         
-                        {/* Exibir se está vencido na lista para fácil identificação */}
                         {isOfertaVencida(item.dataFinalOferta) ? (
                             <Text style={[styles.listItemText, {color: 'red', fontWeight: 'bold'}]}>
                                 Oferta Vencida: {item.dataFinalOferta}
@@ -884,7 +911,7 @@ export default function CadastroProduto() {
                         
                         {item.enquantoDurarEstoque && (
                           <Text style={[styles.listItemText, {color: '#e67e22', fontSize: 12, fontWeight: 'bold'}]}>
-                             ⚠️ Enquanto durar o estoque
+                              ⚠️ Enquanto durar o estoque
                           </Text>
                         )}
                         
@@ -1003,6 +1030,23 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     backgroundColor: "#fff",
   },
+  // ✅ ESTILOS NOVOS PARA O INPUT DE DATA + BOTÃO
+  dateInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    gap: 10,
+  },
+  calendarButton: {
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // ----------------------------------------
   sectionTitle: {
     fontSize: 20,
     fontWeight: "bold",
@@ -1212,7 +1256,6 @@ const styles = StyleSheet.create({
     color: "white",
     fontWeight: "bold",
   },
-  // ✅ NOVOS ESTILOS PARA OS BOTÕES DE FILTRO
   filterContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',

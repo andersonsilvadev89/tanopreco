@@ -1,97 +1,119 @@
+import React, { useEffect, useState } from "react";
+import { ActivityIndicator, View, Text, Alert } from "react-native";
 import { Redirect } from "expo-router";
 import { useAuth } from "../context/AuthContext";
-import { ActivityIndicator, View, Text, Alert } from "react-native";
-import React, { useEffect, useState } from "react";
+import mobileAds from "react-native-google-mobile-ads";
 import * as Updates from "expo-updates";
-import mobileAds from 'react-native-google-mobile-ads';
+
+import { useVersionCheck } from "../hooks/useVersionCheck";
+import { UpdateModal } from "./components/UpdateModal";
+
+// URL DO ARQUIVO VERSION.JSON
+const VERSION_URL =
+  "https://gist.githubusercontent.com/andersonsilvadev89/d3743d2069886848e83b9d1a6c97c21b/raw/version.json";
 
 export default function Index() {
   const { user, loading } = useAuth();
+
+  const { needsUpdate, forceUpdate, message, redirectToStore } =
+    useVersionCheck(VERSION_URL);
+
   const [isUpdating, setIsUpdating] = useState(false);
 
+  // ---------------------------------------------------------
+  // 1. Inicialização do Google Mobile Ads
+  // ---------------------------------------------------------
   useEffect(() => {
-    // ------------------------------------------
-    // 1. INICIALIZAÇÃO DO GOOGLE MOBILE ADS SDK
-    // ------------------------------------------
-    console.log("Inicializando Google Mobile Ads SDK...");
     mobileAds()
       .initialize()
-      .then(() => {
-        console.log('Mobile Ads SDK inicializado com sucesso.');
-      })
-      .catch(error => {
-        console.error("Erro ao inicializar Google Mobile Ads SDK:", error);
-      });
-    // ------------------------------------------
-
-    // ------------------------------------------
-    // 2. LÓGICA DE VERIFICAÇÃO DE UPDATES OTA
-    // ------------------------------------------
-    async function checkForUpdates() {
-      if (!__DEV__) {
-        try {
-          console.log("Verificando atualizações OTA...");
-          console.log("Runtime Version:", Updates.runtimeVersion);
-          console.log("Canal de atualização:", Updates.channel || "indefinido");
-
-          setIsUpdating(true);
-          const update = await Updates.checkForUpdateAsync();
-
-          if (update.isAvailable) {
-            console.log("⬇Baixando atualização...");
-            await Updates.fetchUpdateAsync();
-            Alert.alert(
-              "Atualização Importante",
-              "Uma nova versão do aplicativo foi baixada. O app será fechado e você precisará abri-lo novamente para aplicar as mudanças. Toque em OK para continuar.",
-              [
-                {
-                  text: "OK",
-                  onPress: async () => {
-                    console.log("Atualização baixada com sucesso. Recarregando o app...");
-                    await Updates.reloadAsync();
-                  },
-                },
-              ],
-              { cancelable: false }
-            );
-          }
-        } catch (error: any) {
-          console.error("Erro ao verificar/baixar atualização OTA:", error?.message || error);
-        } finally {
-          setIsUpdating(false);
-        }
-      } else {
-        console.log("Ambiente de desenvolvimento. Ignorando updates OTA.");
-        setIsUpdating(false); // Garante que saia do estado de loading
-      }
-    }
-    // ------------------------------------------
-
-    // ------------------------------------------
-    // 3. LÓGICA DE CARREGAMENTO DO DEVICE ID
-    // ------------------------------------------
-    async function initializeApp() {
-      await checkForUpdates();
-    }
-
-    initializeApp();
+      .then(() => console.log("Google Mobile Ads inicializado."))
+      .catch((error) =>
+        console.error("Erro ao inicializar Google Mobile Ads SDK:", error)
+      );
   }, []);
 
-  // 1. Carregamento do contexto de autenticação (`loading`)
-  // 2. Verificação/Download de atualizações OTA (`isUpdating`)
+  // ---------------------------------------------------------
+  // 2. Verificação de atualizações OTA (Expo Updates)
+  // ---------------------------------------------------------
+  useEffect(() => {
+    async function checkOTA() {
+      if (__DEV__) {
+        console.log("Dev mode → OTA ignorado.");
+        return setIsUpdating(false);
+      }
+
+      try {
+        setIsUpdating(true);
+
+        const update = await Updates.checkForUpdateAsync();
+
+        if (update.isAvailable) {
+          await Updates.fetchUpdateAsync();
+
+          Alert.alert(
+            "Atualização disponível",
+            "Uma nova versão foi baixada. Clique em OK para reiniciar.",
+            [
+              {
+                text: "OK",
+                onPress: async () => {
+                  await Updates.reloadAsync();
+                },
+              },
+            ],
+            { cancelable: false }
+          );
+        }
+      } catch (error) {
+        console.log("Erro verificando OTA:", error);
+      } finally {
+        setIsUpdating(false);
+      }
+    }
+
+    checkOTA();
+  }, []);
+
+  // ---------------------------------------------------------
+  // 3. Loading → Auth ou OTA
+  // ---------------------------------------------------------
   if (loading || isUpdating) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
-        {isUpdating && <Text style={{ marginTop: 10, color: 'gray' }}>Verificando atualizações...</Text>}
-        {loading && <Text style={{ marginTop: 10, color: 'gray' }}>Carregando dados do usuário...</Text>}
-        {!isUpdating && !loading && (
-          <Text style={{ marginTop: 10, color: 'gray' }}>Preparando aplicativo...</Text>
+
+        {isUpdating && (
+          <Text style={{ marginTop: 10, color: "gray" }}>
+            Verificando atualizações...
+          </Text>
+        )}
+
+        {loading && (
+          <Text style={{ marginTop: 10, color: "gray" }}>
+            Carregando dados do usuário...
+          </Text>
         )}
       </View>
     );
   }
 
+  // ---------------------------------------------------------
+  // 4. Modal de atualização obrigatória ou recomendada
+  // ---------------------------------------------------------
+  if (needsUpdate) {
+    return (
+      <UpdateModal
+        visible
+        message={message}
+        forceUpdate={forceUpdate}
+        onUpdate={redirectToStore}
+      />
+    );
+  }
+
+  // ---------------------------------------------------------
+  // 5. Fluxo normal de navegação
+  // ---------------------------------------------------------
   if (!user) {
     return <Redirect href="/(tabs)/homeScreen" />;
   }
