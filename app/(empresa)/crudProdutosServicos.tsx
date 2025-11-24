@@ -651,23 +651,33 @@ export default function CadastroProduto() {
 
             {/* ✅ BLOCO DE DATA COM CALENDÁRIO ATUALIZADO */}
             <Text>Data Final da Oferta</Text>
-            <View style={styles.dateInputContainer}>
+            <View 
+                style={styles.dateInputContainer}
+                // 1. Movemos o onLayout para a View pai para pegar a posição correta na tela
+                onLayout={(event) => {
+                    setDataFinalOfertaY(event.nativeEvent.layout.y);
+                }}
+            >
                 <TextInput
                     value={dataFinalOferta}
                     onChangeText={(text) => setDataFinalOferta(formatarData(text))}
                     placeholder="DD/MM/AAAA"
                     keyboardType="numeric"
-                    style={[styles.input, { flex: 1, marginBottom: 0 }]} // flex 1 para ocupar espaço e sem margem bottom interna
+                    style={[styles.input, { flex: 1, marginBottom: 0 }]}
                     maxLength={10}
                     accessibilityLabel="Campo para inserir a data final da oferta"
-                    onLayout={(event) => {
-                        setDataFinalOfertaY(event.nativeEvent.layout.y);
-                    }}
+                    // Mantemos o onFocus no input para caso o usuário clique no texto
                     onFocus={() => scrollToInput(dataFinalOfertaY)}
                 />
                 <TouchableOpacity 
                     style={styles.calendarButton} 
-                    onPress={() => setShowDatePicker(true)}
+                    onPress={() => {
+                        // 2. Chamamos o scroll também ao clicar no botão do calendário
+                        scrollToInput(dataFinalOfertaY);
+                        // Opcional: Fecha o teclado se estiver aberto para focar no calendário
+                        Keyboard.dismiss(); 
+                        setShowDatePicker(true);
+                    }}
                 >
                     <Feather name="calendar" size={24} color="#007BFF" />
                 </TouchableOpacity>
@@ -675,11 +685,11 @@ export default function CadastroProduto() {
             
             {showDatePicker && (
                 <DateTimePicker
-                    value={getDateObject(dataFinalOferta)}
+                    value={new Date()}
                     mode="date"
                     display="default"
                     onChange={onChangeDatePicker}
-                    minimumDate={new Date()} // Não permite datas passadas
+                    minimumDate={new Date()}
                 />
             )}
             {/* ------------------------------------------- */}

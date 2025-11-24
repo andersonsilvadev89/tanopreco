@@ -364,7 +364,7 @@ export default function HomeScreen() {
   });
 
   const produtosParaExibir = termoBusca.length >= 3 || categoriaSelecionada ? produtosValidos : produtosValidos.filter(p => p.destaque);
-  const tituloDaLista = termoBusca.length >= 3 || categoriaSelecionada ? `Resultados da busca (${categoriaSelecionada})` : "Produtos em Destaque";
+  const tituloDaLista = (termoBusca.length >= 3 && categoriaSelecionada) || (!(termoBusca.length >= 3) && categoriaSelecionada) ? `Resultados da busca (${categoriaSelecionada})` : termoBusca.length >= 3 && categoriaSelecionada === null ? `Resultados da busca`: "Produtos em Destaque";
 
   const produtosOrdenados = [...produtosParaExibir].sort((a, b) => {
     // 1. Se for ordenação aleatória inicial (sem busca e sem categoria)
