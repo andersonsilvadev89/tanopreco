@@ -106,6 +106,7 @@ const categorias = [
   "Móveis",
   "Kids",
   "Imóveis",
+  "Construção",
   "Autos",
   "Mercado",
   "Utilidades",
@@ -983,7 +984,6 @@ const styles = StyleSheet.create({
   },
   scrollViewContent: {
     padding: 15,
-    paddingBottom: 80,
   },
   formContainer: {
     backgroundColor: "rgba(255, 255, 255, 0.9)",

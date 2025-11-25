@@ -1,8 +1,0 @@
-Metas para geração de build manual:
-
-<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID"
-    android:value="ca-app-pub-5241782827769638~1347375952"
-    tools:replace="replace" />
-    <meta-data android:name="com.google.android.gms.ads.DELAY_APP_MEASUREMENT_INIT"
-    android:value="true"
-    tools:replace="android:value" />

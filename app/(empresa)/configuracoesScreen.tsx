@@ -20,7 +20,6 @@ import { useNavigation } from '@react-navigation/native';
 
 import AdBanner from '../components/AdBanner';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
-import { checkAndDownloadImages } from '../../utils/imageManager';
 import LocalizacaoModal from '../components/LocalizacaoModal';
 
 const defaultFundoLocal = require('../../assets/images/fundo.png');
@@ -221,7 +220,7 @@ const ConfiguracoesEmpresaScreen = () => {
                 nome,
                 nomeEmpresa,
                 palavrasChave,
-                telefoneContato: telefone || null,
+                telefone: telefone || null,
                 emailContato: email || null,
                 instagram: processedInstagram,
                 imagem: finalImageUrl,
