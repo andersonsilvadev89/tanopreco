@@ -94,16 +94,21 @@ const AdBanner = () => {
 
 const styles = StyleSheet.create({
     container: {
+        width: '95%',
         alignItems: 'center', 
-        marginVertical: 1, 
+        alignSelf: 'center',
+        marginVertical: 5,
         minHeight: BANNER_HEIGHT,
-        marginTop: Platform.OS === 'ios' ? 40 : 0,
+        borderRadius: 12,
+        overflow: 'hidden',
     },
     // Novo estilo: Container para o Banner Ad
     adWrapper: {
         width: '100%',
         alignItems: 'center',
         justifyContent: 'center',
+        borderRadius: 12,
+        overflow: 'hidden',
     },
     // Estilo para esconder o AD WRAPPER e, consequentemente, o BannerAd
     hiddenAdWrapper: {
@@ -117,6 +122,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: '#f0f0f0',
+        borderRadius: 12,
+        overflow: 'hidden',
     },
     placeholderImage: {
         width: '100%',

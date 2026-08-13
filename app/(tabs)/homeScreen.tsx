@@ -15,10 +15,9 @@ import {
   ScrollView,
   Dimensions,
   Modal,
-  LayoutAnimation,
-  UIManager,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { database, auth } from "../../firebaseConfig";
 import { ref, onValue, set, get, update, increment } from "firebase/database";
 import { signOut } from "firebase/auth";
@@ -35,12 +34,6 @@ import { AppHeader } from "../components/shell/AppHeader";
 import { DrawerMenu } from "../components/shell/DrawerMenu";
 import { BRAND_COLORS } from "@/constants/BrandColors";
 
-if (Platform.OS === 'android') {
-  if (UIManager.setLayoutAnimationEnabledExperimental) {
-    UIManager.setLayoutAnimationEnabledExperimental(true);
-  }
-}
-
 // ----------------------------------------------------
 // 1. CONSTANTES E CONFIGURAÇÕES
 // ----------------------------------------------------
@@ -51,9 +44,6 @@ const { width } = Dimensions.get("window");
 const CARD_MARGIN = 8;
 const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2;
 const CARD_MIN_HEIGHT = 300;
-
-// 💡 IMPORTANTE: 4 categorias + 1 botão "Mais" = 5 itens na linha
-const CATEGORIAS_INICIAIS = 4;
 
 interface ProdutoComEmpresa {
   id: string;
@@ -195,9 +185,15 @@ export default function HomeScreen() {
   const [ordenarPorPreco, setOrdenarPorPreco] = useState(true);
   const [loadingInicial, setLoadingInicial] = useState(true);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number; } | null>(null);
-  const [expandirCategorias, setExpandirCategorias] = useState(false);
+  const [mostrarFiltrosManual, setMostrarFiltrosManual] = useState(true);
+  const [painelFiltroForaDaTela, setPainelFiltroForaDaTela] = useState(false);
+  const [alturaPainelFiltro, setAlturaPainelFiltro] = useState(0);
   const [drawerMenuVisible, setDrawerMenuVisible] = useState(false);
   const [mostrarMapa, setMostrarMapa] = useState(false);
+  const [mostrarDicaEsquerda, setMostrarDicaEsquerda] = useState(false);
+  const [mostrarDicaDireita, setMostrarDicaDireita] = useState(false);
+  const [larguraViewportCategorias, setLarguraViewportCategorias] = useState(0);
+  const [larguraConteudoCategorias, setLarguraConteudoCategorias] = useState(0);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [mapRegion, setMapRegion] = useState<Region>({
     latitude: -7.2345, longitude: -39.4056, latitudeDelta: 0.0922, longitudeDelta: 0.0421,
@@ -206,11 +202,24 @@ export default function HomeScreen() {
   const [imagemModalVisivel, setImagemModalVisivel] = useState(false);
   const [imagemModalUrl, setImagemModalUrl] = useState<string | null>(null);
   const mapRef = useRef<MapView>(null);
+  const listaRef = useRef<FlatList<ProdutoComEmpresa>>(null);
+  const categoriasScrollXRef = useRef(0);
+  const painelFiltroForaDaTelaRef = useRef(false);
+  const filtrosVisiveis = mostrarFiltrosManual;
+  const mostrarBotaoFiltro = !filtrosVisiveis || painelFiltroForaDaTela;
 
-  const toggleCategorias = () => {
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
-    setExpandirCategorias(!expandirCategorias);
-  };
+  const atualizarDicasCategorias = useCallback((scrollX: number, contentWidth: number, viewportWidth: number) => {
+    const temOverflow = contentWidth > viewportWidth + 1;
+
+    if (!temOverflow) {
+      setMostrarDicaEsquerda(false);
+      setMostrarDicaDireita(false);
+      return;
+    }
+
+    setMostrarDicaEsquerda(scrollX > 8);
+    setMostrarDicaDireita(scrollX + viewportWidth < contentWidth - 8);
+  }, []);
 
   const handleImagePress = useCallback((url: string) => {
     setImagemModalUrl(url);
@@ -441,8 +450,6 @@ export default function HomeScreen() {
     return <ProdutoCard produto={item} empresaInfo={emp} userLocation={userLocation} deviceId={deviceId} votarProduto={votarProduto} handleVerNoMapa={handleVerNoMapa} openInstagramProfile={openInstagramProfile} openWhatsApp={openWhatsApp} onImagePress={handleImagePress} />;
   }, [empresas, userLocation, deviceId]);
 
-  const categoriasExibidas = expandirCategorias ? categorias : categorias.slice(0, CATEGORIAS_INICIAIS);
-
   const handleLogout = useCallback(async () => {
     try {
       await signOut(auth);
@@ -473,6 +480,36 @@ export default function HomeScreen() {
   const handleBuscaPorVoz = useCallback(() => {
     Alert.alert("Busca por voz", "Reconhecimento de voz em desenvolvimento.");
   }, []);
+
+  const handleBotaoFiltro = useCallback(() => {
+    // Se o painel existe mas saiu da tela, volta para o topo para exibir filtros novamente.
+    if (filtrosVisiveis && painelFiltroForaDaTela) {
+      setMostrarFiltrosManual(true);
+      listaRef.current?.scrollToOffset({ offset: 0, animated: true });
+      return;
+    }
+
+    setMostrarFiltrosManual((prev) => !prev);
+  }, [filtrosVisiveis, painelFiltroForaDaTela]);
+
+  const handleScrollLista = useCallback((event: any) => {
+    if (!filtrosVisiveis) {
+      if (!painelFiltroForaDaTelaRef.current) {
+        painelFiltroForaDaTelaRef.current = true;
+        setPainelFiltroForaDaTela(true);
+      }
+      return;
+    }
+
+    const offsetY = event.nativeEvent.contentOffset.y ?? 0;
+    const limiteSaida = Math.max(alturaPainelFiltro - 12, 24);
+    const foraDaTela = offsetY > limiteSaida;
+
+    if (foraDaTela !== painelFiltroForaDaTelaRef.current) {
+      painelFiltroForaDaTelaRef.current = foraDaTela;
+      setPainelFiltroForaDaTela(foraDaTela);
+    }
+  }, [filtrosVisiveis, alturaPainelFiltro]);
 
   const contadorOfertas = () =>{
     {/* --- NOVO: CONTADOR DE PRODUTOS CADASTRADOS --- */}
@@ -510,7 +547,6 @@ export default function HomeScreen() {
       <View style={styles.container}>
 
         <View style={styles.topBarContainer}>
-          {/* Busca */}
           <View style={styles.buscaOverlayContainer}>
             <View style={styles.buscaBar}>
               <View style={styles.buscaInputWrapper}>
@@ -531,68 +567,140 @@ export default function HomeScreen() {
               >
                 <Feather name="mic" size={18} color={BRAND_COLORS.primaryDark} />
               </TouchableOpacity>
-            </View>
-          </View>
 
-          {/* Ordenação */}
-          <View style={styles.ordenacaoContainer}>
-            <Text style={{ color: "#063494", fontWeight: "bold" }}>Ordenar por:</Text>
-            <Text style={[styles.ordenacaoText, !ordenarPorPreco && styles.ordenacaoTextActive]}>Proximidade</Text>
-            <Switch
-              value={ordenarPorPreco}
-              onValueChange={(v) => { setOrdenarPorPreco(v); setOrdenacaoManual(true); }}
-              thumbColor={BRAND_COLORS.white}
-              trackColor={{ false: BRAND_COLORS.border, true: BRAND_COLORS.border }}
-            />
-            <Text style={[styles.ordenacaoText, ordenarPorPreco && styles.ordenacaoTextActive]}>Menor Preço</Text>
-          </View>
-
-          {/* 💡 CATEGORIAS EM HORIZONTAL SCROLL */}
-          <View style={styles.categoriasContainer}>
-            <View style={styles.categoriasGrid}>
-
-              {categoriasExibidas.map((cat) => (
-                <View key={cat.nome} style={styles.categoriaItem}>
-                  <TouchableOpacity
-                    style={[styles.categoriaBotaoRedondo, categoriaSelecionada === cat.nome && styles.categoriaBotaoSelecionado]}
-                    onPress={() => setCategoriaSelecionada(cat.nome === categoriaSelecionada ? null : cat.nome)}
-                  >
-                    <Image source={categoriaImagens[cat.nome]} style={styles.categoriaImagem} resizeMode="contain" />
-                  </TouchableOpacity>
-                  <Text style={[styles.categoriaLegenda, categoriaSelecionada === cat.nome && { color: BRAND_COLORS.white, fontWeight: "bold" }]}>
-                    {cat.nome}
-                  </Text>
-                </View>
-              ))}
-
-              <View style={styles.categoriaItem}>
+              {mostrarBotaoFiltro && (
                 <TouchableOpacity
-                  style={[styles.categoriaBotaoRedondo, { backgroundColor: BRAND_COLORS.headerIconOverlay }]}
-                  onPress={toggleCategorias}
+                  style={[styles.botaoVoz, styles.botaoFiltros, filtrosVisiveis && styles.botaoFiltrosAtivo]}
+                  onPress={handleBotaoFiltro}
+                  activeOpacity={0.8}
                 >
-                  <Feather name={expandirCategorias ? "chevron-up" : "plus"} size={20} color={BRAND_COLORS.white} />
+                  <Feather
+                    name="sliders"
+                    size={18}
+                    color={filtrosVisiveis ? BRAND_COLORS.white : BRAND_COLORS.primaryDark}
+                  />
                 </TouchableOpacity>
-                <Text style={styles.categoriaLegenda}>{expandirCategorias ? "Menos" : "Mais"}</Text>
-              </View>
-
+              )}
             </View>
           </View>
 
-        </View>
-
-        <View style={styles.listTitleContainer}>
-          <Text style={styles.listTitle}>{tituloDaLista}</Text>
         </View>
 
         {loadingInicial ? <ActivityIndicator size="large" color={BRAND_COLORS.primary} style={{ marginTop: 30 }} /> :
           <FlatList
+            ref={listaRef}
             data={produtosFinal}
             keyExtractor={(item) => item.id + item.empresaId}
+            ListHeaderComponent={
+              <>
+                {filtrosVisiveis && (
+                  <View
+                    style={styles.filtrosPanel}
+                    onLayout={(event) => {
+                      const novaAltura = event.nativeEvent.layout.height;
+                      if (novaAltura !== alturaPainelFiltro) {
+                        setAlturaPainelFiltro(novaAltura);
+                      }
+                    }}
+                  >
+                    {/* Ordenação */}
+                    <View style={styles.ordenacaoContainer}>
+                      <Text style={{ color: "#063494", fontWeight: "bold" }}>Ordenar por:</Text>
+                      <Text style={[styles.ordenacaoText, !ordenarPorPreco && styles.ordenacaoTextActive]}>Proximidade</Text>
+                      <Switch
+                        value={ordenarPorPreco}
+                        onValueChange={(v) => { setOrdenarPorPreco(v); setOrdenacaoManual(true); }}
+                        thumbColor={BRAND_COLORS.white}
+                        trackColor={{ false: BRAND_COLORS.border, true: BRAND_COLORS.border }}
+                      />
+                      <Text style={[styles.ordenacaoText, ordenarPorPreco && styles.ordenacaoTextActive]}>Menor Preço</Text>
+                    </View>
+
+                    {/* Categorias */}
+                    <View style={styles.categoriasContainer}>
+                      <View style={styles.categoriasScrollWrapper}>
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          contentContainerStyle={styles.categoriasGrid}
+                          scrollEventThrottle={16}
+                          onScroll={(event) => {
+                            const scrollX = event.nativeEvent.contentOffset.x;
+                            categoriasScrollXRef.current = scrollX;
+                            atualizarDicasCategorias(scrollX, larguraConteudoCategorias, larguraViewportCategorias);
+                          }}
+                          onLayout={(event) => {
+                            const largura = event.nativeEvent.layout.width;
+                            setLarguraViewportCategorias(largura);
+                            atualizarDicasCategorias(categoriasScrollXRef.current, larguraConteudoCategorias, largura);
+                          }}
+                          onContentSizeChange={(contentWidth) => {
+                            setLarguraConteudoCategorias(contentWidth);
+                            atualizarDicasCategorias(categoriasScrollXRef.current, contentWidth, larguraViewportCategorias);
+                          }}
+                        >
+                          {categorias.map((cat) => (
+                            <View key={cat.nome} style={styles.categoriaItem}>
+                              <TouchableOpacity
+                                style={[styles.categoriaBotaoRedondo, categoriaSelecionada === cat.nome && styles.categoriaBotaoSelecionado]}
+                                onPress={() => setCategoriaSelecionada(cat.nome === categoriaSelecionada ? null : cat.nome)}
+                              >
+                                <Image source={categoriaImagens[cat.nome]} style={styles.categoriaImagem} resizeMode="contain" />
+                              </TouchableOpacity>
+                              <Text style={[styles.categoriaLegenda, categoriaSelecionada === cat.nome && styles.categoriaLegendaSelecionada]}>
+                                {cat.nome}
+                              </Text>
+                              {categoriaSelecionada === cat.nome && <View style={styles.categoriaSelecionadaIndicador} />}
+                            </View>
+                          ))}
+                        </ScrollView>
+
+                        {mostrarDicaEsquerda && (
+                          <View pointerEvents="none" style={[styles.categoriaHintSide, styles.categoriaHintLeft]}>
+                            <LinearGradient
+                              colors={["rgba(248, 250, 255, 0.96)", "rgba(248, 250, 255, 0)"]}
+                              start={{ x: 0, y: 0.5 }}
+                              end={{ x: 1, y: 0.5 }}
+                              style={styles.categoriaFade}
+                            />
+                            <View style={styles.categoriaArrowBubble}>
+                              <Feather name="chevron-left" size={14} color={BRAND_COLORS.primaryDark} />
+                            </View>
+                          </View>
+                        )}
+
+                        {mostrarDicaDireita && (
+                          <View pointerEvents="none" style={[styles.categoriaHintSide, styles.categoriaHintRight]}>
+                            <LinearGradient
+                              colors={["rgba(248, 250, 255, 0)", "rgba(248, 250, 255, 0.96)"]}
+                              start={{ x: 0, y: 0.5 }}
+                              end={{ x: 1, y: 0.5 }}
+                              style={styles.categoriaFade}
+                            />
+                            <View style={styles.categoriaArrowBubble}>
+                              <Feather name="chevron-right" size={14} color={BRAND_COLORS.primaryDark} />
+                            </View>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                )}
+
+                <AdBanner />
+
+                <View style={styles.listTitleContainer}>
+                  <Text style={styles.listTitle}>{tituloDaLista}</Text>
+                </View>
+              </>
+            }
             ListEmptyComponent={<Text style={styles.mensagemNenhumResultado}>Nenhum produto encontrado.</Text>}
             numColumns={2}
             columnWrapperStyle={styles.cardRow}
             renderItem={renderProdutoItem}
             style={styles.productList}
+            onScroll={handleScrollLista}
+            scrollEventThrottle={24}
           />
         }
 
@@ -620,8 +728,7 @@ export default function HomeScreen() {
         )}
 
       </View>
-      <AdBanner />
-      
+
     </View>
   );
 }
@@ -638,7 +745,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     paddingTop: 5,
-    paddingBottom: 50,
+    paddingBottom: 8,
     shadowColor: "transparent",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0,
@@ -684,7 +791,7 @@ const styles = StyleSheet.create({
     width: "95%",
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
+    marginTop: 5,
   },
   buscaInputWrapper: {
     flex: 1,
@@ -717,6 +824,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 2,
   },
+  botaoFiltros: {
+    marginLeft: 8,
+  },
+  botaoFiltrosAtivo: {
+    backgroundColor: BRAND_COLORS.primary,
+  },
+  filtrosPanel: {
+    backgroundColor: "rgba(255,255,255,0.88)",
+    borderRadius: 12,
+    marginHorizontal: 10,
+    paddingTop: 8,
+    paddingBottom: 10,
+  },
   ordenacaoContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -738,19 +858,22 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: 5,
   },
+  categoriasScrollWrapper: {
+    position: "relative",
+  },
   categoriasGrid: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: 4,
+    paddingHorizontal: 2,
     paddingBottom: 2,
-    gap: 6,
+    gap: 2,
   },
   categoriaItem: {
     alignItems: "center",
     justifyContent: "flex-start",
-    width: 60,
+    width: 52,
     marginBottom: 2,
-    marginHorizontal: 2,
+    marginHorizontal: 0,
   },
   categoriaBotaoRedondo: {
     width: 46,
@@ -759,13 +882,13 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.95)",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 2,
     elevation: 2,
   },
   categoriaBotaoSelecionado: {
-    backgroundColor: BRAND_COLORS.surface,
-    borderWidth: 3,
-    borderColor: BRAND_COLORS.white,
+    backgroundColor: "rgba(10, 79, 203, 0.16)",
+    borderWidth: 2,
+    borderColor: BRAND_COLORS.primaryDark,
   },
   categoriaImagem: {
     width: 28,
@@ -778,13 +901,56 @@ const styles = StyleSheet.create({
     textAlign: "center",
     lineHeight: 12,
   },
+  categoriaLegendaSelecionada: {
+    color: BRAND_COLORS.primaryDark,
+    fontWeight: "800",
+    backgroundColor: "rgba(10, 79, 203, 0.1)",
+    paddingHorizontal: 3,
+    borderRadius: 4,
+  },
+  categoriaSelecionadaIndicador: {
+    marginTop: 2,
+    width: 5,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: BRAND_COLORS.primaryDark,
+  },
+  categoriaHintSide: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 38,
+    justifyContent: "center",
+    zIndex: 4,
+  },
+  categoriaHintLeft: {
+    left: 0,
+    alignItems: "flex-start",
+  },
+  categoriaHintRight: {
+    right: 0,
+    alignItems: "flex-end",
+  },
+  categoriaFade: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  categoriaArrowBubble: {
+    marginHorizontal: 6,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
   // Outros estilos (mantidos)
   listTitleContainer: {
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginHorizontal: 10,
-    marginTop: 6,
     borderRadius: 10,
     backgroundColor: "rgba(255,255,255,0.92)",
   },
