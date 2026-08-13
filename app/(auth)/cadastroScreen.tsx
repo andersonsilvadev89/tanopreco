@@ -8,7 +8,6 @@ import {
   Text,
   StyleSheet,
   ActivityIndicator,
-  ImageBackground,
   TouchableOpacity,
   Linking,
 } from "react-native";
@@ -27,8 +26,7 @@ import { router } from "expo-router";
 import AdBanner from "../components/AdBanner";
 import CpfInput from "../components/CpfInput";
 import CnpjInput from "../components/CnpjInput";
-
-const defaultFundoLocal = require("../../assets/images/fundo.png");
+import { BRAND_COLORS } from "@/constants/BrandColors";
 
 // Constante para o nome do app que estamos buscando
 const TARGET_APP_NAME = "TaNoPreco";
@@ -273,6 +271,8 @@ export default function CadastroScreen() {
   };
 
   const cadastrarUsuario = async () => {
+    const normalizedEmail = email.trim().toLowerCase();
+
     if (!camposPreenchidos()) {
       setErro(
         "Preencha os campos obrigatórios: Nome da Empresa, Nome, Email, Senha e Confirmar Senha, CPF ou CNPJ e Palavras-chave."
@@ -318,7 +318,7 @@ export default function CadastroScreen() {
 
     try {
       // 1. Verificar Duplicidade no Firebase Auth (Email)
-      const methods = await fetchSignInMethodsForEmail(auth, email);
+      const methods = await fetchSignInMethodsForEmail(auth, normalizedEmail);
       if (methods.length > 0) {
         setErro("Email já cadastrado em outra conta.");
         setLoading(false);
@@ -345,7 +345,7 @@ export default function CadastroScreen() {
       // 3. Criar o Usuário no Firebase Auth
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        email,
+        normalizedEmail,
         senha
       );
       const userId = userCredential.user.uid;
@@ -357,7 +357,7 @@ export default function CadastroScreen() {
       await set(ref(database, "usuariosEmpresa/" + userId), {
         nome,
         nomeEmpresa,
-        email,
+        email: normalizedEmail,
         telefone: telefone || null,
         instagram: processedInstagram,
         imagem: imageUrl,
@@ -366,6 +366,7 @@ export default function CadastroScreen() {
         palavrasChave,
         produtosDisponiveis,
         destaquesDisponiveis,
+        termosAceitos: true,
         latitude,
         longitude,
       });
@@ -404,17 +405,14 @@ export default function CadastroScreen() {
 
   if (loadingPrivacyPolicyUrl || !localizacaoCarregada) {
     return (
-      <ImageBackground
-        source={defaultFundoLocal}
-        style={styles.loadingContainer}
-      >
-        <ActivityIndicator size="large" color="#007BFF" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={BRAND_COLORS.primary} />
         <Text style={styles.loadingText}>
           {loadingPrivacyPolicyUrl
             ? "Preparando tela de cadastro..."
             : "Obtendo sua localização..."}
         </Text>
-      </ImageBackground>
+      </View>
     );
   }
   const handleCnpjChange = (maskedValue: string, unmaskedValue: string) => {
@@ -422,7 +420,7 @@ export default function CadastroScreen() {
   };
 
   return (
-    <ImageBackground source={defaultFundoLocal} style={styles.background}>
+    <View style={styles.background}>
       <AdBanner />
 
       <KeyboardAwareScrollView
@@ -442,7 +440,7 @@ export default function CadastroScreen() {
                 placeholder="Telefone (opcional)"
                 keyboardType="phone-pad"
                 style={styles.input}
-                placeholderTextColor="#666"
+                placeholderTextColor={BRAND_COLORS.textMuted}
               />
               <TextInput
                 placeholder="Instagram (opcional)"
@@ -450,7 +448,7 @@ export default function CadastroScreen() {
                 onChangeText={setInstagram}
                 autoCapitalize="none"
                 style={styles.input}
-                placeholderTextColor="#666"
+                placeholderTextColor={BRAND_COLORS.textMuted}
               />
             </View>
 
@@ -471,7 +469,7 @@ export default function CadastroScreen() {
             value={nomeEmpresa}
             onChangeText={setNomeEmpresa}
             style={styles.input}
-            placeholderTextColor="#666"
+            placeholderTextColor={BRAND_COLORS.textMuted}
           />
 
           <TextInput
@@ -479,7 +477,7 @@ export default function CadastroScreen() {
             value={nome}
             onChangeText={setNome}
             style={styles.input}
-            placeholderTextColor="#666"
+            placeholderTextColor={BRAND_COLORS.textMuted}
           />
           <TextInput
             placeholder="Email*"
@@ -488,7 +486,7 @@ export default function CadastroScreen() {
             keyboardType="email-address"
             autoCapitalize="none"
             style={styles.input}
-            placeholderTextColor="#666"
+            placeholderTextColor={BRAND_COLORS.textMuted}
           />
           <View style={styles.inputContainer}>
             <TextInput
@@ -497,16 +495,16 @@ export default function CadastroScreen() {
               onChangeText={setSenha}
               secureTextEntry={!mostrarSenha}
               style={styles.inputSenha}
-              placeholderTextColor="#666"
+              placeholderTextColor={BRAND_COLORS.textMuted}
             />
             <TouchableOpacity
               onPress={() => setMostrarSenha(!mostrarSenha)}
               style={styles.eyeIcon}
             >
               {mostrarSenha ? (
-                <Feather name="eye-off" size={24} color="#888" />
+                <Feather name="eye-off" size={24} color={BRAND_COLORS.iconMuted} />
               ) : (
-                <Feather name="eye" size={24} color="#888" />
+                <Feather name="eye" size={24} color={BRAND_COLORS.iconMuted} />
               )}
             </TouchableOpacity>
           </View>
@@ -517,16 +515,16 @@ export default function CadastroScreen() {
               onChangeText={setConfirmarSenha}
               secureTextEntry={!mostrarConfirmarSenha}
               style={styles.inputSenha}
-              placeholderTextColor="#666"
+              placeholderTextColor={BRAND_COLORS.textMuted}
             />
             <TouchableOpacity
               onPress={() => setMostrarConfirmarSenha(!mostrarConfirmarSenha)}
               style={styles.eyeIcon}
             >
               {mostrarConfirmarSenha ? (
-                <Feather name="eye-off" size={24} color="#888" />
+                <Feather name="eye-off" size={24} color={BRAND_COLORS.iconMuted} />
               ) : (
-                <Feather name="eye" size={24} color="#888" />
+                <Feather name="eye" size={24} color={BRAND_COLORS.iconMuted} />
               )}
             </TouchableOpacity>
           </View>
@@ -537,7 +535,7 @@ export default function CadastroScreen() {
             value={palavrasChave}
             onChangeText={setPalavrasChave}
             style={styles.input}
-            placeholderTextColor="#666"
+            placeholderTextColor={BRAND_COLORS.textMuted}
           />
           <View style={styles.termoContainer}>
             <TouchableOpacity
@@ -562,7 +560,7 @@ export default function CadastroScreen() {
           </View>
           {erro ? <Text style={styles.erro}>{erro}</Text> : null}
           {loading ? (
-            <ActivityIndicator size="large" color="#007BFF" />
+            <ActivityIndicator size="large" color={BRAND_COLORS.primary} />
           ) : (
             <Button
               title="Cadastrar"
@@ -579,12 +577,12 @@ export default function CadastroScreen() {
           </TouchableOpacity>
         </View>
       </KeyboardAwareScrollView>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  background: { flex: 1 },
+  background: { flex: 1, backgroundColor: BRAND_COLORS.surfaceSoft },
   scrollContent: { justifyContent: "center", padding: 10 },
   container: {
     backgroundColor: "rgba(255,255,255,0.9)",
@@ -596,6 +594,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     marginBottom: 10,
+    color: BRAND_COLORS.primaryDeep,
   },
 
   rowContainer: {
@@ -612,7 +611,7 @@ const styles = StyleSheet.create({
     width: 90,
     height: 90,
     borderRadius: 45,
-    backgroundColor: "#ddd",
+    backgroundColor: BRAND_COLORS.surfaceSoft,
     justifyContent: "center",
     alignItems: "center",
     overflow: "hidden",
@@ -624,34 +623,34 @@ const styles = StyleSheet.create({
   },
   addPhotoText: {
     fontSize: 12,
-    color: "#333",
+    color: BRAND_COLORS.text,
     fontWeight: "bold",
     textAlign: "center",
   },
 
   input: {
     height: 45,
-    borderColor: "#ccc",
+    borderColor: BRAND_COLORS.border,
     borderWidth: 1,
     marginBottom: 10,
     paddingHorizontal: 15,
     fontSize: 16,
     borderRadius: 8,
-    backgroundColor: "#fff",
-    color: "#333",
+    backgroundColor: BRAND_COLORS.surface,
+    color: BRAND_COLORS.text,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#ccc",
+    borderColor: BRAND_COLORS.border,
     borderRadius: 8,
     marginBottom: 10,
-    backgroundColor: "#fff",
+    backgroundColor: BRAND_COLORS.surface,
   },
   inputSenha: { flex: 1, height: 45, fontSize: 16, paddingHorizontal: 15 },
   eyeIcon: { padding: 10 },
-  erro: { color: "red", marginBottom: 12, textAlign: "center" },
+  erro: { color: BRAND_COLORS.danger, marginBottom: 12, textAlign: "center" },
   termoContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -662,27 +661,27 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderWidth: 2,
-    borderColor: "#007BFF",
+    borderColor: BRAND_COLORS.primary,
     borderRadius: 4,
     marginRight: 10,
     justifyContent: "center",
     alignItems: "center",
   },
-  checkboxAtivo: { backgroundColor: "#007BFF" },
-  checkboxMarcado: { color: "#fff", fontSize: 16, fontWeight: "bold" },
-  termoTexto: { flex: 1, fontSize: 14, color: "#333" },
-  link: { color: "#007BFF", textDecorationLine: "underline" },
+  checkboxAtivo: { backgroundColor: BRAND_COLORS.primary },
+  checkboxMarcado: { color: BRAND_COLORS.white, fontSize: 16, fontWeight: "bold" },
+  termoTexto: { flex: 1, fontSize: 14, color: BRAND_COLORS.text },
+  link: { color: BRAND_COLORS.primaryDark, textDecorationLine: "underline" },
   loginLink: { marginTop: 15, alignItems: "center" },
-  loginText: { color: "#007BFF", fontSize: 14 },
+  loginText: { color: BRAND_COLORS.primaryDark, fontSize: 14 },
   loadingContainer: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: BRAND_COLORS.surface,
   },
   loadingText: {
     marginTop: 10,
-    color: "#007BFF",
+    color: BRAND_COLORS.primary,
     fontSize: 16,
   },
 });

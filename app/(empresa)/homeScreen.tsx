@@ -4,7 +4,6 @@ import {
     Text,
     TouchableOpacity,
     StyleSheet,
-    ImageBackground,
     SafeAreaView,
     ScrollView,
     Alert,
@@ -27,8 +26,7 @@ import { signOut } from "firebase/auth";
 import AdBanner from '../components/AdBanner';
 import AdCard from '../components/AdCard';
 import Header from '../components/Header';
-
-const defaultFundoLocal = require('../../assets/images/fundo.png');
+import { BRAND_COLORS } from '@/constants/BrandColors';
 const { width } = Dimensions.get('window');
 const SCREEN_PADDING = 20;
 
@@ -113,7 +111,7 @@ const HomeScreen = () => {
             iconName: 'food-fork-drink', 
             iconFamily: MaterialCommunityIcons, 
             path: 'crudProdutosServicos',
-            color: '#064ec7' // Azul padrão
+            color: BRAND_COLORS.primary
         },
         { 
             label: 'Config', 
@@ -121,26 +119,26 @@ const HomeScreen = () => {
             iconName: 'setting', 
             iconFamily: AntDesign, 
             path: 'configuracoesScreen',
-            color: '#064ec7'
+            color: BRAND_COLORS.primary
         },
         { 
             label: 'Pacotes', 
             iconName: 'box', 
             iconFamily: FontAwesome5, 
             onPress: handleBuyPackages,
-            color: '#064ec7'
+            color: BRAND_COLORS.primary
         },
         { 
             label: 'Sair', 
             iconName: 'logout', // Ícone mais comum para sair no Material
             iconFamily: MaterialCommunityIcons, 
             onPress: confirmarLogout,
-            color: '#d32f2f' // Vermelho para destaque de sair
+            color: BRAND_COLORS.accentRed
         },
     ];
 
     return (
-        <ImageBackground source={defaultFundoLocal} style={styles.background} resizeMode="cover">
+        <View style={styles.background}>
             <AdBanner />
             <Header
                 title="Área Empresarial"
@@ -179,13 +177,14 @@ const HomeScreen = () => {
 
                 </ScrollView>
             </SafeAreaView>
-        </ImageBackground>
+        </View>
     );
 };
 
 const styles = StyleSheet.create({
     background: {
         flex: 1,
+        backgroundColor: BRAND_COLORS.surfaceSoft,
         marginBottom: -33
     },
     safeAreaContent: {
@@ -212,13 +211,13 @@ const styles = StyleSheet.create({
         width: 70,
         height: 70,
         borderRadius: 50, // Totalmente redondo
-        backgroundColor: '#fff',
+        backgroundColor: BRAND_COLORS.surface,
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 8, // Espaço entre o círculo e o texto
         
         // Sombra para dar destaque
-        shadowColor: '#000',
+        shadowColor: BRAND_COLORS.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 3,
@@ -227,7 +226,7 @@ const styles = StyleSheet.create({
     menuText: {
         fontSize: 11,
         fontWeight: '600',
-        color: '#333',
+        color: BRAND_COLORS.text,
         textAlign: 'center',
         width: '100%', // Garante que o texto centralize na largura do item
     },
@@ -236,7 +235,7 @@ const styles = StyleSheet.create({
     adCardContainer: {
         width: '100%',
         marginTop: 10,
-        backgroundColor: 'rgba(255, 255, 255, 1)',
+        backgroundColor: 'rgba(255, 255, 255, 0.96)',
         borderRadius: 10,
         overflow: 'hidden', // Garante que o conteúdo respeite as bordas arredondadas
     },
@@ -249,7 +248,7 @@ const styles = StyleSheet.create({
     },
     loadingText: {
         marginTop: 10,
-        color: '#007BFF',
+        color: BRAND_COLORS.primary,
         fontSize: 16,
     },
 });

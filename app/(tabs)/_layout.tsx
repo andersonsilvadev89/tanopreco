@@ -3,7 +3,7 @@ import { auth } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import React, { useState, useEffect } from "react";
 import { FontAwesome5, AntDesign } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient"; // <--- IMPORTANTE
+import { BRAND_COLORS } from "@/constants/BrandColors";
 
 export default function TabsLayout() {
   const [user, setUser] = useState<any>(null);
@@ -24,26 +24,16 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#ffffffea",
-        tabBarInactiveTintColor: "#d3d3d3ff",
+        tabBarActiveTintColor: BRAND_COLORS.white,
+        tabBarInactiveTintColor: BRAND_COLORS.tabInactive,
         // A configuração visual da barra muda aqui:
         tabBarStyle: {
-          backgroundColor: "transparent", // Fundo transparente para o gradiente aparecer
+          backgroundColor: BRAND_COLORS.primary, // Fundo transparente para o gradiente aparecer
           borderTopWidth: 0,              // Remove a linha superior padrão
           elevation: 0,                   // Remove a sombra padrão (Android)
           height: 50,                     // Um pouco mais de altura fica elegante (opcional)
           paddingBottom: 0,               // Ajuste para o ícone não ficar colado embaixo
         },
-        // Aqui inserimos o componente de gradiente como fundo
-        tabBarBackground: () => (
-          <LinearGradient
-            // Cores: Do seu azul original (#064ec7) para um tom mais moderno
-            colors={['#064ec7', '#04358a', '#011b4aff']} 
-            style={{ flex: 1 }}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }} // Gradiente da Esquerda para Direita (Horizontal)
-          />
-        ),
       }}
     >
       <Tabs.Screen
@@ -69,7 +59,7 @@ export default function TabsLayout() {
         options={{
           title: "Sobre",
           tabBarIcon: ({ color, size }) => (
-            <AntDesign name="infocirlce" color={color} size={size} />
+            <AntDesign name="info-circle" color={color} size={size} />
           ),
         }}
       />

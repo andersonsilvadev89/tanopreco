@@ -1,6 +1,7 @@
 import React, { memo, useState } from 'react';
 import { View, Text, Image, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import { Feather } from "@expo/vector-icons";
+import { BRAND_COLORS } from '@/constants/BrandColors';
 
 // ----------------------------------------------------------------------
 // TIPOS E INTERFACES
@@ -133,7 +134,7 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
                     </TouchableOpacity>
                 ) : (
                     <View style={styles.imagemProdutoPlaceholder}>
-                        <Feather name="image" size={50} color="#ccc" />
+                        <Feather name="image" size={50} color={BRAND_COLORS.border} />
                     </View>
                 )}
 
@@ -145,7 +146,7 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
                         <Feather
                             name="thumbs-up"
                             size={23}
-                            color={deviceId ? "#4CAF50" : "#ccc"}
+                            color={deviceId ? BRAND_COLORS.success : BRAND_COLORS.border}
                         />
                     </TouchableOpacity>
                     <Text style={{ color: "green" }}>{produto.like ?? 0}</Text>
@@ -156,7 +157,7 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
                         <Feather
                             name="thumbs-down"
                             size={23}
-                            color={deviceId ? "#F44336" : "#ccc"}
+                            color={deviceId ? BRAND_COLORS.danger : BRAND_COLORS.border}
                         />
                     </TouchableOpacity>
                     <Text style={{ color: "red" }}>{produto.unlike ?? 0}</Text>
@@ -212,7 +213,7 @@ const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({
                         <Feather
                             name={expandidoEmpresa ? "chevron-up" : "chevron-down"}
                             size={20}
-                            color="#555"
+                            color={BRAND_COLORS.textMuted}
                             style={{ marginLeft: 4, marginTop: 2 }}
                         />
                     </View>
@@ -310,7 +311,7 @@ const styles = StyleSheet.create({
         marginHorizontal: CARD_MARGIN / 2,
         elevation: 3,
         alignItems: "center",
-        shadowColor: "#000",
+        shadowColor: BRAND_COLORS.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.2,
         shadowRadius: 3,
@@ -332,21 +333,21 @@ const styles = StyleSheet.create({
     },
     dataOferta: {
         fontSize: 11,
-        color: "#888",
+        color: BRAND_COLORS.textMuted,
         marginBottom: 2, // Diminuí um pouco a margem pois pode vir o texto de estoque abaixo
         textAlign: "center",
     },
     // ✅ NOVO ESTILO PARA O TEXTO DE ESTOQUE
     estoqueText: {
         fontSize: 11,
-        color: "#e67e22", // Laranja alerta
+        color: BRAND_COLORS.warning,
         fontWeight: "bold",
         textAlign: "center",
         marginBottom: 5,
     },
     distancia: {
         fontSize: 12,
-        color: "#007BFF",
+        color: BRAND_COLORS.primary,
         marginBottom: 2,
         textAlign: "center",
     },
@@ -362,7 +363,7 @@ const styles = StyleSheet.create({
         height: 120,
         borderRadius: 8,
         marginTop: 5,
-        backgroundColor: '#f0f0f0',
+        backgroundColor: BRAND_COLORS.surfaceSoft,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -370,7 +371,7 @@ const styles = StyleSheet.create({
     // --- ESTILOS DO CONTAINER DA EMPRESA ---
     empresaContainer: {
         width: "100%",
-        backgroundColor: "#f7f7f7",
+        backgroundColor: BRAND_COLORS.surfaceSoft,
         borderRadius: 8,
         paddingVertical: 4,
         paddingHorizontal: 2,
@@ -392,14 +393,14 @@ const styles = StyleSheet.create({
     },
     confiraOferta: {
         fontSize: 12,
-        color: "#555",
+        color: BRAND_COLORS.textMuted,
         fontWeight: "bold",
         textAlign: "center",
         flexShrink: 1
     },
     nomeEmpresa: {
         fontSize: 12,
-        color: "#0056b3",
+        color: BRAND_COLORS.primaryDark,
         fontWeight: "bold",
         marginBottom: 2,
         marginTop: 4,
@@ -423,19 +424,19 @@ const styles = StyleSheet.create({
         width: 30,
         height: 30,
         borderRadius: 25,
-        backgroundColor: "#fff",
+        backgroundColor: BRAND_COLORS.surface,
         justifyContent: "center",
         alignItems: "center",
         elevation: 2,
         borderWidth: 1,
-        borderColor: "#eee",
+        borderColor: BRAND_COLORS.border,
     },
     imagemBotaoRedondo: {
         width: 40,
         height: 40,
     },
     legendaBotao: {
-        color: "#333",
+        color: BRAND_COLORS.text,
         fontSize: 8,
         marginTop: 4,
         textAlign: "center",

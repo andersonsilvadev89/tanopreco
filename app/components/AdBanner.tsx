@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { View, StyleSheet, Platform, Image } from 'react-native';
-import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads';
+import { getGoogleMobileAdsModule, isGoogleMobileAdsAvailable } from '../utils/googleMobileAds';
 
 // ------------------------------------------------------------------
 // 🔧 CONFIGURAÇÃO POR PLATAFORMA (ANDROID / iOS)
@@ -8,12 +8,6 @@ import { BannerAd, BannerAdSize, TestIds } from 'react-native-google-mobile-ads'
 // ... (seus IDs de AD aqui)
 const IOS_AD_UNIT_ID = 'ca-app-pub-5241782827769638/9708550818';
 const ANDROID_AD_UNIT_ID = 'ca-app-pub-5241782827769638/4392341690';
-const adUnitId = __DEV__
-    ? TestIds.BANNER
-    : Platform.select({
-        ios: IOS_AD_UNIT_ID,
-        android: ANDROID_AD_UNIT_ID,
-    }) || TestIds.BANNER;
 
 // ⚠️ SUBSTITUA COM O CAMINHO REAL DA IMAGEM DO SEU APP
 const APP_LOGO_PLACEHOLDER = require('../../assets/images/placeholder.jpg');
@@ -32,10 +26,36 @@ const AdBanner = () => {
             <Image
                 source={APP_LOGO_PLACEHOLDER}
                 style={styles.placeholderImage}
-                resizeMode="contain" 
+                resizeMode="contain"
             />
         </View>
     );
+
+    if (!isGoogleMobileAdsAvailable) {
+        return (
+            <View style={styles.container}>
+                {renderPlaceholder()}
+            </View>
+        );
+    }
+
+    const googleMobileAds = getGoogleMobileAdsModule();
+
+    if (!googleMobileAds) {
+        return (
+            <View style={styles.container}>
+                {renderPlaceholder()}
+            </View>
+        );
+    }
+
+    const { BannerAd, BannerAdSize, TestIds } = googleMobileAds;
+    const adUnitId = __DEV__
+        ? TestIds.BANNER
+        : Platform.select({
+            ios: IOS_AD_UNIT_ID,
+            android: ANDROID_AD_UNIT_ID,
+        }) || TestIds.BANNER;
 
     return (
         <View style={styles.container}>
@@ -59,7 +79,7 @@ const AdBanner = () => {
                         console.log('✅ Banner Ad carregado com sucesso!');
                         setAdLoaded(true); // Define como carregado
                     }}
-                    onAdFailedToLoad={(error) => {
+                    onAdFailedToLoad={(error: { message: string }) => {
                         console.error('❌ Falha ao carregar Banner Ad:', error.message);
                         // Mantém adLoaded=false para continuar mostrando o placeholder
                         // ou você pode definir setAdLoaded(true) se quiser que o placeholder suma

@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   StyleSheet,
   TouchableOpacity,
-  ImageBackground,
   Linking,
   Alert,
   Switch,
@@ -20,8 +19,9 @@ import {
   UIManager,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { database } from "../../firebaseConfig";
+import { database, auth } from "../../firebaseConfig";
 import { ref, onValue, set, get, update, increment } from "firebase/database";
+import { signOut } from "firebase/auth";
 import { useFocusEffect } from "@react-navigation/native";
 import MapView, { Marker, Callout, Region } from "react-native-maps";
 import AdBanner from "../components/AdBanner";
@@ -29,7 +29,11 @@ import * as Location from "expo-location";
 import AdCard from "../components/AdCard";
 import { useAuth } from "../../context/AuthContext";
 import { ProdutoCard } from "../components/ProdutoCard";
-import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { router } from "expo-router";
+import { AppHeader } from "../components/shell/AppHeader";
+import { DrawerMenu } from "../components/shell/DrawerMenu";
+import { BRAND_COLORS } from "@/constants/BrandColors";
 
 if (Platform.OS === 'android') {
   if (UIManager.setLayoutAnimationEnabledExperimental) {
@@ -41,7 +45,6 @@ if (Platform.OS === 'android') {
 // 1. CONSTANTES E CONFIGURAÇÕES
 // ----------------------------------------------------
 
-const defaultFundoLocal = require("../../assets/images/fundo.png");
 const { width } = Dimensions.get("window");
 
 // Tamanho do card de produto
@@ -182,7 +185,8 @@ function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; lon
 // ----------------------------------------------------
 
 export default function HomeScreen() {
-  const { deviceId } = useAuth();
+  const { deviceId, user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [ordenacaoManual, setOrdenacaoManual] = useState(false);
   const [produtosComEmpresa, setProdutosComEmpresa] = useState<ProdutoComEmpresa[]>([]);
@@ -192,6 +196,7 @@ export default function HomeScreen() {
   const [loadingInicial, setLoadingInicial] = useState(true);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number; } | null>(null);
   const [expandirCategorias, setExpandirCategorias] = useState(false);
+  const [drawerMenuVisible, setDrawerMenuVisible] = useState(false);
   const [mostrarMapa, setMostrarMapa] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [mapRegion, setMapRegion] = useState<Region>({
@@ -438,55 +443,111 @@ export default function HomeScreen() {
 
   const categoriasExibidas = expandirCategorias ? categorias : categorias.slice(0, CATEGORIAS_INICIAIS);
 
+  const handleLogout = useCallback(async () => {
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+      Alert.alert("Erro", "Nao foi possivel sair da conta.");
+    }
+  }, []);
+
+  const handleMenuOpen = useCallback(() => {
+    setDrawerMenuVisible(true);
+  }, []);
+
+  const handleMenuClose = useCallback(() => {
+    setDrawerMenuVisible(false);
+  }, []);
+
+  const handleNavigateTo = useCallback((path: string, requiresAuth: boolean) => {
+    if (requiresAuth && !user) {
+      Alert.alert("Login necessário", "Entre na sua conta para acessar esta área.");
+      router.push("/(auth)/loginScreen");
+      return;
+    }
+
+    router.push(path as any);
+  }, [user]);
+
+  const handleBuscaPorVoz = useCallback(() => {
+    Alert.alert("Busca por voz", "Reconhecimento de voz em desenvolvimento.");
+  }, []);
+
+  const contadorOfertas = () =>{
+    {/* --- NOVO: CONTADOR DE PRODUTOS CADASTRADOS --- */}
+    return(
+        <View style={styles.contadorContainer}>
+        <Text style={styles.contadorTexto}>
+        {produtosComEmpresa.length < 100 ? (
+        <>
+        Estamos com <Text style={styles.textoDestaque}>novas ofertas</Text> todos os dias!
+        </>
+        ) : (
+        <>
+        Estamos com mais de <Text style={styles.textoDestaque}>{produtosComEmpresa.length - 1} ofertas</Text> até agora
+        </>
+        )}
+        </Text>
+        </View>);
+  }
+
   return (
-    <ImageBackground source={defaultFundoLocal} style={styles.background}>
-      <AdBanner />
+    <View style={styles.background}>
+      <AppHeader
+        user={user}
+        paddingTop={Math.max(insets.top, 8)}
+        onMenuOpen={handleMenuOpen}
+        onLogout={handleLogout}
+      />
+      <DrawerMenu
+        visible={drawerMenuVisible}
+        onClose={handleMenuClose}
+        user={user}
+        onLogout={handleLogout}
+        navigateTo={handleNavigateTo}
+      />
       <View style={styles.container}>
 
-        {/* HEADER COM GRADIENTE */}
-        <LinearGradient colors={['#064ec7', '#04358a', '#011b4aff']} style={styles.topBarContainer}>
-
-          {/* --- NOVO: CONTADOR DE PRODUTOS CADASTRADOS --- */}
-          <View style={styles.contadorContainer}>
-  <Text style={styles.contadorTexto}>
-    {produtosComEmpresa.length < 100 ? (
-      <>
-        Estamos com <Text style={styles.textoDestaque}>novas ofertas</Text> todos os dias!
-      </>
-    ) : (
-      <>
-        Estamos com mais de <Text style={styles.textoDestaque}>{produtosComEmpresa.length - 1} ofertas</Text> até agora
-      </>
-    )}
-  </Text>
-</View>
-
+        <View style={styles.topBarContainer}>
           {/* Busca */}
           <View style={styles.buscaOverlayContainer}>
-            <TextInput
-              style={styles.inputBuscaOverlay}
-              placeholder="Busque produtos ou serviços..."
-              value={termoBusca}
-              onChangeText={setTermoBusca}
-              placeholderTextColor="#888"
-            />
-            <Image source={require("../../assets/images/lupa.png")} style={styles.lupaSobreposta} />
+            <View style={styles.buscaBar}>
+              <View style={styles.buscaInputWrapper}>
+                <Feather name="search" size={18} color={BRAND_COLORS.textMuted} style={styles.searchIcon} />
+                <TextInput
+                  style={styles.inputBuscaOverlay}
+                  placeholder="Busque produtos ou serviços..."
+                  value={termoBusca}
+                  onChangeText={setTermoBusca}
+                  placeholderTextColor={BRAND_COLORS.textMuted}
+                />
+              </View>
+
+              <TouchableOpacity
+                style={styles.botaoVoz}
+                onPress={handleBuscaPorVoz}
+                activeOpacity={0.8}
+              >
+                <Feather name="mic" size={18} color={BRAND_COLORS.primaryDark} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Ordenação */}
           <View style={styles.ordenacaoContainer}>
-            <Text style={{ color: "#ffffffea", fontWeight: "bold" }}>Ordenar por:</Text>
+            <Text style={{ color: "#063494", fontWeight: "bold" }}>Ordenar por:</Text>
             <Text style={[styles.ordenacaoText, !ordenarPorPreco && styles.ordenacaoTextActive]}>Proximidade</Text>
             <Switch
               value={ordenarPorPreco}
               onValueChange={(v) => { setOrdenarPorPreco(v); setOrdenacaoManual(true); }}
-              thumbColor={"white"}
-              trackColor={{ false: "#ccc", true: "#ccc" }}
+              thumbColor={BRAND_COLORS.white}
+              trackColor={{ false: BRAND_COLORS.border, true: BRAND_COLORS.border }}
             />
             <Text style={[styles.ordenacaoText, ordenarPorPreco && styles.ordenacaoTextActive]}>Menor Preço</Text>
           </View>
 
-          {/* 💡 CATEGORIAS EM GRADE (ACORDEÃO) */}
+          {/* 💡 CATEGORIAS EM HORIZONTAL SCROLL */}
           <View style={styles.categoriasContainer}>
             <View style={styles.categoriasGrid}>
 
@@ -498,19 +559,18 @@ export default function HomeScreen() {
                   >
                     <Image source={categoriaImagens[cat.nome]} style={styles.categoriaImagem} resizeMode="contain" />
                   </TouchableOpacity>
-                  <Text style={[styles.categoriaLegenda, categoriaSelecionada === cat.nome && { color: "#5bc5ffff", fontWeight: "bold" }]}>
+                  <Text style={[styles.categoriaLegenda, categoriaSelecionada === cat.nome && { color: BRAND_COLORS.white, fontWeight: "bold" }]}>
                     {cat.nome}
                   </Text>
                 </View>
               ))}
 
-              {/* Botão Mais/Menos - SEMPRE visível ao final da lista exibida (seja curta ou longa) */}
               <View style={styles.categoriaItem}>
                 <TouchableOpacity
-                  style={[styles.categoriaBotaoRedondo, { backgroundColor: 'rgba(255,255,255,0.2)' }]}
+                  style={[styles.categoriaBotaoRedondo, { backgroundColor: BRAND_COLORS.headerIconOverlay }]}
                   onPress={toggleCategorias}
                 >
-                  <Feather name={expandirCategorias ? "chevron-up" : "plus"} size={28} color="#FFF" />
+                  <Feather name={expandirCategorias ? "chevron-up" : "plus"} size={20} color={BRAND_COLORS.white} />
                 </TouchableOpacity>
                 <Text style={styles.categoriaLegenda}>{expandirCategorias ? "Menos" : "Mais"}</Text>
               </View>
@@ -518,13 +578,13 @@ export default function HomeScreen() {
             </View>
           </View>
 
-        </LinearGradient>
+        </View>
 
         <View style={styles.listTitleContainer}>
           <Text style={styles.listTitle}>{tituloDaLista}</Text>
         </View>
 
-        {loadingInicial ? <ActivityIndicator size="large" color="#007BFF" style={{ marginTop: 30 }} /> :
+        {loadingInicial ? <ActivityIndicator size="large" color={BRAND_COLORS.primary} style={{ marginTop: 30 }} /> :
           <FlatList
             data={produtosFinal}
             keyExtractor={(item) => item.id + item.empresaId}
@@ -544,7 +604,7 @@ export default function HomeScreen() {
                 <Marker coordinate={userLocation}><View style={styles.myLocationMarker}><Text style={styles.myLocationMarkerText}>EU</Text></View></Marker>
                 {selectedLocation && <Marker coordinate={{ latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }} pinColor="red" />}
               </MapView>
-              <TouchableOpacity style={styles.closeMapButtonOverlay} onPress={() => setMostrarMapa(false)}><Feather name="x" size={24} color="#333" /></TouchableOpacity>
+              <TouchableOpacity style={styles.closeMapButtonOverlay} onPress={() => setMostrarMapa(false)}><Feather name="x" size={24} color={BRAND_COLORS.text} /></TouchableOpacity>
               <TouchableOpacity style={styles.externalMapButton} onPress={() => openExternalMap(selectedLocation.latitude, selectedLocation.longitude, selectedLocation.nome)}><Text style={styles.externalMapButtonText}>Abrir Rota</Text></TouchableOpacity>
             </View>
           </View>
@@ -560,7 +620,9 @@ export default function HomeScreen() {
         )}
 
       </View>
-    </ImageBackground>
+      <AdBanner />
+      
+    </View>
   );
 }
 
@@ -569,18 +631,19 @@ export default function HomeScreen() {
 // ----------------------------------------------------
 
 const styles = StyleSheet.create({
-  background: { flex: 1, resizeMode: "cover" },
+  background: { flex: 1, backgroundColor: BRAND_COLORS.surfaceSoft },
   container: { flex: 1 },
   topBarContainer: {
+    backgroundColor: "transparent",
     borderBottomLeftRadius: 30,
     borderBottomRightRadius: 30,
     paddingTop: 5,
-    paddingBottom: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4.65,
-    elevation: 8,
+    paddingBottom: 50,
+    shadowColor: "transparent",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0,
+    shadowRadius: 0,
+    elevation: 0,
     zIndex: 10,
   },
 
@@ -592,64 +655,81 @@ const styles = StyleSheet.create({
     marginBottom: 12, // Espaço entre o texto e a barra de busca
   },
   contadorTexto: {
-    color: "#FFFFFF",
+    color: BRAND_COLORS.text,
     fontSize: 14,
-    fontWeight: "bold", // Peso base
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 1, height: 1 },
-    textShadowRadius: 2,
+    fontWeight: "bold",
+    textShadowColor: 'rgba(255, 255, 255, 0.6)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 0,
   },
   
-  // ADICIONE ESTE ESTILO NOVO:
   textoDestaque: {
-    color: "#47ea1aff", // Amarelo Ouro (contrasta muito bem com azul)
-    fontSize: 17,     // Um pouco maior que o texto normal (que é 14)
-    fontWeight: "900", // Extra negrito
-    textDecorationLine: "underline", // Opcional: sublinhado para ênfase extra
+    color: BRAND_COLORS.primaryDark,
+    backgroundColor: "rgba(10, 79, 203, 0.12)",
+    fontSize: 16,
+    fontWeight: "900",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 6,
   },
   // -----------------------------
 
   buscaOverlayContainer: {
     justifyContent: "center",
-    alignItems: "flex-start",
+    alignItems: "center",
     width: "100%",
     paddingHorizontal: 10,
   },
+  buscaBar: {
+    width: "95%",
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  buscaInputWrapper: {
+    flex: 1,
+    position: "relative",
+    justifyContent: "center",
+  },
   inputBuscaOverlay: {
-    width: "90%", // Ocupa a largura do container pai (respeitando padding)
+    width: "100%",
     fontSize: 16,
-    color: "#333",
-    backgroundColor: "#fff",
+    color: BRAND_COLORS.text,
+    backgroundColor: BRAND_COLORS.surface,
     borderRadius: 25,
-    paddingLeft: 45,
-    paddingRight: 10,
+    paddingLeft: 42,
+    paddingRight: 12,
     height: 40,
     elevation: 2,
-    marginLeft: 15,
   },
-  lupaSobreposta: {
+  searchIcon: {
     position: "absolute",
-    left: 10,
-    top: 0,
-    width: 50,
-    height: 50,
+    left: 14,
     zIndex: 2,
+  },
+  botaoVoz: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    marginLeft: 8,
+    backgroundColor: "rgba(255,255,255,0.96)",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 2,
   },
   ordenacaoContainer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 5,
-    marginBottom: 5,
   },
   ordenacaoText: {
     marginHorizontal: 5,
-    color: "#e0e0e0",
+    color: BRAND_COLORS.textMuted,
     fontSize: 12,
   },
   ordenacaoTextActive: {
     fontWeight: "bold",
-    color: "#FFF",
+    color: BRAND_COLORS.primaryDark,
     textDecorationLine: "underline",
   },
 
@@ -660,59 +740,79 @@ const styles = StyleSheet.create({
   },
   categoriasGrid: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-start', // Alinha à esquerda para o wrap funcionar bem
-    paddingHorizontal: 5, // Pequeno padding lateral
+    alignItems: 'flex-start',
+    paddingHorizontal: 4,
+    paddingBottom: 2,
+    gap: 6,
   },
   categoriaItem: {
     alignItems: "center",
     justifyContent: "flex-start",
-    width: '20%',
-    marginBottom: 5,
+    width: 60,
+    marginBottom: 2,
+    marginHorizontal: 2,
   },
   categoriaBotaoRedondo: {
-    width: 60,
-    height: 60,
-    borderRadius: 50,
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: "rgba(255, 255, 255, 0.95)",
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 4,
-    elevation: 3,
-
+    elevation: 2,
   },
   categoriaBotaoSelecionado: {
-    backgroundColor: "#fff",
-    borderWidth: 4,
-    borderColor: "#5bc5ffff",
+    backgroundColor: BRAND_COLORS.surface,
+    borderWidth: 3,
+    borderColor: BRAND_COLORS.white,
   },
   categoriaImagem: {
-    width: 40,
-    height: 40,
+    width: 28,
+    height: 28,
   },
   categoriaLegenda: {
-    fontSize: 10, // Fonte um pouco menor para não quebrar linha
-    color: "#e0e0e0",
+    fontSize: 9,
+    color: BRAND_COLORS.textMuted,
     fontWeight: "600",
     textAlign: "center",
+    lineHeight: 12,
   },
 
   // Outros estilos (mantidos)
-  listTitleContainer: { paddingHorizontal: 12, paddingVertical: 8 },
-  listTitle: { fontSize: 20, fontWeight: "bold", color: "#333", textAlign: "center" },
+  listTitleContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginHorizontal: 10,
+    marginTop: 6,
+    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.92)",
+  },
+  listTitle: { fontSize: 20, fontWeight: "bold", color: BRAND_COLORS.text, textAlign: "center" },
   productList: { flex: 1 },
   cardRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12, paddingHorizontal: CARD_MARGIN / 2 },
   cardProdutoGenerico: { backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 10, marginBottom: 12, marginHorizontal: CARD_MARGIN / 2, elevation: 3, alignItems: "center", justifyContent: "center", width: CARD_WIDTH, minHeight: CARD_MIN_HEIGHT },
-  mensagemNenhumResultado: { textAlign: "center", marginTop: 20, fontStyle: "italic", color: "gray", fontSize: 15 },
-  mapOverlayContainer: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", zIndex: 1000 },
-  mapDisplayBox: { width: "90%", height: "70%", backgroundColor: "white", borderRadius: 15, overflow: "hidden", elevation: 10, padding: 5, justifyContent: 'space-between' },
+  mensagemNenhumResultado: {
+    textAlign: "center",
+    marginTop: 20,
+    fontStyle: "italic",
+    color: BRAND_COLORS.textMuted,
+    fontSize: 15,
+    backgroundColor: "rgba(255,255,255,0.92)",
+    alignSelf: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  mapOverlayContainer: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: BRAND_COLORS.overlayStrong, justifyContent: "center", alignItems: "center", zIndex: 1000 },
+  mapDisplayBox: { width: "90%", height: "70%", backgroundColor: BRAND_COLORS.surface, borderRadius: 15, overflow: "hidden", elevation: 10, padding: 5, justifyContent: 'space-between' },
   mapViewStyle: { flex: 1, borderRadius: 10, marginBottom: 10 },
-  closeMapButtonOverlay: { position: "absolute", top: 10, right: 10, backgroundColor: "rgba(255, 255, 255, 0.9)", padding: 8, borderRadius: 20, elevation: 12, zIndex: 10 },
-  externalMapButton: { backgroundColor: "#34A853", paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 5, alignSelf: 'center', width: '95%' },
-  externalMapButtonText: { color: "white", fontWeight: "bold", fontSize: 14 },
-  myLocationMarker: { backgroundColor: "#007BFF", padding: 6, borderRadius: 15, width: 30, height: 30, justifyContent: "center", alignItems: "center", borderColor: "white", borderWidth: 1.5 },
-  myLocationMarkerText: { color: "white", fontWeight: "bold", fontSize: 10 },
-  modalContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0, 0, 0, 0.8)" },
+  closeMapButtonOverlay: { position: "absolute", top: 10, right: 10, backgroundColor: "rgba(255, 255, 255, 0.96)", padding: 8, borderRadius: 20, elevation: 12, zIndex: 10, borderWidth: 1, borderColor: BRAND_COLORS.border },
+  externalMapButton: { backgroundColor: BRAND_COLORS.success, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 5, alignSelf: 'center', width: '95%' },
+  externalMapButtonText: { color: BRAND_COLORS.white, fontWeight: "bold", fontSize: 14 },
+  myLocationMarker: { backgroundColor: BRAND_COLORS.primary, padding: 6, borderRadius: 15, width: 30, height: 30, justifyContent: "center", alignItems: "center", borderColor: BRAND_COLORS.white, borderWidth: 1.5 },
+  myLocationMarkerText: { color: BRAND_COLORS.white, fontWeight: "bold", fontSize: 10 },
+  modalContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: BRAND_COLORS.overlayStrong },
   modalBackground: { flex: 1, width: "100%", justifyContent: "center", alignItems: "center" },
   imagemModal: { width: "100%", height: "100%", borderRadius: 10 },
 });

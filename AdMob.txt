@@ -1,0 +1,28 @@
+AdMob:
+
+Banner:
+Id de aplicativo:
+ca-app-pub-5241782827769638~1347375952
+Id de Bloco:
+ca-app-pub-5241782827769638/4392341690
+
+Card:
+Id de aplicativo:
+ca-app-pub-5241782827769638~1347375952
+Id de Bloco:
+ca-app-pub-5241782827769638/1260262961
+
+
+IOS:
+
+Banner:
+Id de aplicativo:
+ca-app-pub-5241782827769638~8974053643
+Id de Bloco:
+ca-app-pub-5241782827769638/9708550818
+
+Card:
+Id de aplicativo:
+ca-app-pub-5241782827769638~8974053643
+Id de Bloco:
+ca-app-pub-5241782827769638/2862164767

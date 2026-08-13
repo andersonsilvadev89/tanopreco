@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  ImageBackground,
   Image,
   Dimensions,
   Platform,
@@ -19,15 +18,16 @@ import { auth, database } from '../../firebaseConfig';
 import {
   signInWithEmailAndPassword,
   sendPasswordResetEmail,
+  fetchSignInMethodsForEmail,
 } from 'firebase/auth';
 import { router } from 'expo-router';
 import { ref, get } from 'firebase/database';
 import { Feather } from "@expo/vector-icons";
 import AdBanner from "../components/AdBanner";
+import { BRAND_COLORS } from "@/constants/BrandColors";
 
 
 const defaultLogoLocal = require('../../assets/images/logoEvento.png');
-const defaultFundoLocal = require('../../assets/images/fundo.png');
 
 const LoginScreen = ({ navigation }: any) => {
   const [email, setEmail] = useState('');
@@ -59,7 +59,8 @@ const LoginScreen = ({ navigation }: any) => {
     setLoading(true);
     setError('');
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const normalizedEmail = email.trim().toLowerCase();
+      const userCredential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
       const loggedUser = userCredential.user;
       const userRef = ref(database, `usuariosEmpresa/${loggedUser.uid}`);
       const snapshot = await get(userRef);
@@ -71,6 +72,29 @@ const LoginScreen = ({ navigation }: any) => {
         setError('Usuário não encontrado.');
       }
     } catch (error: any) {
+      const normalizedEmail = email.trim().toLowerCase();
+
+      if (normalizedEmail && ['auth/invalid-credential', 'auth/wrong-password', 'auth/user-not-found'].includes(error.code)) {
+        try {
+          const signInMethods = await fetchSignInMethodsForEmail(auth, normalizedEmail);
+          const hasGoogleProvider = signInMethods.includes('google.com');
+          const hasAppleProvider = signInMethods.includes('apple.com');
+          const hasPasswordProvider = signInMethods.includes('password');
+
+          if (hasGoogleProvider && !hasPasswordProvider) {
+            setError('Esta conta foi criada com Google. Para entrar novamente, use o mesmo provedor.');
+            return;
+          }
+
+          if (hasAppleProvider && !hasPasswordProvider) {
+            setError('Esta conta foi criada com Apple. Para entrar novamente, use o mesmo provedor.');
+            return;
+          }
+        } catch (providerError) {
+          console.warn('Nao foi possivel verificar os provedores de login:', providerError);
+        }
+      }
+
       const errorMessage = error.message || 'Erro ao fazer login.';
       if (error.code === 'auth/missing-password') {
         setError('Digite a senha para efetuar o login');
@@ -92,7 +116,7 @@ const LoginScreen = ({ navigation }: any) => {
     setLoading(true);
     setError('');
     try {
-      await sendPasswordResetEmail(auth, email);
+      await sendPasswordResetEmail(auth, email.trim().toLowerCase());
       Alert.alert('Verifique seu email', 'Email de recuperação enviado!');
     } catch (err: any) {
       const errorMessage = err.message || 'Erro ao enviar email de recuperação.';
@@ -108,15 +132,15 @@ const LoginScreen = ({ navigation }: any) => {
 
   if (authLoading) {
     return (
-      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007BFF" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={BRAND_COLORS.primary} />
         <Text style={styles.loadingText}>Carregando recursos...</Text>
-      </ImageBackground>
+      </View>
     );
   }
 
   return (
-    <ImageBackground source={defaultFundoLocal} style={styles.background}>
+    <View style={styles.background}>
       <AdBanner />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
@@ -154,9 +178,9 @@ const LoginScreen = ({ navigation }: any) => {
               />
               <TouchableOpacity onPress={toggleMostrarSenha} style={styles.eyeIcon}>
                 {mostrarSenha ? (
-                  <Feather name="eye-off" size={24} color="#888" />
+                  <Feather name="eye-off" size={24} color={BRAND_COLORS.iconMuted} />
                 ) : (
-                  <Feather name="eye" size={24} color="#888" />
+                  <Feather name="eye" size={24} color={BRAND_COLORS.iconMuted} />
                 )}
               </TouchableOpacity>
             </View>
@@ -169,7 +193,7 @@ const LoginScreen = ({ navigation }: any) => {
               disabled={loading}
             >
               {loading? (
-                <ActivityIndicator color="#fff" />
+                <ActivityIndicator color={BRAND_COLORS.white} />
               ) : (
                 <Text style={styles.entrarText}>Entrar</Text>
               )}
@@ -189,17 +213,18 @@ const LoginScreen = ({ navigation }: any) => {
           </View>
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
-    </ImageBackground>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   background: {
     flex: 1,
+    backgroundColor: BRAND_COLORS.surfaceSoft,
   },
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.07)',
+    backgroundColor: BRAND_COLORS.overlay,
     justifyContent: 'center', // Centraliza verticalmente
     alignItems: 'center', // Centraliza horizontalmente
   },
@@ -207,11 +232,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: BRAND_COLORS.surface,
   },
   loadingText: {
     marginTop: 10,
-    color: '#020d1aff',
+    color: BRAND_COLORS.primaryDeep,
     fontSize: 16,
   },
   logoContainer: {
@@ -234,60 +259,60 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     height: 50,
-    borderColor: '#ccc',
+    borderColor: BRAND_COLORS.border,
     borderWidth: 1,
     marginBottom: 15,
     paddingLeft: 12,
     borderRadius: 8,
-    backgroundColor: '#fff',
+    backgroundColor: BRAND_COLORS.surface,
   },
   passwordInput: {
     flex: 1,
     height: '100%',
     fontSize: 16,
-    color: '#333',
+    color: BRAND_COLORS.text,
   },
   eyeIcon: {
     padding: 12,
   },
   input: {
     height: 50,
-    borderColor: '#ccc',
+    borderColor: BRAND_COLORS.border,
     borderWidth: 1,
     marginBottom: 15,
     paddingLeft: 12,
     fontSize: 16,
     borderRadius: 8,
-    backgroundColor: '#fff',
-    color: '#333',
+    backgroundColor: BRAND_COLORS.surface,
+    color: BRAND_COLORS.text,
   },
   error: {
-    color: 'red',
+    color: BRAND_COLORS.danger,
     marginBottom: 12,
     textAlign: 'center',
     fontSize: 14,
   },
   entrarButton: {
-    backgroundColor: '#007BFF',
+    backgroundColor: BRAND_COLORS.primary,
     paddingVertical: 15,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: BRAND_COLORS.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 1.5,
   },
   entrarButtonDisabled: {
-    backgroundColor: '#A0CFFF',
+    backgroundColor: '#8EB1EA',
     opacity: 0.8,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   entrarText: {
-    color: '#fff',
+    color: BRAND_COLORS.white,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -296,7 +321,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   forgotPasswordText: {
-    color: '#007BFF',
+    color: BRAND_COLORS.primaryDark,
     fontSize: 15,
   },
   registerButton: {
@@ -305,24 +330,24 @@ const styles = StyleSheet.create({
   },
   homeButton: {
     marginTop: 18,
-    backgroundColor: '#15aa2cff',
+    backgroundColor: BRAND_COLORS.success,
     paddingVertical: 15,
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: BRAND_COLORS.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.2,
     shadowRadius: 1.5,
   },
   homeText: {
-    color: '#fff',
+    color: BRAND_COLORS.white,
     fontSize: 18,
     fontWeight: 'bold',
   },
   registerText: {
-    color: '#007BFF',
+    color: BRAND_COLORS.primaryDark,
     fontSize: 16,
     fontWeight: 'bold',
   },

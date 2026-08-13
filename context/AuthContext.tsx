@@ -1,11 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { v4 as uuidv4 } from 'uuid';
-
-interface User {
-  uid: string;
-  email: string | null;
-}
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth } from '../firebaseConfig';
 
 interface AuthContextType {
   user: User | null;
@@ -57,14 +54,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     };
 
-    const checkAuthStatus = async () => {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setLoadingAuth(false);
-    };
-
     loadDeviceId();
-    checkAuthStatus();
 
+    const unsubscribe = onAuthStateChanged(auth, (authenticatedUser) => {
+      setUser(authenticatedUser);
+      setLoadingAuth(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const loading = loadingAuth || loadingDeviceId;

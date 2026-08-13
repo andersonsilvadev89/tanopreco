@@ -16,6 +16,7 @@ import {
 import { auth, database } from "../../firebaseConfig";
 import { ref, onValue, off } from "firebase/database";
 import { LinearGradient } from 'expo-linear-gradient';
+import { BRAND_COLORS } from '@/constants/BrandColors';
 
 // Habilitar animações de layout no Android
 if (
@@ -90,7 +91,7 @@ const Header = ({ onPressOfertas, onPressLogout, title, nomeUsuario }: HeaderPro
 
   return (
     <LinearGradient
-      colors={['#064ec7', '#04358a', '#011b4aff']}
+      colors={BRAND_COLORS.gradientPrimary}
       start={{ x: 0, y: 0 }}
       end={{ x: 0, y: 1 }}
       style={styles.headerContainer}
@@ -215,20 +216,20 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 40,
-    backgroundColor: '#ffffffff',
+    backgroundColor: BRAND_COLORS.white,
     borderWidth: 4,
     padding: 0,
-    borderColor: '#ffffffc3',
+    borderColor: BRAND_COLORS.drawerItemBorder,
   },
   logoutButton: {
     alignItems: 'center',
-    backgroundColor: '#f41c24',
+    backgroundColor: BRAND_COLORS.accentRed,
     width: 60,
     height: 60,
     borderRadius: 40,
     borderWidth: 4,
     padding: 0,
-    borderColor: '#ffffffc3',
+    borderColor: BRAND_COLORS.drawerItemBorder,
   },
   ofertasIcon: {
     width: 50,
@@ -285,7 +286,7 @@ const styles = StyleSheet.create({
   
   // ESTILOS DO ACORDEÃO E NOTIFICAÇÕES
   notificationsBox: {
-    backgroundColor: 'rgba(255, 255, 255, 1)',
+    backgroundColor: BRAND_COLORS.surface,
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     marginHorizontal: 0,
@@ -312,11 +313,11 @@ const styles = StyleSheet.create({
   notificacaoText: {
     fontSize: 15,
     fontWeight: 'bold',
-    color: '#000000ff',
+    color: BRAND_COLORS.text,
   },
   // Estilo do Badge (Contador)
   badgeContainer: {
-    backgroundColor: '#ff0000',
+    backgroundColor: BRAND_COLORS.accentRed,
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -332,7 +333,7 @@ const styles = StyleSheet.create({
   },
   arrowIcon: {
     fontSize: 14,
-    color: '#666',
+    color: BRAND_COLORS.textMuted,
     fontWeight: 'bold',
   },
   accordionContent: {
@@ -342,21 +343,21 @@ const styles = StyleSheet.create({
     maxHeight: 150, // Limita a altura da lista para não ocupar a tela toda
   },
   messageCard: {
-    backgroundColor: '#f0f0f0',
+    backgroundColor: BRAND_COLORS.surfaceSoft,
     borderRadius: 8,
     padding: 10,
     marginBottom: 8,
     width: "100%",
     borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
+    borderBottomColor: BRAND_COLORS.border,
   },
   messageText: {
     fontSize: 14,
-    color: '#333',
+    color: BRAND_COLORS.text,
   },
   emptyMessagesText: {
     fontSize: 14,
-    color: '#666',
+    color: BRAND_COLORS.textMuted,
     textAlign: 'center',
     fontStyle: 'italic',
     marginVertical: 10,
@@ -365,17 +366,17 @@ const styles = StyleSheet.create({
   // ESTILOS DO MODAL (Mantidos)
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: BRAND_COLORS.overlay,
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalContent: {
     width: '80%',
-    backgroundColor: 'white',
+    backgroundColor: BRAND_COLORS.surface,
     borderRadius: 20,
     padding: 20,
     alignItems: 'center',
-    shadowColor: '#000',
+    shadowColor: BRAND_COLORS.shadow,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -388,16 +389,16 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 15,
-    color: '#04358a',
+    color: BRAND_COLORS.primaryDark,
   },
   modalBodyText: {
     fontSize: 16,
-    color: '#333',
+    color: BRAND_COLORS.text,
     textAlign: 'justify',
     marginBottom: 20,
   },
   closeModalButton: {
-    backgroundColor: '#04358a',
+    backgroundColor: BRAND_COLORS.primaryDark,
     borderRadius: 20,
     padding: 10,
     elevation: 2,
@@ -405,7 +406,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   closeModalText: {
-    color: 'white',
+    color: BRAND_COLORS.white,
     fontWeight: 'bold',
     textAlign: 'center',
   },

@@ -7,7 +7,6 @@ import {
     TouchableOpacity,
     TextInput,
     Image,
-    ImageBackground,
     ActivityIndicator,
     SafeAreaView,
 } from 'react-native';
@@ -21,8 +20,7 @@ import { useNavigation } from '@react-navigation/native';
 import AdBanner from '../components/AdBanner';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import LocalizacaoModal from '../components/LocalizacaoModal';
-
-const defaultFundoLocal = require('../../assets/images/fundo.png');
+import { BRAND_COLORS } from '@/constants/BrandColors';
 
 // --- CONSTANTES CLOUDINARY ---
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dvekhdfgc/image/upload';
@@ -58,7 +56,6 @@ const ConfiguracoesEmpresaScreen = () => {
     const [longitude, setLongitude] = useState<number | null>(null);
 
     const [isLocationModalVisible, setIsLocationModalVisible] = useState(false);
-    const [currentFundoSource, setCurrentFundoSource] = useState<any>(defaultFundoLocal);
 
     const usuarioId = auth.currentUser?.uid;
 
@@ -299,17 +296,17 @@ const ConfiguracoesEmpresaScreen = () => {
 
     if (carregando) {
         return (
-            <ImageBackground source={currentFundoSource} style={styles.loadingContainer}>
-                <ActivityIndicator size="large" color="#fff" />
+            <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={BRAND_COLORS.white} />
                 <Text style={styles.loadingText}>Carregando...</Text>
-            </ImageBackground>
+            </View>
         );
     }
 
     const displayImageSource = novaImagemUri ? { uri: novaImagemUri } : (imagem ? { uri: imagem } : undefined);
 
     return (
-        <ImageBackground source={currentFundoSource} style={styles.background}>
+        <View style={styles.background}>
             <AdBanner />
             <SafeAreaView style={styles.safeArea}>
                 <KeyboardAwareScrollView contentContainerStyle={styles.scrollContainer} enableOnAndroid>
@@ -365,7 +362,7 @@ const ConfiguracoesEmpresaScreen = () => {
 
                                 <View style={styles.editActionsContainer}>
                                     <TouchableOpacity style={[styles.actionButton, styles.saveButton]} onPress={handleSalvarDadosEmpresa} disabled={isSaving}>
-                                        {isSaving ? <ActivityIndicator color="#fff" /> : <Text style={styles.actionButtonText}>Salvar</Text>}
+                                        {isSaving ? <ActivityIndicator color={BRAND_COLORS.white} /> : <Text style={styles.actionButtonText}>Salvar</Text>}
                                     </TouchableOpacity>
                                     <TouchableOpacity style={[styles.actionButton, styles.cancelButton]} onPress={() => setEditando(false)}>
                                         <Text style={styles.actionButtonText}>Cancelar</Text>
@@ -418,7 +415,7 @@ const ConfiguracoesEmpresaScreen = () => {
                 onSave={handleSaveLocation}
                 initialCoords={{ latitude, longitude }}
             />
-        </ImageBackground>
+        </View>
     );
 };
 
@@ -427,14 +424,14 @@ const ConfiguracoesEmpresaScreen = () => {
 // ---------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-    background: { flex: 1 },
+    background: { flex: 1, backgroundColor: BRAND_COLORS.surfaceSoft },
     safeArea: { flex: 1 },
     scrollContainer: { padding: 10 },
     loadingContainer: {
-        flex: 1, justifyContent: 'center', alignItems: 'center'
+        flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: BRAND_COLORS.surfaceSoft,
     },
     loadingText: {
-        marginTop: 10, color: '#fff', fontSize: 16
+        marginTop: 10, color: BRAND_COLORS.white, fontSize: 16
     },
     card: {
         backgroundColor: 'rgba(255,255,255,0.95)',
@@ -445,65 +442,65 @@ const styles = StyleSheet.create({
     profileDisplayContainer: { alignItems: 'center' },
     profileImage: {
         width: 120, height: 120, borderRadius: 100,
-        marginBottom: 5, backgroundColor: '#eee', alignSelf: 'center'
+        marginBottom: 5, backgroundColor: BRAND_COLORS.surfaceSoft, alignSelf: 'center'
     },
-    profileName: { fontSize: 24, fontWeight: 'bold', color: '#333' },
-    profileDescription: { fontSize: 16, color: '#666', fontStyle: 'italic' },
+    profileName: { fontSize: 24, fontWeight: 'bold', color: BRAND_COLORS.text },
+    profileDescription: { fontSize: 16, color: BRAND_COLORS.textMuted, fontStyle: 'italic' },
     detailsSection: { width: '100%', marginTop: 10 },
     detailRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 6 },
-    profileDetail: { marginLeft: 10, fontSize: 16, color: '#333' },
+    profileDetail: { marginLeft: 10, fontSize: 16, color: BRAND_COLORS.text },
 
     editButton: {
-        backgroundColor: '#007BFF',
+        backgroundColor: BRAND_COLORS.primary,
         paddingVertical: 10,
         paddingHorizontal: 25,
         borderRadius: 10,
         marginTop: 10
     },
-    editButtonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+    editButtonText: { color: BRAND_COLORS.white, fontSize: 16, fontWeight: 'bold' },
 
     profileEditContainer: { width: '100%', alignItems: 'center' },
-    changePhotoText: { color: '#007BFF', marginBottom: 10 },
+    changePhotoText: { color: BRAND_COLORS.primaryDark, marginBottom: 10 },
     input: {
         width: '100%',
-        backgroundColor: '#fff',
+        backgroundColor: BRAND_COLORS.surface,
         borderWidth: 1,
-        borderColor: '#ddd',
+        borderColor: BRAND_COLORS.border,
         borderRadius: 8,
         paddingHorizontal: 15,
         marginBottom: 10
     },
     editActionsContainer: { flexDirection: 'row', width: '100%', justifyContent: 'space-between' },
     actionButton: { flex: 1, paddingVertical: 10, marginHorizontal: 5, borderRadius: 8 },
-    saveButton: { backgroundColor: '#4CAF50' },
-    cancelButton: { backgroundColor: '#f44336' },
-    actionButtonText: { color: '#fff', textAlign: 'center', fontWeight: 'bold' },
+    saveButton: { backgroundColor: BRAND_COLORS.success },
+    cancelButton: { backgroundColor: BRAND_COLORS.danger },
+    actionButtonText: { color: BRAND_COLORS.white, textAlign: 'center', fontWeight: 'bold' },
 
-    sectionTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', textAlign: 'center' },
-    settingDescription: { textAlign: 'center', color: '#666', marginTop: 5 },
+    sectionTitle: { fontSize: 20, fontWeight: 'bold', color: BRAND_COLORS.text, textAlign: 'center' },
+    settingDescription: { textAlign: 'center', color: BRAND_COLORS.textMuted, marginTop: 5 },
 
     updateLocationButton: {
-        backgroundColor: '#4CAF50',
+        backgroundColor: BRAND_COLORS.success,
         paddingVertical: 12,
         borderRadius: 8,
         alignItems: 'center',
         marginTop: 12
     },
     updateLocationButtonText: {
-        color: '#fff', fontSize: 16, fontWeight: 'bold'
+        color: BRAND_COLORS.white, fontSize: 16, fontWeight: 'bold'
     },
-    selectMapButton: { backgroundColor: '#007BFF' },
-    currentCoordsText: { textAlign: 'center', color: '#333', marginTop: 10 },
+    selectMapButton: { backgroundColor: BRAND_COLORS.primary },
+    currentCoordsText: { textAlign: 'center', color: BRAND_COLORS.text, marginTop: 10 },
 
     deleteAccountButton: {
-        backgroundColor: '#d9534f',
+        backgroundColor: BRAND_COLORS.danger,
         paddingVertical: 12,
         borderRadius: 8,
         alignItems: 'center',
         marginTop: 15
     },
     deleteAccountButtonText: {
-        color: 'white',
+        color: BRAND_COLORS.white,
         fontSize: 16,
         fontWeight: 'bold'
     }

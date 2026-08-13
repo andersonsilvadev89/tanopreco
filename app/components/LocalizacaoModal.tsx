@@ -5,6 +5,7 @@ import { View, Text, Modal, Button, StyleSheet, Alert, TouchableOpacity, Activit
 import MapView, { Marker, Region } from "react-native-maps";
 import * as Location from "expo-location";
 import { Feather } from "@expo/vector-icons";
+import { BRAND_COLORS } from "@/constants/BrandColors";
 
 interface Props {
   isVisible: boolean;
@@ -97,7 +98,7 @@ const LocalizacaoModal: React.FC<Props> = ({ isVisible, onClose, onSave, initial
       <View style={styles.modalOverlay}>
         <View style={styles.modalContent}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Feather name="x" size={24} color="#333" />
+            <Feather name="x" size={24} color={BRAND_COLORS.text} />
           </TouchableOpacity>
           <Text style={styles.modalTitle}>📍 Selecionar Localização do Produto</Text>
           <Text style={styles.tipText}>
@@ -107,7 +108,7 @@ const LocalizacaoModal: React.FC<Props> = ({ isVisible, onClose, onSave, initial
           <View style={styles.mapContainer}>
             {loading ? (
                 <View style={styles.loadingMapContainer}>
-                    <ActivityIndicator size="large" color="#007BFF" />
+                <ActivityIndicator size="large" color={BRAND_COLORS.primary} />
                     <Text>Carregando mapa...</Text>
                 </View>
             ) : (
@@ -150,7 +151,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     width: "90%",
-    backgroundColor: "white",
+    backgroundColor: BRAND_COLORS.surface,
     padding: 15,
     borderRadius: 10,
     alignItems: "stretch",
@@ -161,11 +162,11 @@ const styles = StyleSheet.create({
     top: 5,
     right: 5,
     zIndex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: BRAND_COLORS.surface,
     borderRadius: 20,
     padding: 5,
     elevation: 5,
-    shadowColor: "#000",
+    shadowColor: BRAND_COLORS.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
@@ -179,13 +180,13 @@ const styles = StyleSheet.create({
   },
   tipText: {
     textAlign: 'center',
-    color: '#666',
+    color: BRAND_COLORS.textMuted,
     marginBottom: 10,
     fontSize: 12,
   },
   coordsText: {
     textAlign: 'center',
-    color: '#333',
+    color: BRAND_COLORS.text,
     marginBottom: 15,
     fontWeight: 'bold',
   },
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#ccc',
+    borderColor: BRAND_COLORS.border,
   },
   map: {
     flex: 1,
@@ -205,7 +206,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f0f0',
+    backgroundColor: BRAND_COLORS.surfaceSoft,
   }
 });
 

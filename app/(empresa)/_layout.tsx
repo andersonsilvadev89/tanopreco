@@ -4,6 +4,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import React, { useState, useEffect } from 'react';
 import { FontAwesome5, MaterialCommunityIcons, AntDesign } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient'; // <--- Importante
+import { BRAND_COLORS } from '@/constants/BrandColors';
 
 export default function EmpresaLayout() {
   const [user, setUser] = useState<any>(null);
@@ -28,8 +29,8 @@ export default function EmpresaLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: "#ffffffea",
-        tabBarInactiveTintColor: "#fff",
+        tabBarActiveTintColor: BRAND_COLORS.white,
+        tabBarInactiveTintColor: BRAND_COLORS.tabInactive,
         // Configuração para permitir o gradiente
         tabBarStyle: {
           backgroundColor: "transparent", // Fundo transparente
@@ -41,7 +42,7 @@ export default function EmpresaLayout() {
         // O componente de fundo com gradiente
         tabBarBackground: () => (
           <LinearGradient
-            colors={['#064ec7', '#04358a', '#011b4aff']} // Mesmo gradiente azul vibrante
+            colors={BRAND_COLORS.gradientPrimary}
             style={{ flex: 1 }}
             start={{ x: 0, y: 0 }}
             end={{ x: 0, y: 1 }}
@@ -74,7 +75,7 @@ export default function EmpresaLayout() {
         name="sobreScreen"
         options={{
           title: 'Sobre',
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <AntDesign name="infocirlceo" color={color} size={size} />,
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <AntDesign name="info-circle" color={color} size={size} />,
         }}
       />
     </Tabs>

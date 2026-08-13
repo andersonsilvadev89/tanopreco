@@ -1,14 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, Image, StyleSheet, ActivityIndicator, Platform } from 'react-native';
-import {
-    NativeAd,
-    NativeAdView,
-    NativeAsset,
-    NativeAssetType,
-    NativeMediaView,
-    TestIds,
-} from 'react-native-google-mobile-ads';
-import type { NativeAd as NativeAdType } from 'react-native-google-mobile-ads';
+import { getGoogleMobileAdsModule, isGoogleMobileAdsAvailable } from '../utils/googleMobileAds';
+import { BRAND_COLORS } from '@/constants/BrandColors';
 
 // ------------------------------------------------------------------
 // 🔧 CONFIGURAÇÃO POR PLATAFORMA (ANDROID / iOS)
@@ -17,37 +10,51 @@ import type { NativeAd as NativeAdType } from 'react-native-google-mobile-ads';
 const IOS_AD_UNIT_ID = 'ca-app-pub-5241782827769638/1260262961';
 const ANDROID_AD_UNIT_ID = 'ca-app-pub-5241782827769638/2862164767';
 
-// Se estiver em modo de desenvolvimento, usar o ID de teste do Google
-const AD_UNIT_ID = __DEV__
-    ? TestIds.NATIVE
-    : Platform.select({
-        ios: IOS_AD_UNIT_ID,
-        android: ANDROID_AD_UNIT_ID,
-    })|| TestIds.NATIVE;
-
 const AdCard: React.FC = () => {
-    const [nativeAd, setNativeAd] = useState<NativeAdType | null>(null);
+    const googleMobileAds = getGoogleMobileAdsModule();
+    const [nativeAd, setNativeAd] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<Error | null>(null);
 
-    const adRef = useRef<NativeAdType | null>(null);
+    const adRef = useRef<any>(null);
+
+    if (!isGoogleMobileAdsAvailable || !googleMobileAds) {
+        return null;
+    }
+
+    const {
+        NativeAd,
+        NativeAdView,
+        NativeAsset,
+        NativeAssetType,
+        NativeMediaView,
+        TestIds,
+    } = googleMobileAds;
+
+    // Se estiver em modo de desenvolvimento, usar o ID de teste do Google
+    const AD_UNIT_ID = __DEV__
+        ? TestIds.NATIVE
+        : Platform.select({
+            ios: IOS_AD_UNIT_ID,
+            android: ANDROID_AD_UNIT_ID,
+        }) || TestIds.NATIVE;
 
     useEffect(() => {
         let isMounted = true;
 
         // Cria o anúncio e carrega automaticamente
         NativeAd.createForAdRequest(AD_UNIT_ID)
-            .then((ad) => {
+            .then((ad: any) => {
                 if (!isMounted) return;
 
                 adRef.current = ad;
                 setNativeAd(ad);
                 setLoading(false);
             })
-            .catch((err) => {
+            .catch((err: unknown) => {
                 console.error('Erro ao criar NativeAd:', err);
                 if (isMounted) {
-                    setError(err);
+                    setError(err instanceof Error ? err : new Error('Falha ao carregar NativeAd'));
                     setLoading(false);
                 }
             });
@@ -63,7 +70,7 @@ const AdCard: React.FC = () => {
     if (loading) {
         return (
             <View style={styles.loadingContainer}>
-                <ActivityIndicator color="#007bff" />
+                <ActivityIndicator color={BRAND_COLORS.primary} />
                 <Text style={styles.loadingText}>Carregando anúncio...</Text>
             </View>
         );
@@ -153,7 +160,7 @@ const styles = StyleSheet.create({
         padding: 10, // Padding interno do produto real (do HomeScreen)
     },
     loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    loadingText: { marginTop: 8, fontSize: 12, color: '#888' },
+    loadingText: { marginTop: 8, fontSize: 12, color: BRAND_COLORS.textMuted },
     errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     errorText: { padding: 16, color: 'red' },
 
@@ -184,7 +191,7 @@ const styles = StyleSheet.create({
     // --- CONTAINER DA EMPRESA (FUNDO CINZA) ---
     empresaContainerSimulado: {
         width: "100%",
-        backgroundColor: "#f7f7f7", // Cor do 'empresaContainer' no HomeScreen
+        backgroundColor: BRAND_COLORS.surfaceSoft,
         borderRadius: 8,
         padding: 8,
         marginTop: 8,
@@ -193,14 +200,14 @@ const styles = StyleSheet.create({
     },
     confiraOfertaSimulado: {
         fontSize: 12,
-        color: "#555",
+        color: BRAND_COLORS.textMuted,
         fontWeight: "bold",
         marginBottom: 2,
         textAlign: "center",
     },
     advertiser: {
         fontSize: 12,
-        color: '#0056b3', // Cor do 'nomeEmpresa' do produto
+        color: BRAND_COLORS.primaryDark,
         fontWeight: 'bold',
         marginBottom: 5,
         textAlign: 'center'
@@ -209,7 +216,7 @@ const styles = StyleSheet.create({
     // --- CTA (Botão de Ação) ---
     cta: {
         // Simula o estilo da linha de botões de ação do produto
-        backgroundColor: '#007BFF', // Cor de Traçar Rota
+        backgroundColor: BRAND_COLORS.primary,
         borderRadius: 20,
         paddingVertical: 6,
         paddingHorizontal: 18,
@@ -217,7 +224,7 @@ const styles = StyleSheet.create({
         marginBottom: 5,
     },
     ctaText: {
-        color: 'white',
+        color: BRAND_COLORS.white,
         fontWeight: 'bold',
         fontSize: 13,
         textAlign: 'center'
@@ -226,7 +233,7 @@ const styles = StyleSheet.create({
     // --- BADGE (Patrocinado) ---
     adBadge: {
         fontSize: 10,
-        color: '#777',
+        color: BRAND_COLORS.textMuted,
         marginTop: 6,
         position: 'absolute', // Coloca o badge em uma posição fixa se necessário
         bottom: 0,

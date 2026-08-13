@@ -13,7 +13,6 @@ import {
   ScrollView,
   Keyboard,
   StyleSheet,
-  ImageBackground,
   Linking,
   Switch,
   Dimensions,
@@ -34,8 +33,7 @@ import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker"; // ✅ IMPORTADO
 
 import LocalizacaoModal from "../components/LocalizacaoModal";
-
-const defaultFundoLocal = require("../../assets/images/fundo.png");
+import { BRAND_COLORS } from "@/constants/BrandColors";
 const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dvekhdfgc/image/upload";
 const UPLOAD_PRESET = "tanopreco";
 
@@ -569,22 +567,15 @@ export default function CadastroProduto() {
 
   if (loadingCompanyData) {
     return (
-      <ImageBackground
-        source={defaultFundoLocal}
-        style={styles.loadingContainer}
-      >
-        <ActivityIndicator size="large" color="#007BFF" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={BRAND_COLORS.primary} />
         <Text style={styles.loadingText}>Carregando dados da empresa...</Text>
-      </ImageBackground>
+      </View>
     );
   }
 
   return (
-    <ImageBackground
-      source={defaultFundoLocal}
-      style={styles.background}
-      resizeMode="cover"
-    >
+    <View style={styles.background}>
       <AdBanner />
       <View style={styles.contentContainer}>
         <ScrollView
@@ -680,7 +671,7 @@ export default function CadastroProduto() {
                         setShowDatePicker(true);
                     }}
                 >
-                    <Feather name="calendar" size={24} color="#007BFF" />
+                  <Feather name="calendar" size={24} color={BRAND_COLORS.primary} />
                 </TouchableOpacity>
             </View>
             
@@ -968,13 +959,14 @@ export default function CadastroProduto() {
         />
 
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   background: {
     flex: 1,
+    backgroundColor: BRAND_COLORS.surfaceSoft,
   },
   contentContainer: {
     flex: 1,
@@ -1004,7 +996,7 @@ const styles = StyleSheet.create({
   },
   limitMessage: {
     fontSize: 14,
-    color: "#007BFF",
+    color: BRAND_COLORS.primary,
     textAlign: "center",
     marginBottom: 15,
     paddingHorizontal: 5,
@@ -1092,7 +1084,7 @@ const styles = StyleSheet.create({
   },
   localizacaoText: {
     fontSize: 10,
-    color: "#007BFF",
+    color: BRAND_COLORS.primary,
     marginTop: 2,
     fontWeight: 'bold',
   },
@@ -1131,7 +1123,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 10,
-    color: "#007BFF",
+    color: BRAND_COLORS.primary,
     fontSize: 16,
   },
   bottomButtonsContainer: {
@@ -1197,7 +1189,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoriaNuvemBotaoSelecionado: {
-    backgroundColor: "#007BFF",
+    backgroundColor: BRAND_COLORS.primary,
   },
   categoriaNuvemTexto: {
     color: "#333",
@@ -1240,7 +1232,7 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
   },
   saveButton: {
-    backgroundColor: "#007BFF",
+    backgroundColor: BRAND_COLORS.primary,
     paddingVertical: 8,
     paddingHorizontal: 20,
     borderRadius: 3,
@@ -1248,12 +1240,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   saveButtonText: {
-    color: '#fff',
+    color: BRAND_COLORS.white,
     fontSize: 16,
     fontWeight: 'bold',
   },
   localizacaoBotao: {
-    backgroundColor: "#007BFF",
+    backgroundColor: BRAND_COLORS.primary,
     padding: 10,
     borderRadius: 8,
     alignItems: "center",
@@ -1263,7 +1255,7 @@ const styles = StyleSheet.create({
     gap: 5,
   },
   localizacaoBotaoTexto: {
-    color: "white",
+    color: BRAND_COLORS.white,
     fontWeight: "bold",
   },
   filterContainer: {
@@ -1276,20 +1268,20 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 8,
     borderWidth: 1,
-    borderColor: '#007BFF',
+    borderColor: BRAND_COLORS.primary,
     borderRadius: 20,
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: BRAND_COLORS.surface,
   },
   filterButtonActive: {
-    backgroundColor: '#007BFF',
+    backgroundColor: BRAND_COLORS.primary,
   },
   filterText: {
-    color: '#007BFF',
+    color: BRAND_COLORS.primary,
     fontWeight: 'bold',
     fontSize: 12,
   },
   filterTextActive: {
-    color: '#fff',
+    color: BRAND_COLORS.white,
   },
 });

@@ -2,7 +2,6 @@ import {
   View,
   Text,
   StyleSheet,
-  ImageBackground,
   ScrollView,
   Alert,
   ActivityIndicator, 
@@ -15,8 +14,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { auth, database, adminDatabase } from '../../firebaseConfig'; 
 import { ref, get, push, serverTimestamp, onValue } from 'firebase/database';
 import AdBanner from '../components/AdBanner'; 
-
-const defaultFundoLocal = require('../../assets/images/fundo.png');
+import { BRAND_COLORS } from '@/constants/BrandColors';
 
 // Constantes de configuração do Firebase
 const FIREBASE_COLLECTION = 'configuracoes_apps';
@@ -82,10 +80,10 @@ export default function Sobre() {
     }
 
     const user = auth.currentUser;
-    if (!user) {
+    /*if (!user) { essa verificação não condiz com este app!
       Alert.alert("Acesso Negado", "Você precisa estar logado para enviar feedback. Por favor, faça login e tente novamente.");
       return;
-    }
+    }*/
 
     setEnviandoFeedback(true);
     try {
@@ -109,19 +107,15 @@ export default function Sobre() {
 
   if (loadingSobreAppTexto) { 
     return (
-      <ImageBackground source={defaultFundoLocal} style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007BFF" />
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={BRAND_COLORS.primary} />
         <Text style={styles.loadingText}>Carregando informações do app...</Text>
-      </ImageBackground>
+      </View>
     );
   }
 
   return (
-    <ImageBackground
-      source={defaultFundoLocal} 
-      style={styles.container}
-      resizeMode="cover"
-    >
+    <View style={styles.container}>
       <AdBanner />
 
       <View style={styles.contentArea}>
@@ -142,10 +136,10 @@ export default function Sobre() {
             <TextInput 
               style={styles.textInputSugestao} 
               multiline 
-              placeholder="Sua opinião é muito importante para nós! Conte aqui sua sugestão ou problema..." 
+              placeholder="Sua opinião é muito importante para nós! Identifique-se e conte-nos aqui sua sugestão ou problema..." 
               value={sugestao} 
               onChangeText={setSugestao} 
-              placeholderTextColor="#777" 
+              placeholderTextColor={BRAND_COLORS.textMuted}
               editable={!enviandoFeedback} 
             />
             <TouchableOpacity 
@@ -154,7 +148,7 @@ export default function Sobre() {
               disabled={enviandoFeedback}
             >
               {enviandoFeedback ? (
-                <ActivityIndicator size="small" color="#fff" />
+                <ActivityIndicator size="small" color={BRAND_COLORS.white} />
               ) : (
                 <Text style={styles.botaoEnviarTexto}>Enviar Feedback</Text>
               )}
@@ -162,18 +156,18 @@ export default function Sobre() {
           </ScrollView>
         </View>
       </View>
-    </ImageBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  container: { flex: 1, backgroundColor: BRAND_COLORS.surfaceSoft },
   contentArea: { flex: 1, paddingHorizontal: 10, paddingBottom: 10 },
-  sectionWrapper: { flex: 1, marginTop: 10, backgroundColor: 'rgba(255, 255, 255, 1)', borderRadius: 10, overflow: 'hidden', borderColor: '#0056b3', borderWidth:  1},
+  sectionWrapper: { flex: 1, marginTop: 10, backgroundColor: 'rgba(255, 255, 255, 1)', borderRadius: 10, overflow: 'hidden', borderColor: BRAND_COLORS.primaryDark, borderWidth:  1},
   scrollContentContainer: { padding: 15, paddingBottom: 20 },
-  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: '#2c3e50', textAlign: 'center' },
+  title: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, color: BRAND_COLORS.primaryDeep, textAlign: 'center' },
 
-  paragraphText: { fontSize: 16, color: '#34495e', textAlign: 'justify', lineHeight: 25, marginBottom: 15 },
+  paragraphText: { fontSize: 16, color: BRAND_COLORS.text, textAlign: 'justify', lineHeight: 25, marginBottom: 15 },
   
   supportersContainer: { flex: 0.7, justifyContent: 'center', alignItems: 'center', marginTop: 5 },
   supportersTitle: { fontSize: 19, fontWeight: 'bold', color: '#FFFFFF', marginTop: 10, marginBottom: 8, textShadowColor: 'rgba(0, 0, 0, 0.6)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
@@ -183,18 +177,19 @@ const styles = StyleSheet.create({
   supporterErrorText: { color: '#FFC107', fontSize: 14, textAlign: 'center', marginHorizontal: 15, marginTop: 10 },
   supporterLogo: { width: 95, height: 95, resizeMode: 'contain', borderRadius: 10, backgroundColor: '#f8f9fa', marginLeft: 10, borderWidth: 1, borderColor: '#dee2e6' },
 
-  textInputSugestao: { width: '100%', height: 100, borderColor: '#bdc3c7', borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 16, textAlignVertical: 'top', marginBottom: 10, backgroundColor: '#fff', color: '#2c3e50' },
-  botaoEnviar: { backgroundColor: '#3498db', paddingVertical: 10, paddingHorizontal: 35, borderRadius: 30, alignItems: 'center', justifyContent: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, alignSelf: 'center', minWidth: 150 },
+  textInputSugestao: { width: '100%', height: 100, borderColor: BRAND_COLORS.border, borderWidth: 1, borderRadius: 8, padding: 12, fontSize: 16, textAlignVertical: 'top', marginBottom: 10, backgroundColor: BRAND_COLORS.surface, color: BRAND_COLORS.text },
+  botaoEnviar: { backgroundColor: BRAND_COLORS.primary, paddingVertical: 10, paddingHorizontal: 35, borderRadius: 30, alignItems: 'center', justifyContent: 'center', elevation: 3, shadowColor: BRAND_COLORS.shadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.2, shadowRadius: 4, alignSelf: 'center', minWidth: 150 },
   botaoDesabilitado: { backgroundColor: '#95a5a6' },
-  botaoEnviarTexto: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  botaoEnviarTexto: { color: BRAND_COLORS.white, fontSize: 16, fontWeight: '600' },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: BRAND_COLORS.surfaceSoft,
   },
   loadingText: {
     marginTop: 10,
-    color: '#01060aff',
+    color: BRAND_COLORS.primaryDeep,
     fontSize: 16,
     textShadowColor: 'rgba(0, 0, 0, 0.75)', 
     textShadowOffset: { width: 1, height: 1 },
