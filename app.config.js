@@ -115,7 +115,28 @@ export default {
         "icon": "./assets/images/notification-icon.png",
         "color": "#ffffff"
       }
-    ]
+    ],
+    // -------- INÍCIO DA REGRA DO MANIFEST --------
+    (config) => {
+      const { withAndroidManifest } = require('@expo/config-plugins');
+      return withAndroidManifest(config, (config) => {
+        const manifest = config.modResults;
+        const app = manifest.manifest.application[0];
+        
+        manifest.manifest.$['xmlns:tools'] = 'http://schemas.android.com/tools';
+        app.$['android:appComponentFactory'] = 'androidx.core.app.CoreComponentFactory';
+        
+        if (app.$['tools:replace']) {
+          if (!app.$['tools:replace'].includes('android:appComponentFactory')) {
+            app.$['tools:replace'] += ',android:appComponentFactory';
+          }
+        } else {
+          app.$['tools:replace'] = 'android:appComponentFactory';
+        }
+        return config;
+      });
+    }
+    // -------- FIM DA REGRA DO MANIFEST --------
   ],
   experiments: {
     typedRoutes: true
