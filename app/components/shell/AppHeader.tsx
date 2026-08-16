@@ -124,11 +124,11 @@ const s = StyleSheet.create({
     zIndex: 1,
   },
   logo: {
-    height: 40,
-    width: "60%",
+    height: 42,
+    width: "70%",
     backgroundColor: BRAND_COLORS.surfaceSoft,
-    borderTopRightRadius: 45,
-    borderBottomLeftRadius: 45
+    borderTopRightRadius: 50,
+    borderBottomLeftRadius: 50,
 
   },
   avatarBtn: {

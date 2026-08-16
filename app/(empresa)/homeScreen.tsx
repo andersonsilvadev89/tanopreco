@@ -23,9 +23,8 @@ import * as WebBrowser from 'expo-web-browser';
 import { signOut } from "firebase/auth";
 
 // Importações de componentes de Ads
-import AdBanner from '../components/AdBanner';
 import AdCard from '../components/AdCard';
-import Header from '../components/Header';
+import { AppHeaderTitle } from '../components/shell/AppHeaderTitle';
 import { BRAND_COLORS } from '@/constants/BrandColors';
 const { width } = Dimensions.get('window');
 const SCREEN_PADDING = 20;
@@ -139,12 +138,13 @@ const HomeScreen = () => {
 
     return (
         <View style={styles.background}>
-            <AdBanner />
-            <Header
+            <AppHeaderTitle
                 title="Área Empresarial"
-                nomeUsuario={userName}
-                onPressOfertas={() => navigate('/(tabs)/homeScreen')}
-                onPressLogout={confirmarLogout}
+                user={auth.currentUser}
+                paddingTop={18}
+                onBack={() => {}}
+                onMenuOpen={() => {}}
+                onLogout={confirmarLogout}
             />
             <SafeAreaView style={styles.safeAreaContent}>
                 <ScrollView contentContainerStyle={styles.scrollViewContent}>

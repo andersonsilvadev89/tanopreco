@@ -28,7 +28,7 @@ import {
   get,
 } from "firebase/database";
 import { auth, database } from "../../firebaseConfig";
-import AdBanner from "../components/AdBanner";
+import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker"; // ✅ IMPORTADO
 
@@ -576,7 +576,14 @@ export default function CadastroProduto() {
 
   return (
     <View style={styles.background}>
-      <AdBanner />
+      <AppHeaderTitle
+        title="Produtos"
+        user={auth.currentUser}
+        paddingTop={18}
+        onBack={() => {}}
+        onMenuOpen={() => {}}
+        onLogout={() => {}}
+      />
       <View style={styles.contentContainer}>
         <ScrollView
           ref={scrollRef}

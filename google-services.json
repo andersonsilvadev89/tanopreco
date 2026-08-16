@@ -13,7 +13,36 @@
           "package_name": "com.tanopreco"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "662489416845-a3vchcf75evv9u0f7afeikh61tkikm3c.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tanopreco",
+            "certificate_hash": "4cc4c28e7c26abc06441fb1cb063085467877110"
+          }
+        },
+        {
+          "client_id": "662489416845-hu7npd3c1khjuvaf9c4d6ch306rt3u99.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tanopreco",
+            "certificate_hash": "5e8f16062ea3cd2c4a0d547876baa6f38cabf625"
+          }
+        },
+        {
+          "client_id": "662489416845-uad0a6cltk9ihk0g8pcjok8otev5la54.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.tanopreco",
+            "certificate_hash": "6ccfbeaa18c1cbcf7d76ed951a62e384a9b0f829"
+          }
+        },
+        {
+          "client_id": "662489416845-uo9j6c853urp19r55p23p43rubj9i9ph.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyA7oJ0l7dADR925nDTJzA7RCjn7TiucZa4"
@@ -21,7 +50,20 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "662489416845-uo9j6c853urp19r55p23p43rubj9i9ph.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "662489416845-0jt9lns53lt5j6s2l6ho8n72ftm6gtso.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.tanopreco",
+                "app_store_id": "6754825370"
+              }
+            }
+          ]
         }
       }
     }

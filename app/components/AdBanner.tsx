@@ -109,6 +109,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderRadius: 12,
         overflow: 'hidden',
+        
     },
     // Estilo para esconder o AD WRAPPER e, consequentemente, o BannerAd
     hiddenAdWrapper: {
@@ -121,7 +122,7 @@ const styles = StyleSheet.create({
         width: '100%', 
         justifyContent: 'center',
         alignItems: 'center',
-        backgroundColor: '#f0f0f0',
+        backgroundColor: 'transparent',
         borderRadius: 12,
         overflow: 'hidden',
     },

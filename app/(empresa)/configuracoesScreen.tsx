@@ -17,7 +17,7 @@ import { ref, set, get, update, remove } from 'firebase/database';
 import { auth, database } from '../../firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
 
-import AdBanner from '../components/AdBanner';
+import { AppHeaderTitle } from '../components/shell/AppHeaderTitle';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import LocalizacaoModal from '../components/LocalizacaoModal';
 import { BRAND_COLORS } from '@/constants/BrandColors';
@@ -307,7 +307,14 @@ const ConfiguracoesEmpresaScreen = () => {
 
     return (
         <View style={styles.background}>
-            <AdBanner />
+            <AppHeaderTitle
+                title="Configurações"
+                user={auth.currentUser}
+                paddingTop={18}
+                onBack={() => navigation.goBack()}
+                onMenuOpen={() => {}}
+                onLogout={() => {}}
+            />
             <SafeAreaView style={styles.safeArea}>
                 <KeyboardAwareScrollView contentContainerStyle={styles.scrollContainer} enableOnAndroid>
 

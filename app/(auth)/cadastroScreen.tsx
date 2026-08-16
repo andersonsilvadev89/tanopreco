@@ -23,7 +23,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view
 import { Feather } from "@expo/vector-icons";
 import { MaskedTextInput } from "react-native-mask-text";
 import { router } from "expo-router";
-import AdBanner from "../components/AdBanner";
+import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
 import CpfInput from "../components/CpfInput";
 import CnpjInput from "../components/CnpjInput";
 import { BRAND_COLORS } from "@/constants/BrandColors";
@@ -421,7 +421,14 @@ export default function CadastroScreen() {
 
   return (
     <View style={styles.background}>
-      <AdBanner />
+      <AppHeaderTitle
+        title="Criar conta"
+        user={null}
+        paddingTop={18}
+        onBack={() => {}}
+        onMenuOpen={() => {}}
+        onLogout={() => {}}
+      />
 
       <KeyboardAwareScrollView
         contentContainerStyle={styles.scrollContent}

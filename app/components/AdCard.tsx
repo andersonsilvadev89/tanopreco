@@ -1,14 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, Image, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Platform, Dimensions } from 'react-native';
 import { getGoogleMobileAdsModule, isGoogleMobileAdsAvailable } from '../utils/googleMobileAds';
 import { BRAND_COLORS } from '@/constants/BrandColors';
 
 // ------------------------------------------------------------------
-// 🔧 CONFIGURAÇÃO POR PLATAFORMA (ANDROID / iOS)
+// 🔧 CONFIGURAÇÃO POR PLATAFORMA (ANDROID / iOS) E DIMENSÕES
 // ------------------------------------------------------------------
 
 const IOS_AD_UNIT_ID = 'ca-app-pub-5241782827769638/1260262961';
 const ANDROID_AD_UNIT_ID = 'ca-app-pub-5241782827769638/2862164767';
+
+// Importando as mesmas constantes de dimensão do ProdutoCard
+const { width } = Dimensions.get('window');
+const CARD_MARGIN = 12;
+const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2;
+const CARD_MIN_HEIGHT = 270;
 
 const AdCard: React.FC = () => {
     const googleMobileAds = getGoogleMobileAdsModule();
@@ -31,7 +37,6 @@ const AdCard: React.FC = () => {
         TestIds,
     } = googleMobileAds;
 
-    // Se estiver em modo de desenvolvimento, usar o ID de teste do Google
     const AD_UNIT_ID = __DEV__
         ? TestIds.NATIVE
         : Platform.select({
@@ -42,11 +47,9 @@ const AdCard: React.FC = () => {
     useEffect(() => {
         let isMounted = true;
 
-        // Cria o anúncio e carrega automaticamente
         NativeAd.createForAdRequest(AD_UNIT_ID)
             .then((ad: any) => {
                 if (!isMounted) return;
-
                 adRef.current = ad;
                 setNativeAd(ad);
                 setLoading(false);
@@ -59,7 +62,6 @@ const AdCard: React.FC = () => {
                 }
             });
 
-        // Cleanup
         return () => {
             isMounted = false;
             adRef.current?.destroy();
@@ -77,167 +79,181 @@ const AdCard: React.FC = () => {
     }
 
     if (error || !nativeAd) {
-        return (
-            <View style={styles.errorContainer}>
-                <Text style={styles.errorText}>Erro ao carregar anúncio.</Text>
-            </View>
-        );
+        return null; // Oculta o card se der erro para não quebrar a listagem
     }
 
     return (
         <NativeAdView nativeAd={nativeAd} style={styles.adContainer}>
-            <View style={styles.card}>
+            <View style={styles.cardProduto}>
+                
+                {/* ÁREA DA IMAGEM E BADGES */}
+                <View style={styles.imageArea}>
+                    
+                    {/* 1. Imagem Principal */}
+                    <NativeMediaView style={styles.imagemProduto} />
 
-                {/* 1. Mídia (Imagem Principal) - Topo, como a imagem do produto */}
-                <NativeMediaView style={styles.media} />
-
-                {/* 2. Headline (Descrição) */}
-                <NativeAsset assetType={NativeAssetType.HEADLINE}>
-                    <Text style={styles.headline} numberOfLines={2}>
-                        {nativeAd.headline}
-                    </Text>
-                </NativeAsset>
-
-                {/* 3. Price (Simulado pelo Advertiser/Body) - Usa a cor 'green' */}
-                <NativeAsset assetType={NativeAssetType.BODY}>
-                    <Text style={styles.simulatedPrice}>
-                        {/* Exibe a descrição/corpo como se fosse o preço ou uma chamada */}
-                        {nativeAd.body ? nativeAd.body.substring(0, 30) + '...' : 'Confira a Oferta!'}
-                    </Text>
-                </NativeAsset>
-
-                {/* 4. Container da Empresa (Advertiser e CTA como botões de ação) */}
-                <View style={styles.empresaContainerSimulado}>
-                    <Text style={styles.confiraOfertaSimulado}>
-                        Confira a oferta direto na empresa:
-                    </Text>
-
-                    {/* Nome da Empresa (Advertiser) */}
+                    {/* 2. Badge Empresa (Anunciante no Topo Esquerdo) */}
                     {nativeAd.advertiser && (
-                        <NativeAsset assetType={NativeAssetType.ADVERTISER}>
-                            <Text style={styles.advertiser}>{nativeAd.advertiser}</Text>
-                        </NativeAsset>
+                        <View style={styles.badgeEmpresaWrapper}>
+                            <NativeAsset assetType={NativeAssetType.ADVERTISER}>
+                                <View style={styles.badgeEmpresa}>
+                                    <Text style={styles.badgeEmpresaText} numberOfLines={1}>
+                                        {nativeAd.advertiser}
+                                    </Text>
+                                </View>
+                            </NativeAsset>
+                        </View>
                     )}
 
-                    {/* Botão CTA (Simulando o botão de Rota/Contato) */}
+                    {/* 3. Badge Preço (Call to Action no Canto Inferior Direito) */}
                     {nativeAd.callToAction && (
-                        <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
-                            <View style={styles.cta}>
-                                <Text style={styles.ctaText}>{nativeAd.callToAction}</Text>
-                            </View>
+                        <View style={styles.badgePrecoWrapper}>
+                            <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
+                                <View style={styles.badgePreco}>
+                                    <Text style={styles.badgePrecoText}>
+                                        {nativeAd.callToAction}
+                                    </Text>
+                                </View>
+                            </NativeAsset>
+                        </View>
+                    )}
+                </View>
+
+                {/* 4. Descrição (Headline simulando nome do produto) */}
+                <View style={styles.descRow}>
+                    <NativeAsset assetType={NativeAssetType.HEADLINE}>
+                        <Text style={styles.descricao} numberOfLines={2}>
+                            {nativeAd.headline}
+                        </Text>
+                    </NativeAsset>
+                </View>
+
+                {/* 5. Meta Data (Body do anúncio + Tag Patrocinado) */}
+                <View style={styles.metaRow}>
+                    <Text style={styles.distancia}>Patrocinado</Text>
+                    {nativeAd.body && (
+                        <NativeAsset assetType={NativeAssetType.BODY}>
+                            <Text style={styles.dataOferta} numberOfLines={1}>
+                                {nativeAd.body}
+                            </Text>
                         </NativeAsset>
                     )}
                 </View>
 
-                {/* Badge Patrocinado, no rodapé */}
-                <Text style={styles.adBadge}>Patrocinado</Text>
             </View>
         </NativeAdView>
     );
 };
 
 // ------------------------------------------------------------------
-// ESTILOS AJUSTADOS PARA COMBINAR COM O HOMESCREEN
+// ESTILOS GÊMEOS AO PRODUTOCARD
 // ------------------------------------------------------------------
 
 const styles = StyleSheet.create({
-    // O adContainer no AdCard precisa refletir o estilo do cardProdutoGenerico/cardProduto
     adContainer: {
-        // Estas margens/paddings são adicionais ao que já está no HomeScreen
-        padding: 0, // Removido o padding interno para usar o padding do 'cardProdutoGenerico'
+        padding: 0,
         backgroundColor: 'transparent',
         elevation: 0,
         margin: 0,
-        // O container principal deve ocupar 100% da área disponível
-        width: '100%',
-        flex: 1,
     },
-    card: {
-        // Garante que o conteúdo ocupe toda a área do container
-        flex: 1,
-        width: '100%',
-        alignItems: 'center', // Centralizado como o card de produto
-        padding: 10, // Padding interno do produto real (do HomeScreen)
-    },
-    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    loadingText: { marginTop: 8, fontSize: 12, color: BRAND_COLORS.textMuted },
-    errorContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    errorText: { padding: 16, color: 'red' },
-
-    // --- MÍDIA ---
-    media: {
-        width: '100%',
-        height: 100, // 💡 IGUAL À IMAGEM DO PRODUTO NO HOMESCREEN
-        marginVertical: 5, // Simula o margin top da imagem do produto
-        borderRadius: 8
-    },
-
-    // --- TEXTOS ---
-    headline: {
-        fontSize: 15, // Tamanho da 'descricao' do produto
-        fontWeight: 'bold',
-        textAlign: 'center',
-        marginBottom: 5,
-        marginVertical: 0,
-    },
-    simulatedPrice: {
-        fontSize: 15,
-        color: 'green', // Cor do 'preco' do produto
-        fontWeight: '600',
-        textAlign: 'center',
-        marginBottom: 2,
-    },
-
-    // --- CONTAINER DA EMPRESA (FUNDO CINZA) ---
-    empresaContainerSimulado: {
-        width: "100%",
-        backgroundColor: BRAND_COLORS.surfaceSoft,
-        borderRadius: 8,
+    cardProduto: {
+        width: CARD_WIDTH,
+        minHeight: CARD_MIN_HEIGHT,
+        backgroundColor: 'transparent',
+        borderRadius: 18,
         padding: 8,
-        marginTop: 8,
-        alignItems: "center",
-        // Use 'flexGrow: 1' se o card de anúncio ficar muito menor que o de produto
+        marginBottom: 12,
+        marginHorizontal: CARD_MARGIN / 2,
+        alignItems: 'center',
     },
-    confiraOfertaSimulado: {
-        fontSize: 12,
-        color: BRAND_COLORS.textMuted,
-        fontWeight: "bold",
-        marginBottom: 2,
-        textAlign: "center",
+    loadingContainer: { 
+        width: CARD_WIDTH, 
+        minHeight: CARD_MIN_HEIGHT, 
+        justifyContent: 'center', 
+        alignItems: 'center' 
     },
-    advertiser: {
-        fontSize: 12,
-        color: BRAND_COLORS.primaryDark,
-        fontWeight: 'bold',
-        marginBottom: 5,
-        textAlign: 'center'
+    loadingText: { marginTop: 8, fontSize: 12, color: BRAND_COLORS.textMuted },
+    
+    imageArea: {
+        position: 'relative',
+        width: '100%',
+        alignItems: 'center',
     },
-
-    // --- CTA (Botão de Ação) ---
-    cta: {
-        // Simula o estilo da linha de botões de ação do produto
-        backgroundColor: BRAND_COLORS.primary,
-        borderRadius: 20,
-        paddingVertical: 6,
-        paddingHorizontal: 18,
-        marginTop: 5,
-        marginBottom: 5,
+    imagemProduto: {
+        width: '90%',
+        alignSelf: 'flex-end',
+        height: 150,
+        borderRadius: 40,
+        backgroundColor: BRAND_COLORS.surfaceSoft,
+        overflow: 'hidden',
     },
-    ctaText: {
+    
+    // Wrapper absolutos para os badges ficarem sobre a imagem
+    badgeEmpresaWrapper: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        maxWidth: '64%',
+    },
+    badgeEmpresa: {
+        backgroundColor: 'rgba(0,0,0,0.8)', // Leve opacidade para destacar
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+    },
+    badgeEmpresaText: {
         color: BRAND_COLORS.white,
-        fontWeight: 'bold',
-        fontSize: 13,
-        textAlign: 'center'
+        fontSize: 9,
+        fontWeight: '700',
     },
 
-    // --- BADGE (Patrocinado) ---
-    adBadge: {
+    badgePrecoWrapper: {
+        position: 'absolute',
+        right: 0,
+        bottom: 0,
+    },
+    badgePreco: {
+        backgroundColor: 'rgba(16,117,60,0.9)',
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 5,
+    },
+    badgePrecoText: {
+        color: BRAND_COLORS.white,
+        fontSize: 13, // Levemente menor caso o texto do CTA seja grande
+        fontWeight: '800',
+    },
+
+    descRow: {
+        width: '100%',
+        marginTop: 10,
+        paddingHorizontal: 4,
+    },
+    descricao: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: BRAND_COLORS.text,
+        textAlign: 'center',
+        lineHeight: 16,
+    },
+
+    metaRow: {
+        width: '100%',
+        alignItems: 'center',
+        marginTop: 4,
+        marginBottom: 6,
+    },
+    distancia: {
+        fontSize: 11,
+        color: BRAND_COLORS.primary,
+        fontWeight: '700',
+        textAlign: 'center',
+    },
+    dataOferta: {
         fontSize: 10,
         color: BRAND_COLORS.textMuted,
-        marginTop: 6,
-        position: 'absolute', // Coloca o badge em uma posição fixa se necessário
-        bottom: 0,
-        right: 5,
+        textAlign: 'center',
+        marginTop: 2,
     },
 });
 

@@ -25,6 +25,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import MapView, { Marker, Callout, Region } from "react-native-maps";
 import AdBanner from "../components/AdBanner";
 import * as Location from "expo-location";
+import Voice from "@react-native-voice/voice";
 import AdCard from "../components/AdCard";
 import { useAuth } from "../../context/AuthContext";
 import { ProdutoCard } from "../components/ProdutoCard";
@@ -190,6 +191,7 @@ export default function HomeScreen() {
   const [alturaPainelFiltro, setAlturaPainelFiltro] = useState(0);
   const [drawerMenuVisible, setDrawerMenuVisible] = useState(false);
   const [mostrarMapa, setMostrarMapa] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [mostrarDicaEsquerda, setMostrarDicaEsquerda] = useState(false);
   const [mostrarDicaDireita, setMostrarDicaDireita] = useState(false);
   const [larguraViewportCategorias, setLarguraViewportCategorias] = useState(0);
@@ -201,6 +203,7 @@ export default function HomeScreen() {
   const [empresas, setEmpresas] = useState<{ [key: string]: EmpresaData }>({});
   const [imagemModalVisivel, setImagemModalVisivel] = useState(false);
   const [imagemModalUrl, setImagemModalUrl] = useState<string | null>(null);
+  const [produtoModal, setProdutoModal] = useState<ProdutoComEmpresa | null>(null);
   const mapRef = useRef<MapView>(null);
   const listaRef = useRef<FlatList<ProdutoComEmpresa>>(null);
   const categoriasScrollXRef = useRef(0);
@@ -221,8 +224,9 @@ export default function HomeScreen() {
     setMostrarDicaDireita(scrollX + viewportWidth < contentWidth - 8);
   }, []);
 
-  const handleImagePress = useCallback((url: string) => {
-    setImagemModalUrl(url);
+  const handleImagePress = useCallback((produto: ProdutoComEmpresa) => {
+    setProdutoModal(produto);
+    setImagemModalUrl(produto.imagemUrl ?? null);
     setImagemModalVisivel(true);
   }, []);
 
@@ -448,7 +452,7 @@ export default function HomeScreen() {
     const emp = empresas[item.empresaId];
     if (!emp) return null;
     return <ProdutoCard produto={item} empresaInfo={emp} userLocation={userLocation} deviceId={deviceId} votarProduto={votarProduto} handleVerNoMapa={handleVerNoMapa} openInstagramProfile={openInstagramProfile} openWhatsApp={openWhatsApp} onImagePress={handleImagePress} />;
-  }, [empresas, userLocation, deviceId]);
+  }, [empresas, userLocation, deviceId, handleImagePress, votarProduto, handleVerNoMapa, openInstagramProfile, openWhatsApp]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -477,9 +481,56 @@ export default function HomeScreen() {
     router.push(path as any);
   }, [user]);
 
-  const handleBuscaPorVoz = useCallback(() => {
-    Alert.alert("Busca por voz", "Reconhecimento de voz em desenvolvimento.");
+  useEffect(() => {
+    if (Platform.OS === "web") {
+      return;
+    }
+
+    Voice.onSpeechStart = () => setIsListening(true);
+    Voice.onSpeechEnd = () => setIsListening(false);
+    Voice.onSpeechResults = (event) => {
+      const spokenText = event.value?.[0]?.trim();
+      if (!spokenText) return;
+      setTermoBusca(spokenText);
+      setCategoriaSelecionada(null);
+      Alert.alert("Busca por voz", `Resultado: ${spokenText}`);
+    };
+    Voice.onSpeechError = (event) => {
+      console.error("Voice error:", event);
+      setIsListening(false);
+      Alert.alert("Erro na voz", "Não foi possível reconhecer sua fala. Tente novamente.");
+    };
+
+    return () => {
+      Voice.destroy().catch(() => undefined);
+    };
   }, []);
+
+  const handleBuscaPorVoz = useCallback(async () => {
+    if (Platform.OS === "web") {
+      Alert.alert("Indisponível", "Reconhecimento de voz não está disponível no web.");
+      return;
+    }
+
+    try {
+      if (isListening) {
+        await Voice.stop();
+        setIsListening(false);
+        return;
+      }
+
+      const available = await Voice.isAvailable();
+      if (!available) {
+        Alert.alert("Reconhecimento indisponível", "Seu aparelho não suporta reconhecimento de voz neste momento.");
+        return;
+      }
+
+      await Voice.start("pt-BR");
+    } catch (error) {
+      console.error("Erro ao iniciar voz:", error);
+      Alert.alert("Erro", "Não foi possível iniciar a busca por voz.");
+    }
+  }, [isListening]);
 
   const handleBotaoFiltro = useCallback(() => {
     // Se o painel existe mas saiu da tela, volta para o topo para exibir filtros novamente.
@@ -561,11 +612,11 @@ export default function HomeScreen() {
               </View>
 
               <TouchableOpacity
-                style={styles.botaoVoz}
+                style={[styles.botaoVoz, isListening && styles.botaoVozAtivo]}
                 onPress={handleBuscaPorVoz}
                 activeOpacity={0.8}
               >
-                <Feather name="mic" size={18} color={BRAND_COLORS.primaryDark} />
+                <Feather name={isListening ? "mic-off" : "mic"} size={18} color={isListening ? BRAND_COLORS.white : BRAND_COLORS.primaryDark} />
               </TouchableOpacity>
 
               {mostrarBotaoFiltro && (
@@ -717,12 +768,75 @@ export default function HomeScreen() {
             </View>
           </View>
         )}
-        {imagemModalVisivel && imagemModalUrl && (
-          <Modal transparent animationType="fade" visible={imagemModalVisivel} onRequestClose={() => setImagemModalVisivel(false)}>
+        {imagemModalVisivel && imagemModalUrl && produtoModal && (
+          <Modal transparent animationType="fade" visible={imagemModalVisivel} onRequestClose={() => {
+            setImagemModalVisivel(false);
+            setProdutoModal(null);
+          }}>
             <View style={styles.modalContainer}>
-              <TouchableOpacity style={styles.modalBackground} onPress={() => setImagemModalVisivel(false)}>
+              <View style={styles.modalCard}>
+                <TouchableOpacity
+                  style={styles.modalCloseButton}
+                  onPress={() => {
+                    setImagemModalVisivel(false);
+                    setProdutoModal(null);
+                  }}
+                >
+                  <Feather name="x" size={20} color={BRAND_COLORS.text} />
+                </TouchableOpacity>
+
                 <Image source={{ uri: imagemModalUrl }} style={styles.imagemModal} resizeMode="contain" />
-              </TouchableOpacity>
+
+                <View style={styles.modalContent}>
+                  <Text style={styles.modalTitle}>{produtoModal.descricao}</Text>
+                  <Text style={styles.modalPrice}>{produtoModal.preco}</Text>
+
+                  {produtoModal.dataFinalOferta && (
+                    <Text style={styles.modalMeta}>Validade: {produtoModal.dataFinalOferta}</Text>
+                  )}
+
+                  {produtoModal.empresaId && empresas[produtoModal.empresaId]?.nomeEmpresa && (
+                    <Text style={styles.modalMeta}>Empresa: {empresas[produtoModal.empresaId].nomeEmpresa}</Text>
+                  )}
+
+                  {(() => {
+                    const location = getProdutoLocation(produtoModal);
+                    const distanciaModal = userLocation && location ? calcularDistancia(userLocation, { latitude: location.latitude, longitude: location.longitude }) : null;
+                    return distanciaModal !== null ? (
+                      <Text style={styles.modalMeta}>Distância: {distanciaModal.toFixed(1)} km</Text>
+                    ) : null;
+                  })()}
+
+                  <View style={styles.modalActions}>
+                    {getProdutoLocation(produtoModal) && (
+                      <TouchableOpacity style={styles.modalAction} onPress={() => handleVerNoMapa(produtoModal)}>
+                        <Feather name="map-pin" size={18} color={BRAND_COLORS.white} />
+                        <Text style={styles.modalActionText}>Mapa</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {empresas[produtoModal.empresaId]?.instagram && (
+                      <TouchableOpacity
+                        style={[styles.modalAction, styles.modalActionInstagram]}
+                        onPress={() => openInstagramProfile(empresas[produtoModal.empresaId].instagram)}
+                      >
+                        <Feather name="instagram" size={18} color={BRAND_COLORS.white} />
+                        <Text style={styles.modalActionText}>Instagram</Text>
+                      </TouchableOpacity>
+                    )}
+
+                    {empresas[produtoModal.empresaId]?.telefone && (
+                      <TouchableOpacity
+                        style={[styles.modalAction, styles.modalActionWhatsApp]}
+                        onPress={() => openWhatsApp(empresas[produtoModal.empresaId].telefone)}
+                      >
+                        <Feather name="message-circle" size={18} color={BRAND_COLORS.white} />
+                        <Text style={styles.modalActionText}>WhatsApp</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </View>
+              </View>
             </View>
           </Modal>
         )}
@@ -791,7 +905,7 @@ const styles = StyleSheet.create({
     width: "95%",
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 5,
+    marginTop: 10,
   },
   buscaInputWrapper: {
     flex: 1,
@@ -824,6 +938,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     elevation: 2,
   },
+  botaoVozAtivo: {
+    backgroundColor: BRAND_COLORS.primary,
+  },
   botaoFiltros: {
     marginLeft: 8,
   },
@@ -831,11 +948,8 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.primary,
   },
   filtrosPanel: {
-    backgroundColor: "rgba(255,255,255,0.88)",
     borderRadius: 12,
     marginHorizontal: 10,
-    paddingTop: 8,
-    paddingBottom: 10,
   },
   ordenacaoContainer: {
     flexDirection: "row",
@@ -856,7 +970,8 @@ const styles = StyleSheet.create({
   // 💡 ESTILOS DA GRADE DE CATEGORIAS
   categoriasContainer: {
     width: '100%',
-    marginTop: 5,
+    backgroundColor:"#9ac7ff",
+    borderRadius: 20,
   },
   categoriasScrollWrapper: {
     position: "relative",
@@ -865,14 +980,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     paddingHorizontal: 2,
-    paddingBottom: 2,
+    paddingTop: 10,
     gap: 2,
   },
   categoriaItem: {
     alignItems: "center",
     justifyContent: "flex-start",
     width: 52,
-    marginBottom: 2,
+    marginBottom: 0,
     marginHorizontal: 0,
   },
   categoriaBotaoRedondo: {
@@ -883,7 +998,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginBottom: 2,
-    elevation: 2,
   },
   categoriaBotaoSelecionado: {
     backgroundColor: "rgba(10, 79, 203, 0.16)",
@@ -896,7 +1010,7 @@ const styles = StyleSheet.create({
   },
   categoriaLegenda: {
     fontSize: 9,
-    color: BRAND_COLORS.textMuted,
+    color: BRAND_COLORS.shadow,
     fontWeight: "600",
     textAlign: "center",
     lineHeight: 12,
@@ -978,7 +1092,86 @@ const styles = StyleSheet.create({
   externalMapButtonText: { color: BRAND_COLORS.white, fontWeight: "bold", fontSize: 14 },
   myLocationMarker: { backgroundColor: BRAND_COLORS.primary, padding: 6, borderRadius: 15, width: 30, height: 30, justifyContent: "center", alignItems: "center", borderColor: BRAND_COLORS.white, borderWidth: 1.5 },
   myLocationMarkerText: { color: BRAND_COLORS.white, fontWeight: "bold", fontSize: 10 },
-  modalContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: BRAND_COLORS.overlayStrong },
-  modalBackground: { flex: 1, width: "100%", justifyContent: "center", alignItems: "center" },
-  imagemModal: { width: "100%", height: "100%", borderRadius: 10 },
+  modalContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    backgroundColor: BRAND_COLORS.overlayStrong,
+    padding: 16,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 420,
+    backgroundColor: BRAND_COLORS.white,
+    borderRadius: 20,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: "rgba(0,0,0,0.06)",
+  },
+  modalCloseButton: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.82)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  imagemModal: {
+    width: "100%",
+    height: 280,
+    backgroundColor: BRAND_COLORS.surfaceSoft,
+  },
+  modalContent: {
+    padding: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: BRAND_COLORS.text,
+    marginBottom: 8,
+  },
+  modalPrice: {
+    fontSize: 24,
+    fontWeight: "900",
+    color: BRAND_COLORS.success,
+    marginBottom: 6,
+  },
+  modalMeta: {
+    fontSize: 12,
+    color: BRAND_COLORS.textMuted,
+    marginBottom: 6,
+  },
+  modalActions: {
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    marginTop: 12,
+    gap: 10,
+  },
+  modalAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: BRAND_COLORS.primary,
+    borderRadius: 999,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minWidth: 96,
+  },
+  modalActionInstagram: {
+    backgroundColor: "#E1306C",
+  },
+  modalActionWhatsApp: {
+    backgroundColor: "#25D366",
+  },
+  modalActionText: {
+    color: BRAND_COLORS.white,
+    fontWeight: "700",
+    marginLeft: 6,
+    fontSize: 12,
+  },
 });

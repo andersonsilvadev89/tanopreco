@@ -16,7 +16,7 @@ export default function Index() {
   const { needsUpdate, forceUpdate, message, redirectToStore } = useVersionCheck(VERSION_URL);
 
   const [isUpdating, setIsUpdating] = useState(false);
-  
+
   // 1. NOVO ESTADO: Controla se o usuário fechou o modal manualmente
   const [updateDismissed, setUpdateDismissed] = useState(false);
 
@@ -29,17 +29,22 @@ export default function Index() {
       return;
     }
 
-    const mobileAds = getGoogleMobileAdsModule();
-    if (!mobileAds) {
+    const adsModule = getGoogleMobileAdsModule();
+    if (!adsModule) {
       return;
     }
 
-    mobileAds()
-      .initialize()
-      .then(() => console.log("Google Mobile Ads inicializado."))
-      .catch((error: unknown) =>
-        console.error("Erro ao inicializar Google Mobile Ads SDK:", error)
-      );
+    // Garante que estamos chamando a função correta do módulo, mesmo após a minificação
+    const initializeAds = adsModule.default || adsModule;
+
+    if (typeof initializeAds === 'function') {
+      initializeAds()
+        .initialize()
+        .then(() => console.log("Google Mobile Ads inicializado."))
+        .catch((error: unknown) =>
+          console.error("Erro ao inicializar Google Mobile Ads SDK:", error)
+        );
+    }
   }, []);
 
   // ---------------------------------------------------------
@@ -106,7 +111,7 @@ export default function Index() {
   // ---------------------------------------------------------
   // 4. Modal de atualização obrigatória ou recomendada
   // ---------------------------------------------------------
-  
+
   // A LÓGICA MUDOU AQUI:
   // Só mostramos o modal se precisar atualizar E se o usuário NÃO tiver dispensado ainda.
   if (needsUpdate && !updateDismissed) {
@@ -118,7 +123,7 @@ export default function Index() {
         onUpdate={redirectToStore}
         // Quando o usuário clicar em "Agora não", setamos o dismissed como true.
         // Isso fará o componente renderizar novamente e cair no passo 5 (Redirect)
-        onCancel={() => setUpdateDismissed(true)} 
+        onCancel={() => setUpdateDismissed(true)}
       />
     );
   }

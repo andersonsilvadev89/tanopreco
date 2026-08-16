@@ -1,14 +1,15 @@
-import { Tabs, Redirect } from 'expo-router';
-import { auth } from '../../firebaseConfig';
-import { onAuthStateChanged } from 'firebase/auth';
-import React, { useState, useEffect } from 'react';
-import { FontAwesome5, MaterialCommunityIcons, AntDesign } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient'; // <--- Importante
-import { BRAND_COLORS } from '@/constants/BrandColors';
+import { Tabs, Redirect } from "expo-router";
+import { auth } from "../../firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
+import React, { useState, useEffect } from "react";
+import { FontAwesome5, MaterialCommunityIcons, AntDesign } from "@expo/vector-icons";
+import { BRAND_COLORS } from "@/constants/BrandColors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function EmpresaLayout() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (authUser) => {
@@ -31,51 +32,63 @@ export default function EmpresaLayout() {
         headerShown: false,
         tabBarActiveTintColor: BRAND_COLORS.white,
         tabBarInactiveTintColor: BRAND_COLORS.tabInactive,
-        // Configuração para permitir o gradiente
+        // Mantem a barra acima da navegacao do aparelho e com altura mais compacta.
         tabBarStyle: {
-          backgroundColor: "transparent", // Fundo transparente
-          borderTopWidth: 0,              // Remove borda superior
-          elevation: 0,                   // Remove sombra do Android
-          height: 50,                     // Altura um pouco maior para elegância
-          paddingBottom: 5,               // Espaço extra inferior
+          backgroundColor: BRAND_COLORS.primary,
+          borderTopWidth: 0,
+          elevation: 0,
+          height: 40 + insets.bottom,
+          paddingBottom: Math.max(insets.bottom, 6),
         },
-        // O componente de fundo com gradiente
-        tabBarBackground: () => (
-          <LinearGradient
-            colors={BRAND_COLORS.gradientPrimary}
-            style={{ flex: 1 }}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 0, y: 1 }}
-          />
-        ),
+        tabBarItemStyle: {
+          paddingVertical: 0,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          marginBottom: 2,
+        },
       }}
     >
       <Tabs.Screen
         name="homeScreen"
         options={{
-          title: 'Início',
+          title: "Início",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => <FontAwesome5 name="home" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="crudProdutosServicos"
         options={{
-          title: 'Produtos',
+          title: "Produtos",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => <MaterialCommunityIcons name="food-fork-drink" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="configuracoesScreen"
         options={{
-          title: 'Config',
+          title: "Config",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => <AntDesign name="setting" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="sobreScreen"
         options={{
-          title: 'Sobre',
+          title: "Sobre",
           tabBarIcon: ({ color, size }: { color: string; size: number }) => <AntDesign name="info-circle" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="compartilharScreen"
+        options={{
+          title: "Compartilhar",
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <AntDesign name="share-alt" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="duvidasScreen"
+        options={{
+          title: "Duvidas",
+          tabBarIcon: ({ color, size }: { color: string; size: number }) => <AntDesign name="question-circle" color={color} size={size} />,
         }}
       />
     </Tabs>

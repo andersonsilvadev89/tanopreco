@@ -13,7 +13,7 @@ import {
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { auth, database, adminDatabase } from '../../firebaseConfig'; 
 import { ref, get, push, serverTimestamp, onValue } from 'firebase/database';
-import AdBanner from '../components/AdBanner'; 
+import { AppHeaderTitle } from '../components/shell/AppHeaderTitle';
 import { BRAND_COLORS } from '@/constants/BrandColors';
 
 // Constantes de configuração do Firebase
@@ -116,7 +116,14 @@ export default function Sobre() {
 
   return (
     <View style={styles.container}>
-      <AdBanner />
+      <AppHeaderTitle
+        title="Sobre"
+        user={auth.currentUser}
+        paddingTop={18}
+        onBack={() => {}}
+        onMenuOpen={() => {}}
+        onLogout={() => {}}
+      />
 
       <View style={styles.contentArea}>
         <View style={styles.sectionWrapper}>

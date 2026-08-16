@@ -3,8 +3,9 @@ import 'dotenv/config';
 export default {
   name: "TaNoPreco",
   slug: "TaNoPreco",
+  "newArchEnabled": true,
   platforms: ["android", "ios"],
-  version: "1.0.3",
+  version: "1.0.4",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   splash: {
@@ -14,7 +15,6 @@ export default {
   },
   scheme: "tanopreco",
   userInterfaceStyle: "automatic",
-  newArchEnabled: false,
   updates: {
     url: "https://u.expo.dev/24f376e8-afe2-4c3e-bab9-035b5e089295"
   },
@@ -27,7 +27,7 @@ export default {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       }
     },
-    versionCode: 31,
+    versionCode: 32,
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff"
@@ -56,7 +56,8 @@ export default {
   },
   ios: {
     bundleIdentifier: "com.tanopreco",
-    buildNumber: "5",
+    buildNumber: "6",
+    usesAppleSignIn: true,
     config: {
       googleMobileAdsAppId: "ca-app-pub-5241782827769638~8974053643"
     },
@@ -76,6 +77,7 @@ export default {
   },
   plugins: [
     "expo-router",
+    "@react-native-voice/voice",
     "expo-splash-screen",
     [
       "expo-location",
@@ -84,6 +86,8 @@ export default {
           "Permitir que $(PRODUCT_NAME) use sua localização para te mostrar no mapa."
       }
     ],
+    "expo-apple-authentication",
+    "@react-native-google-signin/google-signin",
     [
       "react-native-google-mobile-ads",
       {
@@ -91,7 +95,27 @@ export default {
         iosAppId: "ca-app-pub-5241782827769638~8974053643"
       }
     ],
-    "expo-secure-store"
+    "expo-secure-store",
+    [
+      "expo-build-properties",
+      {
+        "android": {
+          "newArchEnabled": true,
+          "enableJetifier": true,
+          "useLegacyPackaging": true
+        },
+        "ios": {
+          "newArchEnabled": true
+        }
+      }
+    ],
+    [
+      "expo-notifications",
+      {
+        "icon": "./assets/images/notification-icon.png",
+        "color": "#ffffff"
+      }
+    ]
   ],
   experiments: {
     typedRoutes: true
@@ -105,6 +129,7 @@ export default {
     firebaseAppId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
     firebaseMeasurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
     googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+    googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
     eas: {
       projectId: "24f376e8-afe2-4c3e-bab9-035b5e089295"
     }
