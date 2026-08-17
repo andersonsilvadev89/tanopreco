@@ -5,7 +5,7 @@ export default {
   slug: "TaNoPreco",
   "newArchEnabled": true,
   platforms: ["android", "ios"],
-  version: "1.0.4",
+  version: "1.0.5",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   splash: {
@@ -27,7 +27,7 @@ export default {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       }
     },
-    versionCode: 32,
+    versionCode: 33,
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff"
@@ -56,7 +56,7 @@ export default {
   },
   ios: {
     bundleIdentifier: "com.tanopreco",
-    buildNumber: "6",
+    buildNumber: "7",
     usesAppleSignIn: true,
     config: {
       googleMobileAdsAppId: "ca-app-pub-5241782827769638~8974053643"
@@ -77,13 +77,19 @@ export default {
   },
   plugins: [
     "expo-router",
-    "@react-native-voice/voice",
     "expo-splash-screen",
     [
       "expo-location",
       {
         locationAlwaysAndWhenInUsePermission:
           "Permitir que $(PRODUCT_NAME) use sua localização para te mostrar no mapa."
+      }
+    ],
+    [
+      "expo-speech-recognition",
+      {
+        "nsSpeechRecognitionUsageDescription": "O App precisa acessar o reconhecimento de fala para que você possa buscar produtos por voz.",
+        "nsMicrophoneUsageDescription": "O App precisa acessar o microfone para ouvir seus comandos de voz."
       }
     ],
     "expo-apple-authentication",
@@ -102,7 +108,6 @@ export default {
         "android": {
           "newArchEnabled": true,
           "enableJetifier": true,
-          "useLegacyPackaging": true
         },
         "ios": {
           "newArchEnabled": true
@@ -122,10 +127,10 @@ export default {
       return withAndroidManifest(config, (config) => {
         const manifest = config.modResults;
         const app = manifest.manifest.application[0];
-        
+
         manifest.manifest.$['xmlns:tools'] = 'http://schemas.android.com/tools';
         app.$['android:appComponentFactory'] = 'androidx.core.app.CoreComponentFactory';
-        
+
         if (app.$['tools:replace']) {
           if (!app.$['tools:replace'].includes('android:appComponentFactory')) {
             app.$['tools:replace'] += ',android:appComponentFactory';

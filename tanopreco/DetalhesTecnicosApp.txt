@@ -1,0 +1,51 @@
+Expocrato - Assistente de Eventos
+
+Funções principais:
+    Encontrar a localizaçâo exata de amigos na festa;
+    Conhecer todos os produtos e serviçoes pertencentes ao evento e saber como localizá-los;
+    LineUp preciso de toda a festa (incluindo uma rádio tocando o que está acontencendo em tempo real em todos os ambientes da festa).
+
+Ferramentas necessárias para implementação:
+    Banco de dados - Utilizaremos o firebase por ser robusto e confiável;
+        Estamos utilizando o Realtime Database para o armazenamento dos dados do usuario e dos produtos e serviços;
+        Para armazenar as imagens necessárias, utilizamos o Cloudnary.
+        Para realização de login estamos usando o Firebase Auth.
+    IDE - Visual Studio Code;
+    Framework - React Native com Expo Router;
+    
+O sistema todo conta com três apps:
+    expocrato;
+        App de acesso dos usuarios que estão aproveitando a festa. Nele o usuario pode:
+            - Encontrar outros usuarios para marcar como amigo;
+            - Saber a localização de seus amigos em tempo real;
+            - Conhecer todos os produtos e serviços disponibilizados no evento, podendo também saber a localização exata de cada ponto comercial.
+            - Acompanhar todos os ambientes do evento através de LineUp com rádio em tempo real do evento e apresentação da programação diária
+            
+    expocratoEmpresa;
+        App para as empresas fornecedoras de produtos e serviços. Nele a empresa pode:
+            - Cadastrar e gerenciar todos os seus produtos e serviços;
+            - Disponibilizar sua localização para conhecimento dos seus clientes; 
+    expocratoAdministrativo.
+        App para usuarios administrativos. Nele o administrador pode:
+            - Cadastrar e gerenciar novos usuarios administrativos ou assistentes;
+            - Alimentar a LineUp e configurar o link das radios dos ambientes do evento;
+
+#App expocrato:#
+Telas do App:
+    Login;
+    Cadastro de Usuario;
+    Principal;
+        Onde aparecerá os botões de navegação para as demais telas.
+    Localização de usuários;
+        Mostrar as solicitações de usuarios para possível confirmação;
+    Localização em tempo real de amigos na festa;
+        O usuário só poderá localizar se tambem permitir a sua localização;
+    Produtos e serviços;
+        Aparecerá a partir do cadastro de empresas no AppEmpresas
+    LineUp;
+        Aparecerá a partir da inserção das informações no AppAdministrativo.
+    Configurações;
+    Sobre;
+
+#App expocratoAdministrativo:#
+    Esse app    
