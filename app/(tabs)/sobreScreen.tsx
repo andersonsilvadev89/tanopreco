@@ -15,12 +15,15 @@ import { auth, database, adminDatabase } from '../../firebaseConfig';
 import { ref, get, push, serverTimestamp, onValue } from 'firebase/database';
 import { AppHeaderTitle } from '../components/shell/AppHeaderTitle';
 import { BRAND_COLORS } from '@/constants/BrandColors';
+import { router } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Constantes de configuração do Firebase
 const FIREBASE_COLLECTION = 'configuracoes_apps';
 const TARGET_APP_NAME = "TaNoPreco"; // Nome do App cujas configurações queremos buscar
 
 export default function Sobre() {
+  const insets = useSafeAreaInsets();
   const [sugestao, setSugestao] = useState('');
   const [enviandoFeedback, setEnviandoFeedback] = useState(false);
   
@@ -119,8 +122,8 @@ export default function Sobre() {
       <AppHeaderTitle
         title="Sobre"
         user={auth.currentUser}
-        paddingTop={18}
-        onBack={() => {}}
+        paddingTop={Math.max(insets.top, 8)}
+        onBack={() => router.replace('/(tabs)/homeScreen')}
         onMenuOpen={() => {}}
         onLogout={() => {}}
       />

@@ -21,6 +21,7 @@ import { AppHeaderTitle } from '../components/shell/AppHeaderTitle';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import LocalizacaoModal from '../components/LocalizacaoModal';
 import { BRAND_COLORS } from '@/constants/BrandColors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // --- CONSTANTES CLOUDINARY ---
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dvekhdfgc/image/upload';
@@ -40,6 +41,7 @@ interface CompanyProfile {
 
 const ConfiguracoesEmpresaScreen = () => {
     const navigation = useNavigation<any>();
+    const insets = useSafeAreaInsets();
 
     const [carregando, setCarregando] = useState(true);
     const [editando, setEditando] = useState(false);
@@ -310,7 +312,7 @@ const ConfiguracoesEmpresaScreen = () => {
             <AppHeaderTitle
                 title="Configurações"
                 user={auth.currentUser}
-                paddingTop={18}
+                paddingTop={Math.max(insets.top, 8)}
                 onBack={() => navigation.goBack()}
                 onMenuOpen={() => {}}
                 onLogout={() => {}}

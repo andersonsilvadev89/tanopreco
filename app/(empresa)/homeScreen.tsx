@@ -26,6 +26,7 @@ import { signOut } from "firebase/auth";
 import AdCard from '../components/AdCard';
 import { AppHeaderTitle } from '../components/shell/AppHeaderTitle';
 import { BRAND_COLORS } from '@/constants/BrandColors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 const { width } = Dimensions.get('window');
 const SCREEN_PADDING = 20;
 
@@ -34,6 +35,7 @@ const ITEM_WIDTH = (width - (SCREEN_PADDING * 2)) / 4;
 
 const HomeScreen = () => {
     const navigate = (path: string) => router.push(path as any);
+    const insets = useSafeAreaInsets();
 
     const [userName, setUserName] = useState('');
 
@@ -141,8 +143,8 @@ const HomeScreen = () => {
             <AppHeaderTitle
                 title="Área Empresarial"
                 user={auth.currentUser}
-                paddingTop={18}
-                onBack={() => {}}
+                paddingTop={Math.max(insets.top, 8)}
+                onBack={() => router.replace('/(tabs)/homeScreen')}
                 onMenuOpen={() => {}}
                 onLogout={confirmarLogout}
             />

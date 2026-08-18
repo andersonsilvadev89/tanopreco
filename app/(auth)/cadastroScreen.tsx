@@ -27,6 +27,7 @@ import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
 import CpfInput from "../components/CpfInput";
 import CnpjInput from "../components/CnpjInput";
 import { BRAND_COLORS } from "@/constants/BrandColors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 // Constante para o nome do app que estamos buscando
 const TARGET_APP_NAME = "TaNoPreco";
@@ -35,6 +36,7 @@ const FIREBASE_COLLECTION = "configuracoes_apps";
 
 
 export default function CadastroScreen() {
+  const insets = useSafeAreaInsets();
   const [nome, setNome] = useState("");
   const [nomeEmpresa, setNomeEmpresa] = useState("");
   const [email, setEmail] = useState("");
@@ -424,7 +426,7 @@ export default function CadastroScreen() {
       <AppHeaderTitle
         title="Criar conta"
         user={null}
-        paddingTop={18}
+        paddingTop={Math.max(insets.top, 8)}
         onBack={() => {}}
         onMenuOpen={() => {}}
         onLogout={() => {}}

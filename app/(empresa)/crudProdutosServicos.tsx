@@ -31,6 +31,7 @@ import { auth, database } from "../../firebaseConfig";
 import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker"; // ✅ IMPORTADO
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import LocalizacaoModal from "../components/LocalizacaoModal";
 import { BRAND_COLORS } from "@/constants/BrandColors";
@@ -132,6 +133,7 @@ interface EmpresaData {
 }
 
 export default function CadastroProduto() {
+  const insets = useSafeAreaInsets();
   const [descricao, setDescricao] = useState("");
   const [preco, setPreco] = useState("");
   const [palavrasChave, setPalavrasChave] = useState("");
@@ -579,7 +581,7 @@ export default function CadastroProduto() {
       <AppHeaderTitle
         title="Produtos"
         user={auth.currentUser}
-        paddingTop={18}
+        paddingTop={Math.max(insets.top, 8)}
         onBack={() => {}}
         onMenuOpen={() => {}}
         onLogout={() => {}}

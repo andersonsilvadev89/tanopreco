@@ -29,6 +29,7 @@ import { ref, get, set, update } from 'firebase/database';
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
 import { BRAND_COLORS } from "@/constants/BrandColors";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const defaultLogoLocal = require('../../assets/images/logoEvento.png');
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -81,6 +82,7 @@ if (GoogleSignin) {
 }
 
 const LoginScreen = ({ navigation }: any) => {
+  const insets = useSafeAreaInsets();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string>('');
@@ -348,8 +350,8 @@ const LoginScreen = ({ navigation }: any) => {
       <AppHeaderTitle
         title="Entrar"
         user={null}
-        paddingTop={18}
-        onBack={() => {}}
+        paddingTop={Math.max(insets.top, 8)}
+        onBack={() => router.replace('/(tabs)/homeScreen')}
         onMenuOpen={() => {}}
         onLogout={() => {}}
       />
@@ -465,11 +467,10 @@ const LoginScreen = ({ navigation }: any) => {
 const styles = StyleSheet.create({
   background: {
     flex: 1,
-    backgroundColor: BRAND_COLORS.surfaceSoft,
+    backgroundColor: BRAND_COLORS.overlay,
   },
   overlay: {
     flex: 1,
-    backgroundColor: BRAND_COLORS.overlay,
     justifyContent: 'center', // Centraliza verticalmente
     alignItems: 'center', // Centraliza horizontalmente
   },
@@ -489,7 +490,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     marginHorizontal: 20,
     borderRadius: 12,
-    width: '90%', // Mantém a largura do formulário
+    width: '95%', // Mantém a largura do formulário
   },
   passwordContainer: {
     flexDirection: 'row',

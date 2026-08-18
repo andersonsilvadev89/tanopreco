@@ -78,14 +78,18 @@ const s = StyleSheet.create({
   headerBar: {
     backgroundColor: BRAND_COLORS.primary,
     paddingHorizontal: SPACING,
-    paddingBottom: 10,
+    paddingBottom: 12,
     shadowColor: SHELL_COLORS.shadow,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.18,
     shadowRadius: 6,
     elevation: 8,
   },
-  header: { flexDirection: "row", alignItems: "center", gap: 8 },
+  header: { 
+    flexDirection: "row", alignItems: "center",
+    justifyContent: "space-between",
+    minHeight: 44,
+  },
   headerIconBtn: {
     width: 40,
     height: 40,

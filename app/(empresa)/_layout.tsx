@@ -34,7 +34,7 @@ export default function EmpresaLayout() {
         tabBarInactiveTintColor: BRAND_COLORS.tabInactive,
         // Mantem a barra acima da navegacao do aparelho e com altura mais compacta.
         tabBarStyle: {
-          backgroundColor: "BRAND_COLORS.primary",
+          backgroundColor: BRAND_COLORS.primary,
           borderTopWidth: 0,
           elevation: 0,
           height: 50 + insets.bottom,
