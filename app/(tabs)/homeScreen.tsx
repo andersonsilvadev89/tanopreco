@@ -25,7 +25,6 @@ import { useFocusEffect } from "@react-navigation/native";
 import MapView, { Marker, Callout, Region } from "react-native-maps";
 import AdBanner from "../components/AdBanner";
 import * as Location from "expo-location";
-import Voice from "@react-native-voice/voice";
 import AdCard from "../components/AdCard";
 import { useAuth } from "../../context/AuthContext";
 import { ProdutoCard } from "../components/ProdutoCard";
@@ -485,50 +484,12 @@ export default function HomeScreen() {
     if (Platform.OS === "web") {
       return;
     }
-
-    Voice.onSpeechStart = () => setIsListening(true);
-    Voice.onSpeechEnd = () => setIsListening(false);
-    Voice.onSpeechResults = (event) => {
-      const spokenText = event.value?.[0]?.trim();
-      if (!spokenText) return;
-      setTermoBusca(spokenText);
-      setCategoriaSelecionada(null);
-      Alert.alert("Busca por voz", `Resultado: ${spokenText}`);
-    };
-    Voice.onSpeechError = (event) => {
-      console.error("Voice error:", event);
-      setIsListening(false);
-      Alert.alert("Erro na voz", "Não foi possível reconhecer sua fala. Tente novamente.");
-    };
-
-    return () => {
-      Voice.destroy().catch(() => undefined);
-    };
   }, []);
 
   const handleBuscaPorVoz = useCallback(async () => {
     if (Platform.OS === "web") {
       Alert.alert("Indisponível", "Reconhecimento de voz não está disponível no web.");
       return;
-    }
-
-    try {
-      if (isListening) {
-        await Voice.stop();
-        setIsListening(false);
-        return;
-      }
-
-      const available = await Voice.isAvailable();
-      if (!available) {
-        Alert.alert("Reconhecimento indisponível", "Seu aparelho não suporta reconhecimento de voz neste momento.");
-        return;
-      }
-
-      await Voice.start("pt-BR");
-    } catch (error) {
-      console.error("Erro ao iniciar voz:", error);
-      Alert.alert("Erro", "Não foi possível iniciar a busca por voz.");
     }
   }, [isListening]);
 

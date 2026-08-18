@@ -124,9 +124,9 @@ const s = StyleSheet.create({
     zIndex: 1,
   },
   logo: {
-    height: 42,
+    height: 45,
     width: "70%",
-    backgroundColor: BRAND_COLORS.surfaceSoft,
+    backgroundColor: "transparent",
     borderTopRightRadius: 50,
     borderBottomLeftRadius: 50,
 

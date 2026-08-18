@@ -33,7 +33,7 @@ export default function TabsLayout() {
           backgroundColor: BRAND_COLORS.primary,
           borderTopWidth: 0,
           elevation: 0,
-          height: 40 + insets.bottom,
+          height: 50 + insets.bottom,
           paddingBottom: Math.max(insets.bottom, 6),
         },
         tabBarItemStyle: {
