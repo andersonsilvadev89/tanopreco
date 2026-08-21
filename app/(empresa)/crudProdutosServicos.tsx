@@ -29,6 +29,7 @@ import {
 } from "firebase/database";
 import { auth, database } from "../../firebaseConfig";
 import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
+import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker"; // ✅ IMPORTADO
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -582,7 +583,7 @@ export default function CadastroProduto() {
         title="Produtos"
         user={auth.currentUser}
         paddingTop={Math.max(insets.top, 8)}
-        onBack={() => {}}
+        onBack={() => router.replace("/(empresa)/homeScreen")}
         onMenuOpen={() => {}}
         onLogout={() => {}}
       />

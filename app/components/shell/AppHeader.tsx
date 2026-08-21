@@ -7,7 +7,7 @@ import { SHELL_COLORS } from "./shellColors";
 import { useAppAppearance } from "../../../context/AppAppearanceContext";
 import { BRAND_COLORS } from "@/constants/BrandColors";
 
-const logoEventoNoite = require("../../../assets/images/logoLarga.png");
+const logoEventoNoite = require("../../../assets/images/logoLargaDia.png");
 const logoEventoDia = require("../../../assets/images/logoLargaDia.png");
 const SPACING = 16;
 const LOGO_OVERFLOW_BOTTOM = 0;

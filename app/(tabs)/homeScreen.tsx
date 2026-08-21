@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -26,6 +26,7 @@ import MapView, { Marker, Callout, Region } from "react-native-maps";
 import AdBanner from "../components/AdBanner";
 import * as Location from "expo-location";
 import AdCard from "../components/AdCard";
+import { DestaquesNoticias } from "../components/DestaquesNoticias";
 import { useAuth } from "../../context/AuthContext";
 import { ProdutoCard } from "../components/ProdutoCard";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -44,6 +45,11 @@ const { width } = Dimensions.get("window");
 const CARD_MARGIN = 8;
 const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2;
 const CARD_MIN_HEIGHT = 300;
+
+// Espelha as dimensões reais do ProdutoCard para calcular o "passo" de rolagem de uma coluna
+const PRODUTO_CARD_LARGURA = ((width - 12 * 3) / 2) * 0.72;
+const PRODUTO_CARD_MARGEM_H = 10;
+const COLUNA_LARGURA = PRODUTO_CARD_LARGURA + PRODUTO_CARD_MARGEM_H * 2;
 
 interface ProdutoComEmpresa {
   id: string;
@@ -174,6 +180,80 @@ function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; lon
 // 2. COMPONENTE PRINCIPAL
 // ----------------------------------------------------
 
+// ----------------------------------------------------
+// Coluna de 3 produtos (empilhados) com scroll horizontal em bloco: cada "passada"
+// desliza uma coluna inteira, mesmo efeito de "dicas" laterais dos destaques.
+// ----------------------------------------------------
+
+function GradeProdutosColunas({
+  colunas,
+  renderProduto,
+}: {
+  colunas: ProdutoComEmpresa[][];
+  renderProduto: (item: ProdutoComEmpresa) => React.ReactNode;
+}) {
+  const [scrollX, setScrollX] = useState(0);
+  const [larguraViewport, setLarguraViewport] = useState(0);
+  const [larguraConteudo, setLarguraConteudo] = useState(0);
+
+  const temOverflow = larguraConteudo > larguraViewport + 1;
+  const mostrarDicaEsquerda = temOverflow && scrollX > 8;
+  const mostrarDicaDireita = temOverflow && scrollX + larguraViewport < larguraConteudo - 8;
+
+  return (
+    <View style={styles.linhaHorizontalWrapper}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.linhaHorizontalConteudo}
+        decelerationRate="fast"
+        snapToInterval={COLUNA_LARGURA}
+        snapToAlignment="start"
+        scrollEventThrottle={16}
+        onScroll={(event) => setScrollX(event.nativeEvent.contentOffset.x)}
+        onLayout={(event) => setLarguraViewport(event.nativeEvent.layout.width)}
+        onContentSizeChange={(contentWidth) => setLarguraConteudo(contentWidth)}
+      >
+        {colunas.map((coluna, index) => (
+          <View key={`coluna_${index}`} style={styles.colunaProdutos}>
+            {coluna.map((produto) => (
+              <React.Fragment key={produto.id}>{renderProduto(produto)}</React.Fragment>
+            ))}
+          </View>
+        ))}
+      </ScrollView>
+
+      {mostrarDicaEsquerda && (
+        <View pointerEvents="none" style={[styles.linhaDicaLateral, styles.linhaDicaEsquerda]}>
+          <LinearGradient
+            colors={["rgba(243, 246, 251, 0.96)", "rgba(243, 246, 251, 0)"]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.linhaFade}
+          />
+          <View style={styles.linhaBolhaSeta}>
+            <Feather name="chevron-left" size={20} color={BRAND_COLORS.primaryDark} />
+          </View>
+        </View>
+      )}
+
+      {mostrarDicaDireita && (
+        <View pointerEvents="none" style={[styles.linhaDicaLateral, styles.linhaDicaDireita]}>
+          <LinearGradient
+            colors={["rgba(243, 246, 251, 0)", "rgba(243, 246, 251, 0.96)"]}
+            start={{ x: 0, y: 0.5 }}
+            end={{ x: 1, y: 0.5 }}
+            style={styles.linhaFade}
+          />
+          <View style={styles.linhaBolhaSeta}>
+            <Feather name="chevron-right" size={20} color={BRAND_COLORS.primaryDark} />
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const { deviceId, user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -204,7 +284,7 @@ export default function HomeScreen() {
   const [imagemModalUrl, setImagemModalUrl] = useState<string | null>(null);
   const [produtoModal, setProdutoModal] = useState<ProdutoComEmpresa | null>(null);
   const mapRef = useRef<MapView>(null);
-  const listaRef = useRef<FlatList<ProdutoComEmpresa>>(null);
+  const listaRef = useRef<ScrollView>(null);
   const categoriasScrollXRef = useRef(0);
   const painelFiltroForaDaTelaRef = useRef(false);
   const filtrosVisiveis = mostrarFiltrosManual;
@@ -382,8 +462,19 @@ export default function HomeScreen() {
     return true;
   });
 
-  const produtosParaExibir = termoBusca.length >= 3 || categoriaSelecionada ? produtosValidos : produtosValidos.filter(p => p.destaque);
-  const tituloDaLista = (termoBusca.length >= 3 && categoriaSelecionada) || (!(termoBusca.length >= 3) && categoriaSelecionada) ? `Resultados da busca (${categoriaSelecionada})` : termoBusca.length >= 3 && categoriaSelecionada === null ? `Resultados da busca`: "Produtos em Destaque";
+  // Por padrão mostramos todos os produtos válidos (o filtro por destaque/busca já ocorre em produtosValidos).
+  const produtosParaExibir = produtosValidos;
+  const produtosDestaqueNoticias = useMemo(
+    () => produtosComEmpresa
+      .filter((produto) => produto.destaque)
+      .map((produto) => ({
+        ...produto,
+        instagram: empresas[produto.empresaId]?.instagram,
+        telefone: empresas[produto.empresaId]?.telefone,
+      })),
+    [produtosComEmpresa, empresas]
+  );
+  const tituloDaLista = (termoBusca.length >= 3 && categoriaSelecionada) || (!(termoBusca.length >= 3) && categoriaSelecionada) ? `Resultados da busca (${categoriaSelecionada})` : termoBusca.length >= 3 && categoriaSelecionada === null ? `Resultados da busca`: "Veja todos os nossos produtos!";
 
   const produtosOrdenados = [...produtosParaExibir].sort((a, b) => {
     // 1. Se for ordenação aleatória inicial (sem busca e sem categoria)
@@ -432,22 +523,24 @@ export default function HomeScreen() {
     }
   });
 
-  const produtosFinal = [];
-  let adCount = 0;
-  produtosOrdenados.forEach((p, i) => {
-    produtosFinal.push(p);
-    adCount++;
-    if (adCount % 5 === 0) produtosFinal.push({ ...AD_PLACEHOLDER, id: `ad_${i}` });
-  });
-  if (produtosFinal.length % 2 === 1) produtosFinal.push({ ...AD_PLACEHOLDER, id: `ad_end` });
+  // Agrupa os produtos ordenados em colunas de 2 (empilhados), sem anúncios intercalados,
+  // para que a rolagem horizontal mova sempre uma coluna inteira por vez.
+  const TAMANHO_COLUNA = 2;
+  const colunasProdutos = useMemo(() => {
+    const colunas: ProdutoComEmpresa[][] = [];
+    for (let i = 0; i < produtosOrdenados.length; i += TAMANHO_COLUNA) {
+      colunas.push(produtosOrdenados.slice(i, i + TAMANHO_COLUNA));
+    }
+    return colunas;
+  }, [produtosOrdenados]);
 
   const openExternalMap = (lat: number, lon: number, label: string) => {
     const url = Platform.select({ ios: `maps:0,0?q=${lat},${lon}(${label})`, android: `geo:0,0?q=${lat},${lon}(${label})` });
     Linking.openURL(url!).catch(() => Linking.openURL(`http://maps.google.com/maps?q=${lat},${lon}`));
   };
 
-  const renderProdutoItem = useCallback(({ item }: { item: ProdutoComEmpresa }) => {
-    if (item.isAd) return <View style={styles.cardProdutoGenerico}><AdCard /></View>;
+  const renderProduto = useCallback((item: ProdutoComEmpresa) => {
+    if (item.isAd) return <AdCard />;
     const emp = empresas[item.empresaId];
     if (!emp) return null;
     return <ProdutoCard produto={item} empresaInfo={emp} userLocation={userLocation} deviceId={deviceId} votarProduto={votarProduto} handleVerNoMapa={handleVerNoMapa} openInstagramProfile={openInstagramProfile} openWhatsApp={openWhatsApp} onImagePress={handleImagePress} />;
@@ -497,7 +590,7 @@ export default function HomeScreen() {
     // Se o painel existe mas saiu da tela, volta para o topo para exibir filtros novamente.
     if (filtrosVisiveis && painelFiltroForaDaTela) {
       setMostrarFiltrosManual(true);
-      listaRef.current?.scrollToOffset({ offset: 0, animated: true });
+      listaRef.current?.scrollTo({ y: 0, animated: true });
       return;
     }
 
@@ -599,12 +692,13 @@ export default function HomeScreen() {
         </View>
 
         {loadingInicial ? <ActivityIndicator size="large" color={BRAND_COLORS.primary} style={{ marginTop: 30 }} /> :
-          <FlatList
+          <ScrollView
             ref={listaRef}
-            data={produtosFinal}
-            keyExtractor={(item) => item.id + item.empresaId}
-            ListHeaderComponent={
-              <>
+            style={styles.productList}
+            onScroll={handleScrollLista}
+            scrollEventThrottle={24}
+          >
+            <>
                 {filtrosVisiveis && (
                   <View
                     style={styles.filtrosPanel}
@@ -699,21 +793,35 @@ export default function HomeScreen() {
                   </View>
                 )}
 
+                <DestaquesNoticias
+                  produtos={produtosDestaqueNoticias}
+                  onProdutoPress={(produto) => {
+                    const produtoCompleto = produtosComEmpresa.find((item) => item.id === produto.id);
+                    if (produtoCompleto) {
+                      handleImagePress(produtoCompleto);
+                    }
+                  }}
+                  onVerNoMapa={(produto) => {
+                    const produtoCompleto = produtosComEmpresa.find((item) => item.id === produto.id);
+                    if (produtoCompleto) {
+                      handleVerNoMapa(produtoCompleto);
+                    }
+                  }}
+                  onInstagram={openInstagramProfile}
+                  onWhatsApp={openWhatsApp}
+                  userLocation={userLocation}
+                />
                 <AdBanner />
 
-                <View style={styles.listTitleContainer}>
-                  <Text style={styles.listTitle}>{tituloDaLista}</Text>
-                </View>
-              </>
-            }
-            ListEmptyComponent={<Text style={styles.mensagemNenhumResultado}>Nenhum produto encontrado.</Text>}
-            numColumns={2}
-            columnWrapperStyle={styles.cardRow}
-            renderItem={renderProdutoItem}
-            style={styles.productList}
-            onScroll={handleScrollLista}
-            scrollEventThrottle={24}
-          />
+                <Text style={styles.listTitle}>{tituloDaLista}</Text>
+
+                {colunasProdutos.length === 0 ? (
+                  <Text style={styles.mensagemNenhumResultado}>Nenhum produto encontrado.</Text>
+                ) : (
+                  <GradeProdutosColunas colunas={colunasProdutos} renderProduto={renderProduto} />
+                )}
+            </>
+          </ScrollView>
         }
 
         {/* Mapa e Modal (Mantidos) */}
@@ -1029,10 +1137,57 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     backgroundColor: "rgba(255,255,255,0.92)",
   },
-  listTitle: { fontSize: 20, fontWeight: "bold", color: BRAND_COLORS.text, textAlign: "center" },
+  listTitle: { 
+    marginHorizontal: 12,
+    marginBottom: 8,
+    marginTop: 20,
+    color: "#063494",
+    fontSize: 18,
+    fontWeight: "800",
+  },
   productList: { flex: 1 },
-  cardRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 12, paddingHorizontal: CARD_MARGIN / 2 },
-  cardProdutoGenerico: { backgroundColor: "rgba(255,255,255,0.95)", borderRadius: 10, marginBottom: 12, marginHorizontal: CARD_MARGIN / 2, elevation: 3, alignItems: "center", justifyContent: "center", width: CARD_WIDTH, minHeight: CARD_MIN_HEIGHT },
+  linhaHorizontalWrapper: {
+    position: "relative",
+    marginBottom: 12,
+  },
+  linhaHorizontalConteudo: {
+    paddingHorizontal: CARD_MARGIN,
+  },
+  colunaProdutos: {
+    width: COLUNA_LARGURA,
+    alignItems: "center",
+  },
+  linhaDicaLateral: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 38,
+    justifyContent: "center",
+    zIndex: 4,
+  },
+  linhaDicaEsquerda: {
+    left: 0,
+    alignItems: "flex-start",
+  },
+  linhaDicaDireita: {
+    right: 0,
+    alignItems: "flex-end",
+  },
+  linhaFade: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  linhaBolhaSeta: {
+    marginHorizontal: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.9)",
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.border,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  bannerListItem: { width: "100%", marginTop: 4 },
   mensagemNenhumResultado: {
     textAlign: "center",
     marginTop: 20,

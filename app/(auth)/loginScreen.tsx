@@ -30,6 +30,7 @@ import { Feather, Ionicons } from "@expo/vector-icons";
 import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
 import { BRAND_COLORS } from "@/constants/BrandColors";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { buildSocialUserProfile } from "./socialUserDefaults";
 
 const defaultLogoLocal = require('../../assets/images/logoEvento.png');
 const isExpoGo = Constants.appOwnership === 'expo';
@@ -104,55 +105,40 @@ const LoginScreen = ({ navigation }: any) => {
   };
 
   const completeSocialLogin = useCallback(async (loggedUser: any) => {
-    const defaultNome =
-      loggedUser.displayName?.trim() ||
-      (loggedUser.email ? loggedUser.email.split('@')[0] : 'Usuario');
-
     const userRef = ref(database, `usuariosEmpresa/${loggedUser.uid}`);
     const snapshot = await get(userRef);
-    const userData = snapshot.val();
+    const userData = snapshot.val() ?? {};
+    const profile = buildSocialUserProfile(loggedUser, userData);
 
-    const nomeAtual = typeof userData?.nome === 'string' && userData.nome.trim()
-      ? userData.nome.trim()
-      : defaultNome;
-    const telefoneAtual = typeof userData?.telefone === 'string' ? userData.telefone.trim() : '';
-    const imagemAtual = typeof userData?.imagem === 'string' && userData.imagem.trim()
-      ? userData.imagem.trim()
-      : (loggedUser.photoURL || '');
+    const profileNeedsOnboarding = !profile.nome || !profile.telefone;
 
-    const profileNeedsOnboarding = !nomeAtual || !telefoneAtual;
-
-    if (!userData) {
-      await set(userRef, {
-        nome: nomeAtual,
-        email: loggedUser.email || '',
-        telefone: null,
-        imagem: imagemAtual,
-        status: 'ativo',
-        criadoEm: Date.now(),
-      });
+    if (!snapshot.exists()) {
+      await set(userRef, profile);
     } else if (profileNeedsOnboarding) {
       const updates: Record<string, any> = {};
 
-      if (!userData.nome && nomeAtual) {
-        updates.nome = nomeAtual;
-      }
-
-      if (!userData.email && loggedUser.email) {
-        updates.email = loggedUser.email;
-      }
-
-      if (!userData.imagem && imagemAtual) {
-        updates.imagem = imagemAtual;
-      }
+      Object.entries(profile).forEach(([key, value]) => {
+        const hasValue = value !== null && value !== undefined && value !== '';
+        if ((userData[key] === undefined || userData[key] === null || userData[key] === '') && hasValue) {
+          updates[key] = value;
+        }
+      });
 
       if (Object.keys(updates).length > 0) {
         await update(userRef, updates);
       }
-    } else if (!userData.email && loggedUser.email) {
-      await update(userRef, {
-        email: loggedUser.email,
+    } else {
+      const updates: Record<string, any> = {};
+
+      Object.entries(profile).forEach(([key, value]) => {
+        if (userData[key] === undefined || userData[key] === null) {
+          updates[key] = value;
+        }
       });
+
+      if (Object.keys(updates).length > 0) {
+        await update(userRef, updates);
+      }
     }
 
     router.replace('/(empresa)/homeScreen');

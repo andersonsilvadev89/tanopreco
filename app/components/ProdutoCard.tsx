@@ -47,8 +47,7 @@ interface ProdutoCardProps {
 
 const { width } = Dimensions.get('window');
 const CARD_MARGIN = 12;
-const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2;
-const CARD_MIN_HEIGHT = 270;
+const CARD_WIDTH = ((width - CARD_MARGIN * 3) / 2) * 0.72;
 
 function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; longitude: number; isProdutoLocation: boolean } | null {
     if (produto.localizacaoDiferente && produto.latitudeProduto && produto.longitudeProduto) {
@@ -231,12 +230,11 @@ export const ProdutoCard = memo(ProdutoCardComponent);
 const styles = StyleSheet.create({
     cardProduto: {
         width: CARD_WIDTH,
-        minHeight: CARD_MIN_HEIGHT,
         backgroundColor: 'transparent',
-        borderRadius: 18,
-        padding: 8,
-        marginBottom: 12,
-        marginHorizontal: CARD_MARGIN / 2,
+        borderRadius: 14,
+        padding: 6,
+        marginBottom: 10,
+        marginHorizontal: 10,
         alignItems: 'center',
     },
     cardPressArea: {
@@ -248,16 +246,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     imagemProduto: {
-        width: '90%',
+        width: '80%',
         alignSelf:"flex-end",
-        height: 150,
-        borderRadius: 40,
+        height: 104,
+        borderRadius: 32,
         backgroundColor: BRAND_COLORS.surfaceSoft,
     },
     imagemProdutoPlaceholder: {
         width: '100%',
-        height: 160,
-        borderRadius: 50,
+        height: 104,
+        borderRadius: 40,
         backgroundColor: BRAND_COLORS.surfaceSoft,
         justifyContent: 'center',
         alignItems: 'center',
@@ -267,14 +265,14 @@ const styles = StyleSheet.create({
         top: 0,
         left: 0,
         backgroundColor: 'rgba(0,0,0)',
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 5,
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 4,
         maxWidth: '64%',
     },
     badgeEmpresaText: {
         color: BRAND_COLORS.white,
-        fontSize: 9,
+        fontSize: 8,
         fontWeight: '700',
     },
     badgePreco: {
@@ -282,13 +280,13 @@ const styles = StyleSheet.create({
         right: 0,
         bottom: 0,
         backgroundColor: 'rgba(16,117,60)',
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 5,
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 4,
     },
     badgePrecoText: {
         color: BRAND_COLORS.white,
-        fontSize: 15,
+        fontSize: 12,
         fontWeight: '800',
     },
     actionOverlay: {
@@ -296,12 +294,12 @@ const styles = StyleSheet.create({
         left: 0,
         bottom: 0,
         flexDirection: 'column',
-        gap: 6,
+        gap: 5,
     },
     smallActionButton: {
-        width: 30,
-        height: 30,
-        borderRadius: 15,
+        width: 24,
+        height: 24,
+        borderRadius: 12,
         backgroundColor: 'rgba(10,79,203,0.82)',
         alignItems: 'center',
         justifyContent: 'center',
@@ -316,37 +314,37 @@ const styles = StyleSheet.create({
     },
     descRow: {
         width: '100%',
-        marginTop: 10,
-        paddingHorizontal: 4,
+        marginTop: 8,
+        paddingHorizontal: 3,
     },
     descricao: {
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '700',
         color: BRAND_COLORS.text,
         textAlign: 'center',
-        lineHeight: 16,
+        lineHeight: 13,
     },
     descHint: {
-        fontSize: 9,
+        fontSize: 8,
         color: BRAND_COLORS.primary,
         fontWeight: '700',
     },
     metaRow: {
         width: '100%',
         alignItems: 'center',
-        marginTop: 4,
-        marginBottom: 6,
+        marginTop: 3,
+        marginBottom: 0,
     },
     distancia: {
-        fontSize: 11,
+        fontSize: 9,
         color: BRAND_COLORS.primary,
         fontWeight: '700',
         textAlign: 'center',
     },
     dataOferta: {
-        fontSize: 10,
+        fontSize: 8,
         color: BRAND_COLORS.textMuted,
         textAlign: 'center',
-        marginTop: 2,
+        marginTop: 1,
     },
 });
