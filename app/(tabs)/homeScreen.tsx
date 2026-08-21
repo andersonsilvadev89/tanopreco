@@ -196,6 +196,27 @@ function GradeProdutosColunas({
   const [larguraViewport, setLarguraViewport] = useState(0);
   const [larguraConteudo, setLarguraConteudo] = useState(0);
 
+  const colunasComAnuncios = useMemo(() => {
+    const itens: ProdutoComEmpresa[] = [];
+    let produtosDesdeUltimoAnuncio = 0;
+
+    colunas.flat().forEach((produto) => {
+      itens.push(produto);
+      produtosDesdeUltimoAnuncio += 1;
+
+      if (produtosDesdeUltimoAnuncio === 3) {
+        itens.push({ ...AD_PLACEHOLDER, id: `ad_after_${produto.id}` });
+        produtosDesdeUltimoAnuncio = 0;
+      }
+    });
+
+    const resultado: ProdutoComEmpresa[][] = [];
+    for (let i = 0; i < itens.length; i += 2) {
+      resultado.push(itens.slice(i, i + 2));
+    }
+    return resultado;
+  }, [colunas]);
+
   const temOverflow = larguraConteudo > larguraViewport + 1;
   const mostrarDicaEsquerda = temOverflow && scrollX > 8;
   const mostrarDicaDireita = temOverflow && scrollX + larguraViewport < larguraConteudo - 8;
@@ -214,7 +235,7 @@ function GradeProdutosColunas({
         onLayout={(event) => setLarguraViewport(event.nativeEvent.layout.width)}
         onContentSizeChange={(contentWidth) => setLarguraConteudo(contentWidth)}
       >
-        {colunas.map((coluna, index) => (
+        {colunasComAnuncios.map((coluna, index) => (
           <View key={`coluna_${index}`} style={styles.colunaProdutos}>
             {coluna.map((produto) => (
               <React.Fragment key={produto.id}>{renderProduto(produto)}</React.Fragment>
@@ -523,7 +544,7 @@ export default function HomeScreen() {
     }
   });
 
-  // Agrupa os produtos ordenados em colunas de 2 (empilhados), sem anúncios intercalados,
+  // Agrupa os produtos ordenados em colunas de 2 (empilhados),
   // para que a rolagem horizontal mova sempre uma coluna inteira por vez.
   const TAMANHO_COLUNA = 2;
   const colunasProdutos = useMemo(() => {
