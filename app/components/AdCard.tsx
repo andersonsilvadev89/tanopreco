@@ -13,8 +13,7 @@ const ANDROID_AD_UNIT_ID = 'ca-app-pub-5241782827769638/2862164767';
 // Importando as mesmas constantes de dimensão do ProdutoCard
 const { width } = Dimensions.get('window');
 const CARD_MARGIN = 12;
-const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2;
-const CARD_MIN_HEIGHT = 270;
+const CARD_WIDTH = ((width - CARD_MARGIN * 3) / 2) * 0.72;
 
 const AdCard: React.FC = () => {
     const googleMobileAds = getGoogleMobileAdsModule();
@@ -158,17 +157,16 @@ const styles = StyleSheet.create({
     },
     cardProduto: {
         width: CARD_WIDTH,
-        minHeight: CARD_MIN_HEIGHT,
         backgroundColor: 'transparent',
-        borderRadius: 18,
-        padding: 8,
-        marginBottom: 12,
-        marginHorizontal: CARD_MARGIN / 2,
+        borderRadius: 14,
+        padding: 6,
+        marginBottom: 10,
+        marginHorizontal: 10,
         alignItems: 'center',
     },
     loadingContainer: { 
         width: CARD_WIDTH, 
-        minHeight: CARD_MIN_HEIGHT, 
+        minHeight: 140,
         justifyContent: 'center', 
         alignItems: 'center' 
     },
@@ -180,10 +178,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     imagemProduto: {
-        width: '90%',
+        width: '80%',
         alignSelf: 'flex-end',
-        height: 150,
-        borderRadius: 40,
+        height: 104,
+        borderRadius: 32,
         backgroundColor: BRAND_COLORS.surfaceSoft,
         overflow: 'hidden',
     },
