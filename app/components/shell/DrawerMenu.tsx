@@ -79,10 +79,10 @@ export const DrawerMenu: React.FC<DrawerProps> = ({
   }, [visible]);
 
   const menuItems = [
-    { label: "Início (Home)",         icon: Home,       path: "/homeScreen",                requiresAuth: false },
-    { label: "Configurações",         icon: Settings,   path: "/configuracoesScreen",       requiresAuth: true  },
-    { label: "Área da Empresa",       icon: Briefcase,  path: "/empresaScreen",             requiresAuth: true  },
-    { label: "Sobre o App",           icon: CircleHelp, path: "/sobreScreen",               requiresAuth: false },
+    { label: "Início (Home)",         icon: Home,       path: "/(tabs)/homeScreen",          requiresAuth: false },
+    { label: "Configurações",         icon: Settings,   path: "/(empresa)/configuracoesScreen", requiresAuth: true  },
+    { label: "Área da Empresa",       icon: Briefcase,  path: "/(empresa)/homeScreen",       requiresAuth: true  },
+    { label: "Sobre o App",           icon: CircleHelp, path: "/(tabs)/sobreScreen",         requiresAuth: false },
   ];
 
   const userName = user?.displayName

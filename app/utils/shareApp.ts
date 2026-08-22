@@ -1,10 +1,10 @@
 import { Share } from "react-native";
 
-const DEFAULT_APP_NAME = "Expocrato";
+const DEFAULT_APP_NAME = "TaNoPreço";
 
 export const APP_SHARE_LINKS = {
-  android: "https://play.google.com/store/apps/details?id=com.ae.stoantoniobarbalhacliente",
-  ios: "https://apps.apple.com/br/app/expocrato/id6747686374",
+  android: "https://play.google.com/store/apps/details?id=com.tanopreco&hl=pt_BR",
+  ios: "https://apps.apple.com/br/app/tanopreco/id6754825370",
 };
 
 interface ShareAppOptions {
@@ -22,9 +22,11 @@ export const buildShareAppMessage = (
   }
 
   return (
-    `Baixe o app ${appName} e acompanhe tudo do evento!\n\n` +
+    `Encontrei um app muito bom para acompanhar ofertas na sua região: ${appName} o melhor preço, o mais perto de você.\n\n` +
+    `Baixe agora:\n` +
     `Android: ${APP_SHARE_LINKS.android}\n` +
-    `iOS: ${APP_SHARE_LINKS.ios}`
+    `iOS: ${APP_SHARE_LINKS.ios}\n\n` +
+    `Depois me conta o que achou!`
   );
 };
 

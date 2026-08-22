@@ -1,7 +1,9 @@
 import { Tabs } from "expo-router";
+import { router } from "expo-router";
 import { auth } from "../../firebaseConfig";
 import { onAuthStateChanged } from "firebase/auth";
 import React, { useState, useEffect } from "react";
+import { Alert } from "react-native";
 import { FontAwesome5, AntDesign } from "@expo/vector-icons";
 import { BRAND_COLORS } from "@/constants/BrandColors";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -61,6 +63,29 @@ export default function TabsLayout() {
           tabBarIcon: ({ color, size }) => (
             <AntDesign name="team" color={color} size={size} />
           ),
+          tabBarButtonTestID: "tab-empresa",
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+
+            if (!user) {
+              Alert.alert(
+                "Login necessário",
+                "Você precisa estar logado para acessar a área da empresa.",
+                [
+                  { text: "Cancelar", style: "cancel" },
+                  {
+                    text: "Ir para login",
+                    onPress: () => router.push("/(auth)/loginScreen"),
+                  },
+                ]
+              );
+              return;
+            }
+
+            router.push("/(empresa)/homeScreen");
+          },
         }}
       />
       <Tabs.Screen

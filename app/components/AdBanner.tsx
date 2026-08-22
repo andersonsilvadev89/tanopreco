@@ -94,12 +94,12 @@ const AdBanner = () => {
 
 const styles = StyleSheet.create({
     container: {
-        width: '95%',
+        width: '96%',
         alignItems: 'center', 
         alignSelf: 'center',
         marginVertical: 5,
         minHeight: BANNER_HEIGHT,
-        borderRadius: 12,
+        borderRadius: 8,
         overflow: 'hidden',
     },
     // Novo estilo: Container para o Banner Ad

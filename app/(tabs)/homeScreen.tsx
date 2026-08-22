@@ -343,6 +343,16 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const handleVerNoMapaViaModal = useCallback((produto: ProdutoComEmpresa) => {
+    setImagemModalVisivel(false);
+    setProdutoModal(null);
+
+    // Aguarda o fechamento visual do modal da imagem para abrir o mapa por cima.
+    setTimeout(() => {
+      handleVerNoMapa(produto);
+    }, 140);
+  }, [handleVerNoMapa]);
+
   const openInstagramProfile = useCallback(async (username: string | undefined) => {
     if (!username) { Alert.alert("Instagram não informado", "Esta empresa não possui um Instagram cadastrado."); return; }
     const user = username.replace("@", "");
@@ -486,14 +496,14 @@ export default function HomeScreen() {
   // Por padrão mostramos todos os produtos válidos (o filtro por destaque/busca já ocorre em produtosValidos).
   const produtosParaExibir = produtosValidos;
   const produtosDestaqueNoticias = useMemo(
-    () => produtosComEmpresa
+    () => produtosValidos
       .filter((produto) => produto.destaque)
       .map((produto) => ({
         ...produto,
         instagram: empresas[produto.empresaId]?.instagram,
         telefone: empresas[produto.empresaId]?.telefone,
       })),
-    [produtosComEmpresa, empresas]
+    [produtosValidos, empresas]
   );
   const tituloDaLista = (termoBusca.length >= 3 && categoriaSelecionada) || (!(termoBusca.length >= 3) && categoriaSelecionada) ? `Resultados da busca (${categoriaSelecionada})` : termoBusca.length >= 3 && categoriaSelecionada === null ? `Resultados da busca`: "Veja todos os nossos produtos!";
 
@@ -899,7 +909,7 @@ export default function HomeScreen() {
 
                   <View style={styles.modalActions}>
                     {getProdutoLocation(produtoModal) && (
-                      <TouchableOpacity style={styles.modalAction} onPress={() => handleVerNoMapa(produtoModal)}>
+                      <TouchableOpacity style={styles.modalAction} onPress={() => handleVerNoMapaViaModal(produtoModal)}>
                         <Feather name="map-pin" size={18} color={BRAND_COLORS.white} />
                         <Text style={styles.modalActionText}>Mapa</Text>
                       </TouchableOpacity>
@@ -1076,7 +1086,7 @@ const styles = StyleSheet.create({
   categoriaItem: {
     alignItems: "center",
     justifyContent: "flex-start",
-    width: 52,
+    width: 60,
     marginBottom: 0,
     marginHorizontal: 0,
   },

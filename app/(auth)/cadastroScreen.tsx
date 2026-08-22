@@ -24,6 +24,7 @@ import { Feather } from "@expo/vector-icons";
 import { MaskedTextInput } from "react-native-mask-text";
 import { router } from "expo-router";
 import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
+import { DrawerMenu } from "../components/shell/DrawerMenu";
 import CpfInput from "../components/CpfInput";
 import CnpjInput from "../components/CnpjInput";
 import { BRAND_COLORS } from "@/constants/BrandColors";
@@ -60,6 +61,7 @@ export default function CadastroScreen() {
   const [privacyPolicyUrl, setPrivacyPolicyUrl] = useState<string | null>(null);
   const [loadingPrivacyPolicyUrl, setLoadingPrivacyPolicyUrl] = useState(true);
   const [localizacaoCarregada, setLocalizacaoCarregada] = useState(false);
+  const [drawerMenuVisible, setDrawerMenuVisible] = useState(false);
 
   const camposPreenchidos = () =>
     nomeEmpresa &&
@@ -421,6 +423,24 @@ export default function CadastroScreen() {
     setCnpj(unmaskedValue);
   };
 
+  const handleMenuOpen = () => {
+    setDrawerMenuVisible(true);
+  };
+
+  const handleMenuClose = () => {
+    setDrawerMenuVisible(false);
+  };
+
+  const handleNavigateTo = (path: string, requiresAuth: boolean) => {
+    if (requiresAuth && !auth.currentUser) {
+      Alert.alert("Login necessário", "Entre na sua conta para acessar esta área.");
+      router.push("/(auth)/loginScreen");
+      return;
+    }
+
+    router.push(path as any);
+  };
+
   return (
     <View style={styles.background}>
       <AppHeaderTitle
@@ -428,8 +448,15 @@ export default function CadastroScreen() {
         user={null}
         paddingTop={Math.max(insets.top, 8)}
         onBack={() => {}}
-        onMenuOpen={() => {}}
+        onMenuOpen={handleMenuOpen}
         onLogout={() => {}}
+      />
+      <DrawerMenu
+        visible={drawerMenuVisible}
+        onClose={handleMenuClose}
+        user={auth.currentUser}
+        onLogout={() => {}}
+        navigateTo={handleNavigateTo}
       />
 
       <KeyboardAwareScrollView

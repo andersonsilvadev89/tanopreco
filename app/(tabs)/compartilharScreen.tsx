@@ -1,37 +1,93 @@
 import React from "react";
-import { Alert, Share, StyleSheet, TouchableOpacity, View } from "react-native";
+import { useState } from "react";
+import { Alert, StyleSheet, TouchableOpacity } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-
-const APP_SHARE_MESSAGE =
-  "Conheca o Ta no Preco! Baixe o app e acompanhe novidades e ofertas da Expocrato.";
+import { shareApp } from "../utils/shareApp";
+import { View } from "react-native";
+import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
+import { DrawerMenu } from "../components/shell/DrawerMenu";
+import { auth } from "../../firebaseConfig";
+import { signOut } from "firebase/auth";
+import { router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function CompartilharScreen() {
+  const insets = useSafeAreaInsets();
+  const [drawerMenuVisible, setDrawerMenuVisible] = useState(false);
+
   const compartilharApp = async () => {
     try {
-      await Share.share({
-        message: APP_SHARE_MESSAGE,
-      });
+      await shareApp();
     } catch (error) {
       Alert.alert("Nao foi possivel compartilhar", "Tente novamente em instantes.");
     }
   };
 
-  return (
-    <ThemedView style={styles.container}>
-      <ThemedText type="title">Compartilhar app</ThemedText>
-      <ThemedText style={styles.description}>
-        Convide outras pessoas para usar o Ta no Preco.
-      </ThemedText>
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.replace("/(tabs)/homeScreen");
+    } catch (error) {
+      console.error("Erro ao fazer logout:", error);
+      Alert.alert("Erro", "Nao foi possivel sair da conta.");
+    }
+  };
 
-      <TouchableOpacity style={styles.button} onPress={compartilharApp}>
-        <ThemedText style={styles.buttonText}>Compartilhar agora</ThemedText>
-      </TouchableOpacity>
-    </ThemedView>
+  const handleMenuOpen = () => {
+    setDrawerMenuVisible(true);
+  };
+
+  const handleMenuClose = () => {
+    setDrawerMenuVisible(false);
+  };
+
+  const handleNavigateTo = (path: string, requiresAuth: boolean) => {
+    if (requiresAuth && !auth.currentUser) {
+      Alert.alert("Login necessário", "Entre na sua conta para acessar esta área.");
+      router.push("/(auth)/loginScreen");
+      return;
+    }
+
+    router.push(path as any);
+  };
+
+  return (
+    <View style={styles.screen}>
+      <AppHeaderTitle
+        title="Compartilhar"
+        user={auth.currentUser}
+        paddingTop={Math.max(insets.top, 8)}
+        onBack={() => router.replace("/(tabs)/homeScreen")}
+        onMenuOpen={handleMenuOpen}
+        onLogout={handleLogout}
+      />
+      <DrawerMenu
+        visible={drawerMenuVisible}
+        onClose={handleMenuClose}
+        user={auth.currentUser}
+        onLogout={handleLogout}
+        navigateTo={handleNavigateTo}
+      />
+
+      <ThemedView style={styles.container}>
+        <ThemedText type="title">Compartilhar app</ThemedText>
+        <ThemedText style={styles.description}>
+          Convide outras pessoas para usar o Ta no Preco.
+        </ThemedText>
+
+        <TouchableOpacity style={styles.button} onPress={compartilharApp}>
+          <ThemedText style={styles.buttonText}>Compartilhar agora</ThemedText>
+        </TouchableOpacity>
+      </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+  },
   container: {
     flex: 1,
     alignItems: "center",

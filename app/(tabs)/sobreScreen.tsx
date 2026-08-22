@@ -14,9 +14,11 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { auth, database, adminDatabase } from '../../firebaseConfig'; 
 import { ref, get, push, serverTimestamp, onValue } from 'firebase/database';
 import { AppHeaderTitle } from '../components/shell/AppHeaderTitle';
+import { DrawerMenu } from '../components/shell/DrawerMenu';
 import { BRAND_COLORS } from '@/constants/BrandColors';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { signOut } from 'firebase/auth';
 
 // Constantes de configuração do Firebase
 const FIREBASE_COLLECTION = 'configuracoes_apps';
@@ -30,6 +32,7 @@ export default function Sobre() {
   // === ESTADOS PARA O TEXTO "SOBRE O APP" ===
   const [sobreAppTexto, setSobreAppTexto] = useState('');
   const [loadingSobreAppTexto, setLoadingSobreAppTexto] = useState(true);
+  const [drawerMenuVisible, setDrawerMenuVisible] = useState(false);
 
   const scrollViewRef = useRef<ScrollView>(null);
   const scrollOffsetRef = useRef(0);
@@ -108,6 +111,34 @@ export default function Sobre() {
     }
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.replace('/(tabs)/homeScreen');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      Alert.alert('Erro', 'Nao foi possivel sair da conta.');
+    }
+  };
+
+  const handleMenuOpen = () => {
+    setDrawerMenuVisible(true);
+  };
+
+  const handleMenuClose = () => {
+    setDrawerMenuVisible(false);
+  };
+
+  const handleNavigateTo = (path: string, requiresAuth: boolean) => {
+    if (requiresAuth && !auth.currentUser) {
+      Alert.alert('Login necessário', 'Entre na sua conta para acessar esta área.');
+      router.push('/(auth)/loginScreen');
+      return;
+    }
+
+    router.push(path as any);
+  };
+
   if (loadingSobreAppTexto) { 
     return (
       <View style={styles.loadingContainer}>
@@ -124,8 +155,15 @@ export default function Sobre() {
         user={auth.currentUser}
         paddingTop={Math.max(insets.top, 8)}
         onBack={() => router.replace('/(tabs)/homeScreen')}
-        onMenuOpen={() => {}}
-        onLogout={() => {}}
+        onMenuOpen={handleMenuOpen}
+        onLogout={handleLogout}
+      />
+      <DrawerMenu
+        visible={drawerMenuVisible}
+        onClose={handleMenuClose}
+        user={auth.currentUser}
+        onLogout={handleLogout}
+        navigateTo={handleNavigateTo}
       />
 
       <View style={styles.contentArea}>

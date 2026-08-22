@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet, Image } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from "react-native";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { Menu, LogIn, ChevronLeft } from "lucide-react-native";
@@ -37,6 +37,18 @@ export const AppHeader = ({
     ? user.email.charAt(0).toUpperCase()
     : null;
 
+  const handleLogoutPress = () => {
+    Alert.alert(
+      "Sair da Conta",
+      "Tem certeza que deseja sair da sua conta?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        { text: "Sair", style: "destructive", onPress: onLogout },
+      ],
+      { cancelable: true }
+    );
+  };
+
   return (
     <>
       <StatusBar backgroundColor={headerBgColor} translucent={false} />
@@ -64,7 +76,7 @@ export const AppHeader = ({
           {user ? (
             <TouchableOpacity
               style={[s.headerIconBtn, s.avatarBtn]}
-              onPress={onLogout}
+              onPress={handleLogoutPress}
               activeOpacity={0.8}
             >
               <Text style={s.avatarText}>{userInitial}</Text>

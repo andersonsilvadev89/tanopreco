@@ -10,7 +10,7 @@ import { BRAND_COLORS } from '@/constants/BrandColors';
 const IOS_AD_UNIT_ID = 'ca-app-pub-5241782827769638/1260262961';
 const ANDROID_AD_UNIT_ID = 'ca-app-pub-5241782827769638/2862164767';
 
-// Importando as mesmas constantes de dimensão do ProdutoCard
+// Mantem as mesmas proporcoes do ProdutoCard para nao destoar no carrossel.
 const { width } = Dimensions.get('window');
 const CARD_MARGIN = 12;
 const CARD_WIDTH = ((width - CARD_MARGIN * 3) / 2) * 0.72;
@@ -78,22 +78,17 @@ const AdCard: React.FC = () => {
     }
 
     if (error || !nativeAd) {
-        return null; // Oculta o card se der erro para não quebrar a listagem
+        return null;
     }
 
     return (
         <NativeAdView nativeAd={nativeAd} style={styles.adContainer}>
             <View style={styles.cardProduto}>
-                
-                {/* ÁREA DA IMAGEM E BADGES */}
-                <View style={styles.imageArea}>
-                    
-                    {/* 1. Imagem Principal */}
-                    <NativeMediaView style={styles.imagemProduto} />
+                <View style={styles.cardPressArea}>
+                    <View style={styles.imageArea}>
+                        <NativeMediaView style={styles.imagemProduto} />
 
-                    {/* 2. Badge Empresa (Anunciante no Topo Esquerdo) */}
-                    {nativeAd.advertiser && (
-                        <View style={styles.badgeEmpresaWrapper}>
+                        {nativeAd.advertiser && (
                             <NativeAsset assetType={NativeAssetType.ADVERTISER}>
                                 <View style={styles.badgeEmpresa}>
                                     <Text style={styles.badgeEmpresaText} numberOfLines={1}>
@@ -101,33 +96,28 @@ const AdCard: React.FC = () => {
                                     </Text>
                                 </View>
                             </NativeAsset>
-                        </View>
-                    )}
+                        )}
 
-                    {/* 3. Badge Preço (Call to Action no Canto Inferior Direito) */}
-                    {nativeAd.callToAction && (
-                        <View style={styles.badgePrecoWrapper}>
+                        {nativeAd.callToAction && (
                             <NativeAsset assetType={NativeAssetType.CALL_TO_ACTION}>
                                 <View style={styles.badgePreco}>
-                                    <Text style={styles.badgePrecoText}>
+                                    <Text style={styles.badgePrecoText} numberOfLines={1}>
                                         {nativeAd.callToAction}
                                     </Text>
                                 </View>
                             </NativeAsset>
-                        </View>
-                    )}
+                        )}
+                    </View>
                 </View>
 
-                {/* 4. Descrição (Headline simulando nome do produto) */}
                 <View style={styles.descRow}>
                     <NativeAsset assetType={NativeAssetType.HEADLINE}>
-                        <Text style={styles.descricao} numberOfLines={2}>
+                        <Text style={styles.descricao} numberOfLines={1}>
                             {nativeAd.headline}
                         </Text>
                     </NativeAsset>
                 </View>
 
-                {/* 5. Meta Data (Body do anúncio + Tag Patrocinado) */}
                 <View style={styles.metaRow}>
                     <Text style={styles.distancia}>Patrocinado</Text>
                     {nativeAd.body && (
@@ -138,7 +128,6 @@ const AdCard: React.FC = () => {
                         </NativeAsset>
                     )}
                 </View>
-
             </View>
         </NativeAdView>
     );
@@ -150,7 +139,7 @@ const AdCard: React.FC = () => {
 
 const styles = StyleSheet.create({
     adContainer: {
-        padding: 0,
+        width: CARD_WIDTH,
         backgroundColor: 'transparent',
         elevation: 0,
         margin: 0,
@@ -164,11 +153,16 @@ const styles = StyleSheet.create({
         marginHorizontal: 10,
         alignItems: 'center',
     },
+    cardPressArea: {
+        width: '100%',
+    },
     loadingContainer: { 
         width: CARD_WIDTH, 
-        minHeight: 140,
+        minHeight: 150,
         justifyContent: 'center', 
-        alignItems: 'center' 
+        alignItems: 'center',
+        marginHorizontal: 10,
+        marginBottom: 10,
     },
     loadingText: { marginTop: 8, fontSize: 12, color: BRAND_COLORS.textMuted },
     
@@ -185,73 +179,68 @@ const styles = StyleSheet.create({
         backgroundColor: BRAND_COLORS.surfaceSoft,
         overflow: 'hidden',
     },
-    
-    // Wrapper absolutos para os badges ficarem sobre a imagem
-    badgeEmpresaWrapper: {
+
+    badgeEmpresa: {
         position: 'absolute',
         top: 0,
         left: 0,
+        backgroundColor: 'rgba(0,0,0)',
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 4,
         maxWidth: '64%',
-    },
-    badgeEmpresa: {
-        backgroundColor: 'rgba(0,0,0,0.8)', // Leve opacidade para destacar
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 5,
     },
     badgeEmpresaText: {
         color: BRAND_COLORS.white,
-        fontSize: 9,
+        fontSize: 8,
         fontWeight: '700',
     },
 
-    badgePrecoWrapper: {
+    badgePreco: {
         position: 'absolute',
         right: 0,
         bottom: 0,
-    },
-    badgePreco: {
-        backgroundColor: 'rgba(16,117,60,0.9)',
-        borderRadius: 8,
-        paddingHorizontal: 8,
-        paddingVertical: 5,
+        backgroundColor: 'rgba(16,117,60)',
+        borderRadius: 6,
+        paddingHorizontal: 6,
+        paddingVertical: 4,
     },
     badgePrecoText: {
         color: BRAND_COLORS.white,
-        fontSize: 13, // Levemente menor caso o texto do CTA seja grande
+        fontSize: 12,
         fontWeight: '800',
     },
 
     descRow: {
         width: '100%',
-        marginTop: 10,
-        paddingHorizontal: 4,
+        marginTop: 8,
+        paddingHorizontal: 3,
     },
     descricao: {
-        fontSize: 12,
+        fontSize: 10,
         fontWeight: '700',
         color: BRAND_COLORS.text,
         textAlign: 'center',
-        lineHeight: 16,
+        lineHeight: 13,
     },
 
     metaRow: {
         width: '100%',
         alignItems: 'center',
-        marginTop: 4,
-        marginBottom: 6,
+        marginTop: 3,
+        marginBottom: 0,
     },
     distancia: {
-        fontSize: 11,
+        fontSize: 9,
         color: BRAND_COLORS.primary,
         fontWeight: '700',
         textAlign: 'center',
     },
     dataOferta: {
-        fontSize: 10,
+        fontSize: 8,
         color: BRAND_COLORS.textMuted,
         textAlign: 'center',
-        marginTop: 2,
+        marginTop: 1,
     },
 });
 

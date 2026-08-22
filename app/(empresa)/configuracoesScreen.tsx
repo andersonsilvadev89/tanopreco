@@ -16,8 +16,11 @@ import * as Location from 'expo-location';
 import { ref, set, get, update, remove } from 'firebase/database';
 import { auth, database } from '../../firebaseConfig';
 import { useNavigation } from '@react-navigation/native';
+import { router } from 'expo-router';
+import { signOut } from 'firebase/auth';
 
 import { AppHeaderTitle } from '../components/shell/AppHeaderTitle';
+import { DrawerMenu } from '../components/shell/DrawerMenu';
 import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import LocalizacaoModal from '../components/LocalizacaoModal';
 import { BRAND_COLORS } from '@/constants/BrandColors';
@@ -58,6 +61,7 @@ const ConfiguracoesEmpresaScreen = () => {
     const [longitude, setLongitude] = useState<number | null>(null);
 
     const [isLocationModalVisible, setIsLocationModalVisible] = useState(false);
+    const [drawerMenuVisible, setDrawerMenuVisible] = useState(false);
 
     const usuarioId = auth.currentUser?.uid;
 
@@ -292,6 +296,34 @@ const ConfiguracoesEmpresaScreen = () => {
         setIsLocationModalVisible(false);
     };
 
+    const handleLogout = async () => {
+        try {
+            await signOut(auth);
+            router.replace('/(tabs)/homeScreen');
+        } catch (error) {
+            console.error('Erro ao fazer logout:', error);
+            Alert.alert('Erro', 'Nao foi possivel sair da conta.');
+        }
+    };
+
+    const handleMenuOpen = () => {
+        setDrawerMenuVisible(true);
+    };
+
+    const handleMenuClose = () => {
+        setDrawerMenuVisible(false);
+    };
+
+    const handleNavigateTo = (path: string, requiresAuth: boolean) => {
+        if (requiresAuth && !auth.currentUser) {
+            Alert.alert('Login necessário', 'Entre na sua conta para acessar esta área.');
+            router.push('/(auth)/loginScreen');
+            return;
+        }
+
+        router.push(path as any);
+    };
+
     // --------------------------------------------------------------------
     // UI PRINCIPAL
     // --------------------------------------------------------------------
@@ -314,8 +346,15 @@ const ConfiguracoesEmpresaScreen = () => {
                 user={auth.currentUser}
                 paddingTop={Math.max(insets.top, 8)}
                 onBack={() => navigation.goBack()}
-                onMenuOpen={() => {}}
-                onLogout={() => {}}
+                onMenuOpen={handleMenuOpen}
+                onLogout={handleLogout}
+            />
+            <DrawerMenu
+                visible={drawerMenuVisible}
+                onClose={handleMenuClose}
+                user={auth.currentUser}
+                onLogout={handleLogout}
+                navigateTo={handleNavigateTo}
             />
             <SafeAreaView style={styles.safeArea}>
                 <KeyboardAwareScrollView contentContainerStyle={styles.scrollContainer} enableOnAndroid>

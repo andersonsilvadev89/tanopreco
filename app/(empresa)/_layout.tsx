@@ -71,13 +71,6 @@ export default function EmpresaLayout() {
         }}
       />
       <Tabs.Screen
-        name="sobreScreen"
-        options={{
-          title: "Sobre",
-          tabBarIcon: ({ color, size }: { color: string; size: number }) => <AntDesign name="info-circle" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
         name="compartilharScreen"
         options={{
           title: "Compartilhar",

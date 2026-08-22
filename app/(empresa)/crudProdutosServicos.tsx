@@ -29,10 +29,12 @@ import {
 } from "firebase/database";
 import { auth, database } from "../../firebaseConfig";
 import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
+import { DrawerMenu } from "../components/shell/DrawerMenu";
 import { router } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker"; // ✅ IMPORTADO
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { signOut } from "firebase/auth";
 
 import LocalizacaoModal from "../components/LocalizacaoModal";
 import { BRAND_COLORS } from "@/constants/BrandColors";
@@ -165,6 +167,7 @@ export default function CadastroProduto() {
   const [destaquesDisponiveis, setDestaquesDisponiveis] = useState<number | null>(null);
   const [loadingCompanyData, setLoadingCompanyData] = useState(true);
   const [mostrarLista, setMostrarLista] = useState(false);
+  const [drawerMenuVisible, setDrawerMenuVisible] = useState(false);
 
   const [descricaoY, setDescricaoY] = useState(0);
   const [precoY, setPrecoY] = useState(0);
@@ -568,6 +571,34 @@ export default function CadastroProduto() {
     setModalMapaVisivel(false);
   };
 
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.replace('/(tabs)/homeScreen');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      Alert.alert('Erro', 'Nao foi possivel sair da conta.');
+    }
+  };
+
+  const handleMenuOpen = () => {
+    setDrawerMenuVisible(true);
+  };
+
+  const handleMenuClose = () => {
+    setDrawerMenuVisible(false);
+  };
+
+  const handleNavigateTo = (path: string, requiresAuth: boolean) => {
+    if (requiresAuth && !auth.currentUser) {
+      Alert.alert('Login necessário', 'Entre na sua conta para acessar esta área.');
+      router.push('/(auth)/loginScreen');
+      return;
+    }
+
+    router.push(path as any);
+  };
+
   if (loadingCompanyData) {
     return (
       <View style={styles.loadingContainer}>
@@ -584,8 +615,15 @@ export default function CadastroProduto() {
         user={auth.currentUser}
         paddingTop={Math.max(insets.top, 8)}
         onBack={() => router.replace("/(empresa)/homeScreen")}
-        onMenuOpen={() => {}}
-        onLogout={() => {}}
+        onMenuOpen={handleMenuOpen}
+        onLogout={handleLogout}
+      />
+      <DrawerMenu
+        visible={drawerMenuVisible}
+        onClose={handleMenuClose}
+        user={auth.currentUser}
+        onLogout={handleLogout}
+        navigateTo={handleNavigateTo}
       />
       <View style={styles.contentContainer}>
         <ScrollView

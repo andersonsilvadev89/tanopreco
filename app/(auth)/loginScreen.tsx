@@ -28,6 +28,7 @@ import { router } from 'expo-router';
 import { ref, get, set, update } from 'firebase/database';
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
+import { DrawerMenu } from "../components/shell/DrawerMenu";
 import { BRAND_COLORS } from "@/constants/BrandColors";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buildSocialUserProfile } from "./socialUserDefaults";
@@ -92,6 +93,7 @@ const LoginScreen = ({ navigation }: any) => {
 
   const [authLoading, setAuthLoading] = useState(true);
   const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [drawerMenuVisible, setDrawerMenuVisible] = useState(false);
 
   const screenWidth = Dimensions.get('window').width;
   const showGoogleButton = Platform.OS === 'android' || Platform.OS === 'ios';
@@ -322,6 +324,24 @@ const LoginScreen = ({ navigation }: any) => {
     }
   };
 
+  const handleMenuOpen = () => {
+    setDrawerMenuVisible(true);
+  };
+
+  const handleMenuClose = () => {
+    setDrawerMenuVisible(false);
+  };
+
+  const handleNavigateTo = (path: string, requiresAuth: boolean) => {
+    if (requiresAuth && !auth.currentUser) {
+      Alert.alert("Login necessário", "Entre na sua conta para acessar esta área.");
+      router.push("/(auth)/loginScreen");
+      return;
+    }
+
+    router.push(path as any);
+  };
+
   if (authLoading) {
     return (
       <View style={styles.loadingContainer}>
@@ -338,8 +358,15 @@ const LoginScreen = ({ navigation }: any) => {
         user={null}
         paddingTop={Math.max(insets.top, 8)}
         onBack={() => router.replace('/(tabs)/homeScreen')}
-        onMenuOpen={() => {}}
+        onMenuOpen={handleMenuOpen}
         onLogout={() => {}}
+      />
+      <DrawerMenu
+        visible={drawerMenuVisible}
+        onClose={handleMenuClose}
+        user={user}
+        onLogout={() => {}}
+        navigateTo={handleNavigateTo}
       />
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
         <KeyboardAvoidingView
