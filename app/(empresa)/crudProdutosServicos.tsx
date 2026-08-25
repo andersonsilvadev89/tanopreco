@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  FlatList,
   Keyboard,
   StyleSheet,
   Linking,
@@ -30,7 +31,7 @@ import {
 import { auth, database } from "../../firebaseConfig";
 import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
 import { DrawerMenu } from "../components/shell/DrawerMenu";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker"; // ✅ IMPORTADO
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -137,6 +138,7 @@ interface EmpresaData {
 
 export default function CadastroProduto() {
   const insets = useSafeAreaInsets();
+  const { editId, abrirLista } = useLocalSearchParams<{ editId?: string | string[]; abrirLista?: string | string[] }>();
   const [descricao, setDescricao] = useState("");
   const [preco, setPreco] = useState("");
   const [palavrasChave, setPalavrasChave] = useState("");
@@ -166,7 +168,7 @@ export default function CadastroProduto() {
   const [produtosDisponiveis, setProdutosDisponiveis] = useState<number | null>(null);
   const [destaquesDisponiveis, setDestaquesDisponiveis] = useState<number | null>(null);
   const [loadingCompanyData, setLoadingCompanyData] = useState(true);
-  const [mostrarLista, setMostrarLista] = useState(false);
+  const [mostrarLista, setMostrarLista] = useState(abrirLista === "true");
   const [drawerMenuVisible, setDrawerMenuVisible] = useState(false);
 
   const [descricaoY, setDescricaoY] = useState(0);
@@ -176,6 +178,12 @@ export default function CadastroProduto() {
 
   const scrollRef = useRef<ScrollView>(null);
   const userId = auth.currentUser?.uid;
+
+  useEffect(() => {
+    if (abrirLista === "true") {
+      setMostrarLista(true);
+    }
+  }, [abrirLista]);
 
   const scrollToInput = (y: number) => {
     setTimeout(() => {
@@ -197,10 +205,10 @@ export default function CadastroProduto() {
         const data: EmpresaData | null = snapshot.val();
         if (data && typeof data.produtosDisponiveis === "number") {
           setProdutosDisponiveis(data.produtosDisponiveis);
-          setEditavel(data.produtosDisponiveis > 5);
         } else {
           setProdutosDisponiveis(0);
         }
+        setEditavel(true);
         if (data && typeof data.destaquesDisponiveis === "number") {
           setDestaquesDisponiveis(data.destaquesDisponiveis);
         } else {
@@ -441,6 +449,29 @@ export default function CadastroProduto() {
       scrollRef.current.scrollTo({ y: 0, animated: true });
     }
   };
+
+  useEffect(() => {
+    const produtoId = Array.isArray(editId) ? editId[0] : editId;
+    if (!produtoId || !userId) return;
+
+    const carregarProdutoParaEdicao = async () => {
+      try {
+        const snapshot = await get(ref(database, `produtos/${userId}/${produtoId}`));
+        const produto = snapshot.val();
+
+        if (produto) {
+          editarProduto({ id: produtoId, ...produto });
+          router.setParams({ editId: undefined } as any);
+        } else {
+          Alert.alert("Erro", "Nao foi possivel encontrar este produto.");
+        }
+      } catch {
+        Alert.alert("Erro", "Nao foi possivel carregar o produto para edicao.");
+      }
+    };
+
+    carregarProdutoParaEdicao();
+  }, [editId, userId]);
 
   const escolherImagem = () => {
     Alert.alert("Selecionar imagem", "Escolha uma opção", [
@@ -917,84 +948,83 @@ export default function CadastroProduto() {
                 Produtos Cadastrados ({produtos.length}{" "}
                 {produtosDisponiveis !== null ? `/ ${produtosDisponiveis}` : ""})
               </Text>
-              <ScrollView>
-                {produtosFiltrados.length === 0 ? (
-                  <Text style={styles.emptyText}>
-                    Nenhum produto encontrado.
-                  </Text>
-                ) : (
-                  produtosFiltrados.map((item) => (
-                    <View key={item.id} style={styles.listItemContainer}>
-                      {item.imagemUrl && (
-                        <Image
-                          source={{ uri: item.imagemUrl }}
-                          style={styles.listItemImage}
-                        />
-                      )}
-                      <View style={styles.productDetails}>
-                        <Text style={styles.listItemTextBold}>
-                          {item.descricao}
+              <FlatList
+                data={produtosFiltrados}
+                keyExtractor={(item) => item.id!}
+                keyboardShouldPersistTaps="handled"
+                ListEmptyComponent={
+                  <Text style={styles.emptyText}>Nenhum produto encontrado.</Text>
+                }
+                renderItem={({ item }) => (
+                  <View style={styles.listItemContainer}>
+                    {item.imagemUrl && (
+                      <Image
+                        source={{ uri: item.imagemUrl }}
+                        style={styles.listItemImage}
+                      />
+                    )}
+                    <View style={styles.productDetails}>
+                      <Text style={styles.listItemTextBold}>
+                        {item.descricao}
+                      </Text>
+                      {item.preco && (
+                        <Text style={styles.listItemText}>
+                          Preço: {item.preco}
                         </Text>
-                        {item.preco && (
-                          <Text style={styles.listItemText}>
-                            Preço: {item.preco}
-                          </Text>
-                        )}
-                        
-                        {isOfertaVencida(item.dataFinalOferta) ? (
-                            <Text style={[styles.listItemText, {color: 'red', fontWeight: 'bold'}]}>
-                                Oferta Vencida: {item.dataFinalOferta}
-                            </Text>
-                        ) : (
-                            item.dataFinalOferta && (
-                                <Text style={styles.listItemText}>
-                                    Válido até: {item.dataFinalOferta}
-                                </Text>
-                            )
-                        )}
+                      )}
 
-                        {item.palavrasChave && (
+                      {isOfertaVencida(item.dataFinalOferta) ? (
+                        <Text style={[styles.listItemText, styles.expiredOfferText]}>
+                          Oferta Vencida: {item.dataFinalOferta}
+                        </Text>
+                      ) : (
+                        item.dataFinalOferta && (
                           <Text style={styles.listItemText}>
-                            Tags: {item.palavrasChave}
+                            Válido até: {item.dataFinalOferta}
                           </Text>
-                        )}
-                        
-                        {item.enquantoDurarEstoque && (
-                          <Text style={[styles.listItemText, {color: '#e67e22', fontSize: 12, fontWeight: 'bold'}]}>
-                              ⚠️ Enquanto durar o estoque
-                          </Text>
-                        )}
-                        
-                        {item.destaque && (
-                          <Text style={styles.ofertaFlag}>Destaque!</Text>
-                        )}
-                        {item.localizacaoDiferente && item.latitude && item.longitude && (
-                          <Text style={styles.localizacaoText}>
-                            📍 Local Customizada
-                          </Text>
-                        )}
-                      </View>
-                      <View style={styles.buttonColumn}>
-                        <Button
-                          title="Editar"
-                          onPress={() => {
-                            editarProduto(item);
-                            setMostrarLista(false);
-                          }}
-                          accessibilityLabel={`Editar o produto ${item.descricao}`}
-                          disabled={!item.editavel}
-                        />
-                        <Button
-                          title="Excluir"
-                          onPress={() => excluirProduto(item.id!)}
-                          color="red"
-                          accessibilityLabel={`Excluir o produto ${item.descricao}`}
-                        />
-                      </View>
+                        )
+                      )}
+
+                      {item.palavrasChave && (
+                        <Text style={styles.listItemText}>
+                          Tags: {item.palavrasChave}
+                        </Text>
+                      )}
+
+                      {item.enquantoDurarEstoque && (
+                        <Text style={[styles.listItemText, styles.stockOfferText]}>
+                          Enquanto durar o estoque
+                        </Text>
+                      )}
+
+                      {item.destaque && (
+                        <Text style={styles.ofertaFlag}>Destaque!</Text>
+                      )}
+                      {item.localizacaoDiferente && item.latitude && item.longitude && (
+                        <Text style={styles.localizacaoText}>
+                          Local Customizada
+                        </Text>
+                      )}
                     </View>
-                  ))
+                    <View style={styles.buttonColumn}>
+                      <Button
+                        title="Editar"
+                        onPress={() => {
+                          editarProduto(item);
+                          setMostrarLista(false);
+                        }}
+                        accessibilityLabel={`Editar o produto ${item.descricao}`}
+                      />
+                      <Button
+                        title="Excluir"
+                        onPress={() => excluirProduto(item.id!)}
+                        color="red"
+                        accessibilityLabel={`Excluir o produto ${item.descricao}`}
+                      />
+                    </View>
+                  </View>
                 )}
-              </ScrollView>
+              />
             </View>
           </KeyboardAvoidingView>
         )}
@@ -1129,6 +1159,15 @@ const styles = StyleSheet.create({
   listItemText: {
     marginBottom: 1,
     fontSize: 10,
+  },
+  expiredOfferText: {
+    color: "red",
+    fontWeight: "bold",
+  },
+  stockOfferText: {
+    color: "#e67e22",
+    fontSize: 12,
+    fontWeight: "bold",
   },
   localizacaoText: {
     fontSize: 10,

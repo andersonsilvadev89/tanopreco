@@ -10,10 +10,9 @@ import { BRAND_COLORS } from '@/constants/BrandColors';
 const IOS_AD_UNIT_ID = 'ca-app-pub-5241782827769638/1260262961';
 const ANDROID_AD_UNIT_ID = 'ca-app-pub-5241782827769638/2862164767';
 
-// Mantem as mesmas proporcoes do ProdutoCard para nao destoar no carrossel.
+// Mantem as mesmas dimensoes do ProductCardBase no carrossel horizontal.
 const { width } = Dimensions.get('window');
-const CARD_MARGIN = 12;
-const CARD_WIDTH = ((width - CARD_MARGIN * 3) / 2) * 0.72;
+const CARD_WIDTH = (width - 32) / 2;
 
 const AdCard: React.FC = () => {
     const googleMobileAds = getGoogleMobileAdsModule();
@@ -23,7 +22,37 @@ const AdCard: React.FC = () => {
 
     const adRef = useRef<any>(null);
 
+    // No Expo Go os anúncios reais não carregam; exibimos um card fictício
+    // apenas para visualizar o espaço/layout ocupado durante o desenvolvimento.
     if (!isGoogleMobileAdsAvailable || !googleMobileAds) {
+        if (__DEV__) {
+            return (
+                <View style={styles.adContainer}>
+                    <View style={styles.cardProduto}>
+                        <View style={styles.cardPressArea}>
+                            <View style={styles.imageArea}>
+                                <View style={styles.imagemProduto} />
+                                <View style={styles.badgeEmpresa}>
+                                    <Text style={styles.badgeEmpresaText} numberOfLines={1}>Anunciante Fictício</Text>
+                                </View>
+                                <View style={styles.badgePreco}>
+                                    <Text style={styles.badgePrecoText} numberOfLines={1}>COMPRAR</Text>
+                                </View>
+                            </View>
+                        </View>
+
+                        <View style={styles.descRow}>
+                            <Text style={styles.descricao} numberOfLines={1}>Anúncio de exemplo (mock)</Text>
+                        </View>
+
+                        <View style={styles.metaRow}>
+                            <Text style={styles.distancia}>Patrocinado</Text>
+                            <Text style={styles.dataOferta} numberOfLines={1}>Visível apenas em produção</Text>
+                        </View>
+                    </View>
+                </View>
+            );
+        }
         return null;
     }
 
@@ -142,26 +171,29 @@ const styles = StyleSheet.create({
         width: CARD_WIDTH,
         backgroundColor: 'transparent',
         elevation: 0,
-        margin: 0,
+        marginHorizontal: 4,
+        
     },
     cardProduto: {
-        width: CARD_WIDTH,
+        width: '100%',
         backgroundColor: 'transparent',
         borderRadius: 14,
         padding: 6,
         marginBottom: 10,
-        marginHorizontal: 10,
         alignItems: 'center',
+        borderStyle: 'solid',
+        borderWidth: 2,
+        borderColor: '#a8aaad',
     },
     cardPressArea: {
         width: '100%',
     },
     loadingContainer: { 
         width: CARD_WIDTH, 
-        minHeight: 150,
+        minHeight: 200,
         justifyContent: 'center', 
         alignItems: 'center',
-        marginHorizontal: 10,
+        marginHorizontal: 4,
         marginBottom: 10,
     },
     loadingText: { marginTop: 8, fontSize: 12, color: BRAND_COLORS.textMuted },
@@ -172,10 +204,11 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     imagemProduto: {
-        width: '80%',
-        alignSelf: 'flex-end',
-        height: 104,
-        borderRadius: 32,
+        width: '100%',
+        height: 170,
+        borderTopRightRadius: 14,
+        borderBottomLeftRadius: 14,
+        borderTopLeftRadius: 14,
         backgroundColor: BRAND_COLORS.surfaceSoft,
         overflow: 'hidden',
     },

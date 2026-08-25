@@ -23,9 +23,8 @@ import { ref, onValue, set, get, update, increment } from "firebase/database";
 import { signOut } from "firebase/auth";
 import { useFocusEffect } from "@react-navigation/native";
 import MapView, { Marker, Callout, Region } from "react-native-maps";
-import AdBanner from "../components/AdBanner";
 import * as Location from "expo-location";
-import AdCard from "../components/AdCard";
+import AdCardLargo from "../components/AdCardLargo";
 import { DestaquesNoticias } from "../components/DestaquesNoticias";
 import { useAuth } from "../../context/AuthContext";
 import { ProdutoCard } from "../components/ProdutoCard";
@@ -41,15 +40,13 @@ import { BRAND_COLORS } from "@/constants/BrandColors";
 
 const { width } = Dimensions.get("window");
 
-// Tamanho do card de produto
-const CARD_MARGIN = 8;
+// Tamanho do card de produto: grade vertical de 2 colunas (mesma largura usada nos Destaques)
+const CARD_MARGIN = 12;
 const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2;
 const CARD_MIN_HEIGHT = 300;
 
-// Espelha as dimensões reais do ProdutoCard para calcular o "passo" de rolagem de uma coluna
-const PRODUTO_CARD_LARGURA = ((width - 12 * 3) / 2) * 0.72;
-const PRODUTO_CARD_MARGEM_H = 10;
-const COLUNA_LARGURA = PRODUTO_CARD_LARGURA + PRODUTO_CARD_MARGEM_H * 2;
+// A cada 6 produtos exibidos na grade vertical, insere um AdCardLargo
+const PRODUTOS_POR_ADCARD_LARGO = 4;
 
 interface ProdutoComEmpresa {
   id: string;
@@ -59,8 +56,8 @@ interface ProdutoComEmpresa {
   palavrasChave?: string;
   empresaId: string;
   nomeEmpresa: string;
-  latitudeEmpresa: number;
-  longitudeEmpresa: number;
+  latitudeEmpresa?: number;
+  longitudeEmpresa?: number;
   latitudeProduto?: number;
   longitudeProduto?: number;
   localizacaoDiferente?: boolean;
@@ -156,17 +153,6 @@ function calcularDistancia(userLocation: any, empresaLocation: any) {
   return R * c;
 }
 
-const AD_PLACEHOLDER: ProdutoComEmpresa = {
-  id: "ad_placeholder",
-  descricao: "Anúncio",
-  preco: "R$ 0,00",
-  empresaId: "ad",
-  nomeEmpresa: "AdMob",
-  latitudeEmpresa: 0,
-  longitudeEmpresa: 0,
-  isAd: true,
-};
-
 function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; longitude: number; isProdutoLocation: boolean } | null {
   if (produto.localizacaoDiferente && produto.latitudeProduto && produto.longitudeProduto) {
     return { latitude: produto.latitudeProduto, longitude: produto.longitudeProduto, isProdutoLocation: true };
@@ -179,101 +165,6 @@ function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; lon
 // ----------------------------------------------------
 // 2. COMPONENTE PRINCIPAL
 // ----------------------------------------------------
-
-// ----------------------------------------------------
-// Coluna de 3 produtos (empilhados) com scroll horizontal em bloco: cada "passada"
-// desliza uma coluna inteira, mesmo efeito de "dicas" laterais dos destaques.
-// ----------------------------------------------------
-
-function GradeProdutosColunas({
-  colunas,
-  renderProduto,
-}: {
-  colunas: ProdutoComEmpresa[][];
-  renderProduto: (item: ProdutoComEmpresa) => React.ReactNode;
-}) {
-  const [scrollX, setScrollX] = useState(0);
-  const [larguraViewport, setLarguraViewport] = useState(0);
-  const [larguraConteudo, setLarguraConteudo] = useState(0);
-
-  const colunasComAnuncios = useMemo(() => {
-    const itens: ProdutoComEmpresa[] = [];
-    let produtosDesdeUltimoAnuncio = 0;
-
-    colunas.flat().forEach((produto) => {
-      itens.push(produto);
-      produtosDesdeUltimoAnuncio += 1;
-
-      if (produtosDesdeUltimoAnuncio === 3) {
-        itens.push({ ...AD_PLACEHOLDER, id: `ad_after_${produto.id}` });
-        produtosDesdeUltimoAnuncio = 0;
-      }
-    });
-
-    const resultado: ProdutoComEmpresa[][] = [];
-    for (let i = 0; i < itens.length; i += 2) {
-      resultado.push(itens.slice(i, i + 2));
-    }
-    return resultado;
-  }, [colunas]);
-
-  const temOverflow = larguraConteudo > larguraViewport + 1;
-  const mostrarDicaEsquerda = temOverflow && scrollX > 8;
-  const mostrarDicaDireita = temOverflow && scrollX + larguraViewport < larguraConteudo - 8;
-
-  return (
-    <View style={styles.linhaHorizontalWrapper}>
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.linhaHorizontalConteudo}
-        decelerationRate="fast"
-        snapToInterval={COLUNA_LARGURA}
-        snapToAlignment="start"
-        scrollEventThrottle={16}
-        onScroll={(event) => setScrollX(event.nativeEvent.contentOffset.x)}
-        onLayout={(event) => setLarguraViewport(event.nativeEvent.layout.width)}
-        onContentSizeChange={(contentWidth) => setLarguraConteudo(contentWidth)}
-      >
-        {colunasComAnuncios.map((coluna, index) => (
-          <View key={`coluna_${index}`} style={styles.colunaProdutos}>
-            {coluna.map((produto) => (
-              <React.Fragment key={produto.id}>{renderProduto(produto)}</React.Fragment>
-            ))}
-          </View>
-        ))}
-      </ScrollView>
-
-      {mostrarDicaEsquerda && (
-        <View pointerEvents="none" style={[styles.linhaDicaLateral, styles.linhaDicaEsquerda]}>
-          <LinearGradient
-            colors={["rgba(243, 246, 251, 0.96)", "rgba(243, 246, 251, 0)"]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.linhaFade}
-          />
-          <View style={styles.linhaBolhaSeta}>
-            <Feather name="chevron-left" size={20} color={BRAND_COLORS.primaryDark} />
-          </View>
-        </View>
-      )}
-
-      {mostrarDicaDireita && (
-        <View pointerEvents="none" style={[styles.linhaDicaLateral, styles.linhaDicaDireita]}>
-          <LinearGradient
-            colors={["rgba(243, 246, 251, 0)", "rgba(243, 246, 251, 0.96)"]}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.linhaFade}
-          />
-          <View style={styles.linhaBolhaSeta}>
-            <Feather name="chevron-right" size={20} color={BRAND_COLORS.primaryDark} />
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}
 
 export default function HomeScreen() {
   const { deviceId, user } = useAuth();
@@ -554,28 +445,49 @@ export default function HomeScreen() {
     }
   });
 
-  // Agrupa os produtos ordenados em colunas de 2 (empilhados),
-  // para que a rolagem horizontal mova sempre uma coluna inteira por vez.
-  const TAMANHO_COLUNA = 2;
-  const colunasProdutos = useMemo(() => {
-    const colunas: ProdutoComEmpresa[][] = [];
-    for (let i = 0; i < produtosOrdenados.length; i += TAMANHO_COLUNA) {
-      colunas.push(produtosOrdenados.slice(i, i + TAMANHO_COLUNA));
-    }
-    return colunas;
-  }, [produtosOrdenados]);
-
   const openExternalMap = (lat: number, lon: number, label: string) => {
     const url = Platform.select({ ios: `maps:0,0?q=${lat},${lon}(${label})`, android: `geo:0,0?q=${lat},${lon}(${label})` });
     Linking.openURL(url!).catch(() => Linking.openURL(`http://maps.google.com/maps?q=${lat},${lon}`));
   };
 
   const renderProduto = useCallback((item: ProdutoComEmpresa) => {
-    if (item.isAd) return <AdCard />;
     const emp = empresas[item.empresaId];
     if (!emp) return null;
-    return <ProdutoCard produto={item} empresaInfo={emp} userLocation={userLocation} deviceId={deviceId} votarProduto={votarProduto} handleVerNoMapa={handleVerNoMapa} openInstagramProfile={openInstagramProfile} openWhatsApp={openWhatsApp} onImagePress={handleImagePress} />;
+    return <ProdutoCard produto={item} empresaInfo={emp} userLocation={userLocation} deviceId={deviceId} votarProduto={votarProduto} handleVerNoMapa={handleVerNoMapa} openInstagramProfile={openInstagramProfile} openWhatsApp={openWhatsApp} onImagePress={handleImagePress} cardStyle={styles.produtoCardGrade} />;
   }, [empresas, userLocation, deviceId, handleImagePress, votarProduto, handleVerNoMapa, openInstagramProfile, openWhatsApp]);
+
+  // Grade vertical de 2 colunas, inserindo anuncios apos 3 e 6 produtos
+  const linhasGradeProdutos = useMemo(() => {
+    const linhas: React.ReactNode[] = [];
+    let parAtual: ProdutoComEmpresa[] = [];
+
+    const flushPar = () => {
+      if (parAtual.length === 0) return;
+      linhas.push(
+        <View key={`linha_${parAtual[0].id}`} style={styles.linhaGradeProdutos}>
+          {parAtual.map((produto) => (
+            <View key={produto.id} style={styles.celulaGradeProduto}>
+              {renderProduto(produto)}
+            </View>
+          ))}
+        </View>
+      );
+      parAtual = [];
+    };
+
+    produtosOrdenados.forEach((produto, index) => {
+      parAtual.push(produto);
+      if (parAtual.length === 2) flushPar();
+
+      if ((index + 1) % PRODUTOS_POR_ADCARD_LARGO === 0) {
+        flushPar();
+        linhas.push(<AdCardLargo key={`ad_${produto.id}`} />);
+      }
+    });
+
+    flushPar();
+    return linhas;
+  }, [produtosOrdenados, renderProduto]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -842,14 +754,12 @@ export default function HomeScreen() {
                   onWhatsApp={openWhatsApp}
                   userLocation={userLocation}
                 />
-                <AdBanner />
-
                 <Text style={styles.listTitle}>{tituloDaLista}</Text>
 
-                {colunasProdutos.length === 0 ? (
+                {produtosOrdenados.length === 0 ? (
                   <Text style={styles.mensagemNenhumResultado}>Nenhum produto encontrado.</Text>
                 ) : (
-                  <GradeProdutosColunas colunas={colunasProdutos} renderProduto={renderProduto} />
+                  <View style={styles.gradeProdutosContainer}>{linhasGradeProdutos}</View>
                 )}
             </>
           </ScrollView>
@@ -1177,46 +1087,22 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   productList: { flex: 1 },
-  linhaHorizontalWrapper: {
-    position: "relative",
-    marginBottom: 12,
-  },
-  linhaHorizontalConteudo: {
+  gradeProdutosContainer: {
     paddingHorizontal: CARD_MARGIN,
   },
-  colunaProdutos: {
-    width: COLUNA_LARGURA,
-    alignItems: "center",
+  linhaGradeProdutos: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
   },
-  linhaDicaLateral: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    width: 38,
-    justifyContent: "center",
-    zIndex: 4,
+  celulaGradeProduto: {
+    width: CARD_WIDTH,
   },
-  linhaDicaEsquerda: {
-    left: 0,
-    alignItems: "flex-start",
-  },
-  linhaDicaDireita: {
-    right: 0,
-    alignItems: "flex-end",
-  },
-  linhaFade: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  linhaBolhaSeta: {
-    marginHorizontal: 6,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "rgba(255,255,255,0.9)",
-    borderWidth: 1,
-    borderColor: BRAND_COLORS.border,
-    justifyContent: "center",
-    alignItems: "center",
+  // Sobrescreve a largura fixa padrão do ProductCardBase para ocupar toda a célula da grade
+  produtoCardGrade: {
+    width: "100%",
+    marginHorizontal: 0,
+    marginBottom: 0,
   },
   bannerListItem: { width: "100%", marginTop: 4 },
   mensagemNenhumResultado: {

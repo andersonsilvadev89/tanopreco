@@ -17,6 +17,7 @@ interface AppHeaderTitleProps {
   onBack: () => void;
   onMenuOpen: () => void;
   onLogout: () => void;
+  adComponent?: React.ReactNode;
 }
 
 export const AppHeaderTitle: React.FC<AppHeaderTitleProps> = ({
@@ -26,6 +27,7 @@ export const AppHeaderTitle: React.FC<AppHeaderTitleProps> = ({
   onBack,
   onMenuOpen,
   onLogout,
+  adComponent,
 }) => {
   const { isNightTheme } = useAppAppearance();
   const headerBgColor = isNightTheme ? SHELL_COLORS.primaryDark : BRAND_COLORS.primary;
@@ -81,7 +83,7 @@ export const AppHeaderTitle: React.FC<AppHeaderTitleProps> = ({
           </View>
         </View>
       </View>
-      <AdBanner />
+      {adComponent ?? <AdBanner />}
     </>
   );
 };

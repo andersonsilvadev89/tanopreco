@@ -4,15 +4,17 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  FlatList,
   ScrollView,
-  Image,
   Alert,
   ActivityIndicator,
   Linking,
   TextInput,
+  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
+import { FontAwesome } from "@expo/vector-icons";
 import {
   Building2,
   MessageCircle,
@@ -21,11 +23,9 @@ import {
   Package,
   Phone,
   Mail,
-  Instagram,
   Users,
   Search,
   Pencil,
-  Trash2,
 } from "lucide-react-native";
 import { ref, onValue, remove, update } from "firebase/database";
 import { signOut } from "firebase/auth";
@@ -35,7 +35,11 @@ import * as WebBrowser from "expo-web-browser";
 import { auth, database } from "@/firebaseConfig";
 import { AppHeaderTitle } from "../components/shell/AppHeaderTitle";
 import { DrawerMenu } from "../components/shell/DrawerMenu";
+import AdBanner from "../components/AdBanner";
+import AdCard from "../components/AdCard";
+import AdCardLargo from "../components/AdCardLargo";
 import { BRAND_COLORS } from "@/constants/BrandColors";
+import { ProductCardAction, ProductCardBase } from "../components/ProductCardBase";
 
 interface ProdutoEmpresa {
   id: string;
@@ -64,13 +68,25 @@ interface AppStatsSummary {
   produtosCadastrados: number;
 }
 
-const CARD_WIDTH = 195;
-const IMG_SIZE = 150;
 const WHATSAPP_PATROCINIO_PHONE = "5588981026505";
 const WHATSAPP_PATROCINIO_MESSAGE = encodeURIComponent(
   "Quero patrocinar este app. Gostaria de conversar sobre as possibilidades de parceria."
 );
-const PACKAGES_HOSTING_URL = "https://tanopreco-67706.web.app";
+const WHATSAPP_DUVIDAS_MESSAGE = encodeURIComponent(
+  "Olá estou com dúvidas sobre o app. Você pode me ajudar?"
+);
+const PACKAGES_HOSTING_URL = "https://www.eradevsystem.com.br/pacotes_expocrato";
+
+// Grade vertical de 2 colunas para os produtos da empresa, com AdCardLargo a cada 6 produtos.
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+const GRADE_CARD_MARGIN = 12;
+const GRADE_CARD_WIDTH = (SCREEN_WIDTH - GRADE_CARD_MARGIN * 3) / 2;
+const PRODUTOS_POR_ADCARD_LARGO = 6;
+const PRODUTOS_POR_ADCARD = 3;
+
+type ProdutoCarrosselItem =
+  | { type: "produto"; produto: ProdutoEmpresa }
+  | { type: "anuncio"; id: string };
 
 function countChildRecords(data: unknown): number {
   if (!data || typeof data !== "object") return 0;
@@ -119,20 +135,9 @@ export default function HomeScreen() {
   }, [user]);
 
   const confirmarLogout = () => {
-    Alert.alert("Sair da Conta", "Tem certeza que deseja sair da sua conta?", [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Sair",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await signOut(auth);
-          } catch {
-            Alert.alert("Erro", "Nao foi possivel sair.");
-          }
-        },
-      },
-    ]);
+    signOut(auth).catch(() => {
+      Alert.alert("Erro", "Nao foi possivel sair.");
+    });
   };
 
   useEffect(() => {
@@ -249,26 +254,6 @@ export default function HomeScreen() {
     };
   }, []);
 
-  const formatarPreco = (preco?: string) => {
-    if (!preco) return null;
-
-    const precoNormalizado = preco
-      .replace("R$", "")
-      .replace(/\s/g, "")
-      .replace(/\./g, "")
-      .replace(",", ".");
-
-    const valor = Number.parseFloat(precoNormalizado);
-    if (Number.isNaN(valor)) return preco;
-
-    return valor.toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    });
-  };
-
   const atualizarLocalizacao = async () => {
     if (!user?.uid) return;
 
@@ -377,10 +362,6 @@ export default function HomeScreen() {
       pathname: "/(empresa)/crudProdutosServicos",
       params: {
         editId: produto.id,
-        descricao: produto.descricao || "",
-        preco: produto.preco || "",
-        palavrasChave: produto.palavrasChave || "",
-        imagemUrl: produto.imagemUrl || "",
       },
     } as any);
   };
@@ -402,7 +383,7 @@ export default function HomeScreen() {
 
   const handleAcquisicaoPacotes = () => {
     const limiteProdutosAtingido = produtosDisponiveis !== null && produtos.length >= produtosDisponiveis;
-    const limiteDestaquesAtingido = destaquesDisponiveis >= 0 && destaquesUtilizados >= destaquesDisponiveis;
+    const limiteDestaquesAtingido = destaquesDisponiveis > 0 && destaquesUtilizados >= destaquesDisponiveis;
 
     if (limiteProdutosAtingido || limiteDestaquesAtingido) {
       const mensagemLimites =
@@ -419,7 +400,10 @@ export default function HomeScreen() {
       return;
     }
 
-    abrirPacotes();
+    Alert.alert("Conheca nossos pacotes", "Adquira um de nossos pacotes para ampliar seus limites e desbloquear mais recursos.", [
+      { text: "Agora nao", style: "cancel" },
+      { text: "Ver pacotes", onPress: abrirPacotes },
+    ]);
   };
 
   const abrirCadastroProdutoComValidacao = () => {
@@ -441,21 +425,55 @@ export default function HomeScreen() {
     router.push("/(empresa)/crudProdutosServicos");
   };
 
+  const abrirTodosProdutos = () => {
+    router.push({
+      pathname: "/(empresa)/crudProdutosServicos",
+      params: { abrirLista: "true" },
+    });
+  };
+
   const abrirContatoSuporte = () => {
-    Linking.openURL(`https://wa.me/${WHATSAPP_PATROCINIO_PHONE}`).catch(() => {
+    Linking.openURL(`https://wa.me/${WHATSAPP_PATROCINIO_PHONE}?text=${WHATSAPP_DUVIDAS_MESSAGE}`).catch(() => {
       Alert.alert("Erro", "Nao foi possivel abrir o WhatsApp.");
     });
   };
 
+  const renderProdutoCard = (produto: ProdutoEmpresa) => {
+    const actions: ProductCardAction[] = [
+      { icon: "trash-2" , onPress: () => excluirProduto(produto.id), backgroundColor: "rgba(217,58,58,0.95)", accessibilityLabel: "Excluir produto" },
+    ];
+    return (
+      <ProductCardBase
+        produto={{ ...produto, nomeEmpresa: nomeEmpresa || undefined }}
+        actions={actions}
+        cardStyle={styles.gradeProdutoCard}
+        descriptionNumberOfLines={2}
+        showCompanyBadge={false}
+        additionalContent={produto.palavrasChave ? <Text style={styles.cardPalavrasChave} numberOfLines={2}>{produto.palavrasChave}</Text> : null}
+        imageOverlay={<TouchableOpacity style={styles.overlayEditButton} activeOpacity={0.85} onPress={() => editarProduto(produto)}><Pencil size={18} color={BRAND_COLORS.white} /><Text style={styles.overlayEditText}>Editar</Text></TouchableOpacity>}
+      />
+    );
+  };
+
+  const produtosCarrossel = useMemo(() => {
+    return produtosFiltrados.flatMap<ProdutoCarrosselItem>((produto, index) => [
+      { type: "produto", produto },
+      ...((index + 1) % PRODUTOS_POR_ADCARD === 0
+        ? [{ type: "anuncio" as const, id: `ad_${produto.id}` }]
+        : []),
+    ]);
+  }, [produtosFiltrados]);
+
   return (
     <View style={styles.background}>
       <AppHeaderTitle
-        title="Area Empresarial"
+        title="Área Empresarial"
         user={auth.currentUser}
         paddingTop={Math.max(insets.top, 8)}
         onBack={() => router.replace("/(tabs)/homeScreen")}
         onMenuOpen={() => setDrawerMenuVisible(true)}
         onLogout={confirmarLogout}
+        adComponent={<AdBanner />}
       />
 
       <DrawerMenu
@@ -469,43 +487,9 @@ export default function HomeScreen() {
       <View style={styles.safeAreaContent}>
         <ScrollView contentContainerStyle={styles.scrollViewContent} showsVerticalScrollIndicator={false}>
           <Text style={styles.greeting}>
-            {user ? `Ola, ${nomeEmpresa || nomeUsuario}!` : "Bem-vindo ao ta no preco!"}
+            {user ? `Olá, ${nomeEmpresa || nomeUsuario}!` : "Bem-vindo ao ta no preco!"}
           </Text>
-          <Text style={styles.subtitle}>Aqui esta um resumo rapido da sua conta.</Text>
-
-          <View style={styles.statsOverviewCard}>
-            <View style={styles.statsOverviewHeader}>
-              <View>
-                <Text style={styles.statsOverviewEyebrow}>Indicadores do app</Text>
-                <Text style={styles.statsOverviewTitle}>Esses numeros so crescem a cada dia.</Text>
-              </View>
-            </View>
-
-            <View style={styles.statsOverviewGrid}>
-              <View style={styles.statsMiniCard}>
-                <Building2 size={18} color={BRAND_COLORS.primary} />
-                <Text style={styles.statsMiniValue}>{appStats.empresasCadastradas}</Text>
-                <Text style={styles.statsMiniLabel}>Empresas cadastradas</Text>
-              </View>
-
-              <View style={styles.statsMiniCard}>
-                <Users size={18} color={BRAND_COLORS.primary} />
-                <Text style={styles.statsMiniValue}>{appStats.usuariosComLogin}</Text>
-                <Text style={styles.statsMiniLabel}>Usuarios com login</Text>
-              </View>
-
-              <View style={styles.statsMiniCard}>
-                <Package size={18} color={BRAND_COLORS.primary} />
-                <Text style={styles.statsMiniValue}>{appStats.produtosCadastrados}</Text>
-                <Text style={styles.statsMiniLabel}>Produtos cadastrados</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity activeOpacity={0.88} style={styles.patrocinioButtonFull} onPress={abrirWhatsAppPatrocinio}>
-              <MessageCircle size={18} color={BRAND_COLORS.white} />
-              <Text style={styles.patrocinioButtonFullText}>Quero patrocinar este app</Text>
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.subtitle}>Aqui está um resumo rápido da sua conta.</Text>
 
           <View style={styles.companyInfoCard}>
             <View style={styles.companyInfoHeader}>
@@ -554,7 +538,7 @@ export default function HomeScreen() {
 
                 {!!empresaResumo.instagram && (
                   <TouchableOpacity style={styles.companyInfoRow} activeOpacity={0.75} onPress={abrirInstagramEmpresa}>
-                    <Instagram size={15} color={BRAND_COLORS.textMuted} />
+                    <FontAwesome name="instagram" size={15} color={BRAND_COLORS.textMuted} />
                     <Text style={[styles.companyInfoText, styles.companyInfoLink]}>
                       @{empresaResumo.instagram.replace("@", "")}
                     </Text>
@@ -619,8 +603,8 @@ export default function HomeScreen() {
               <Package size={18} color={BRAND_COLORS.primary} />
               <Text style={styles.sectionTitle}>Seus produtos</Text>
             </View>
-            <TouchableOpacity style={styles.sectionAddButton} activeOpacity={0.85} onPress={abrirCadastroProdutoComValidacao}>
-              <PlusCircle size={16} color={BRAND_COLORS.surfaceSoft} />
+            <TouchableOpacity style={styles.sectionAddButton} activeOpacity={0.85} onPress={abrirTodosProdutos}>
+              <Text style={styles.pacotesButtonText}>Ver todos</Text>
             </TouchableOpacity>
           </View>
 
@@ -636,56 +620,88 @@ export default function HomeScreen() {
           </View>
 
           {loadingProdutos ? (
-            <ActivityIndicator style={{ marginVertical: 12 }} color={BRAND_COLORS.primary} />
-          ) : produtos.length === 0 ? (
-            <Text style={styles.emptyText}>Voce ainda nao cadastrou produtos.</Text>
-          ) : produtosFiltrados.length === 0 ? (
-            <Text style={styles.emptyText}>Nenhum produto encontrado para essa busca.</Text>
-          ) : (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.produtosRow}>
-              {produtosFiltrados.map((produto) => (
-                <View key={produto.id} style={styles.carouselCard}>
-                  <View style={styles.cardImageArea}>
-                    <View style={styles.cardImageWrapper}>
-                      {produto.imagemUrl ? (
-                        <Image source={{ uri: produto.imagemUrl }} style={styles.cardImage} resizeMode="cover" />
-                      ) : (
-                        <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
-                          <Package size={28} color={BRAND_COLORS.iconMuted} />
-                        </View>
-                      )}
-                    </View>
-
-                    <TouchableOpacity style={styles.overlayEditButton} activeOpacity={0.85} onPress={() => editarProduto(produto)}>
-                      <Pencil size={22} color={BRAND_COLORS.white} />
-                      <Text style={styles.overlayEditText}>Editar</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.overlayDeleteButton} activeOpacity={0.85} onPress={() => excluirProduto(produto.id)}>
-                      <Trash2 size={22} color={BRAND_COLORS.white} />
-                    </TouchableOpacity>
-
-                    {!!produto.preco && (
-                      <View style={styles.badgePrecoOverlay}>
-                        <Text style={styles.badgePrecoText}>{formatarPreco(produto.preco)}</Text>
-                      </View>
-                    )}
-                  </View>
-
-                  <View style={styles.cardDescricaoRow}>
-                    <Text style={styles.cardDescricao} numberOfLines={2}>
-                      {produto.descricao}
-                    </Text>
-                    {!!produto.palavrasChave && (
-                      <Text style={styles.cardPalavrasChave} numberOfLines={2}>
-                        {produto.palavrasChave}
-                      </Text>
-                    )}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.produtosCarrossel}
+            >
+              {[0, 1].map((placeholder) => (
+                <View key={placeholder} style={styles.celulaCarrosselProduto}>
+                  <View style={styles.produtoLoadingCard}>
+                    <ActivityIndicator color={BRAND_COLORS.primary} />
+                    <Text style={styles.produtoLoadingText}>Carregando produto...</Text>
                   </View>
                 </View>
               ))}
             </ScrollView>
+          ) : produtos.length === 0 ? (
+            <Text style={styles.emptyText}>Você ainda não cadastrou produtos.</Text>
+          ) : produtosFiltrados.length === 0 ? (
+            <Text style={styles.emptyText}>Nenhum produto encontrado para essa busca.</Text>
+          ) : (
+            <FlatList
+              data={produtosCarrossel}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.produtosCarrossel}
+              keyExtractor={(item) => item.type === "produto" ? item.produto.id : item.id}
+              renderItem={({ item }) => (
+                <View style={styles.celulaCarrosselProduto}>
+                  {item.type === "produto" ? renderProdutoCard(item.produto) : <AdCard />}
+                </View>
+              )}
+              initialNumToRender={4}
+              maxToRenderPerBatch={4}
+              windowSize={3}
+              removeClippedSubviews
+              extraData={nomeEmpresa}
+            />
           )}
+
+          <TouchableOpacity
+            style={styles.novoProdutoButton}
+            activeOpacity={0.85}
+            onPress={abrirCadastroProdutoComValidacao}
+          >
+            <PlusCircle size={17} color={BRAND_COLORS.surfaceSoft} />
+            <Text style={styles.pacotesButtonText}>Novo Produto</Text>
+          </TouchableOpacity>
+          
+          <AdCardLargo />
+
+          <View style={styles.statsOverviewCard}>
+            <View style={styles.statsOverviewHeader}>
+              <View>
+                <Text style={styles.statsOverviewEyebrow}>Indicadores do app</Text>
+                <Text style={styles.statsOverviewTitle}>Esses números só crescem a cada dia.</Text>
+              </View>
+            </View>
+
+            <View style={styles.statsOverviewGrid}>
+              <View style={styles.statsMiniCard}>
+                <Building2 size={18} color={BRAND_COLORS.primary} />
+                <Text style={styles.statsMiniValue}>{appStats.empresasCadastradas}</Text>
+                <Text style={styles.statsMiniLabel}>Empresas cadastradas</Text>
+              </View>
+
+              <View style={styles.statsMiniCard}>
+                <Users size={18} color={BRAND_COLORS.primary} />
+                <Text style={styles.statsMiniValue}>{appStats.usuariosComLogin}</Text>
+                <Text style={styles.statsMiniLabel}>Usuarios com login</Text>
+              </View>
+
+              <View style={styles.statsMiniCard}>
+                <Package size={18} color={BRAND_COLORS.primary} />
+                <Text style={styles.statsMiniValue}>{appStats.produtosCadastrados}</Text>
+                <Text style={styles.statsMiniLabel}>Produtos cadastrados</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity activeOpacity={0.88} style={styles.patrocinioButtonFull} onPress={abrirWhatsAppPatrocinio}>
+              <MessageCircle size={18} color={BRAND_COLORS.white} />
+              <Text style={styles.patrocinioButtonFullText}>Quero patrocinar este app</Text>
+            </TouchableOpacity>
+          </View>
 
           <View style={styles.contatoSection}>
             <Text style={styles.contatoSectionTitle}>Duvidas sobre o App? Entre em Contato!</Text>
@@ -701,12 +717,6 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-        <View style={[styles.fixedAddProdutoWrap, { paddingBottom: 5 }]}>
-          <TouchableOpacity style={styles.addProdutoFixedButton} activeOpacity={0.85} onPress={abrirCadastroProdutoComValidacao}>
-            <PlusCircle size={15} color={BRAND_COLORS.white} />
-            <Text style={styles.addProdutoBelowListButtonText}>Adicionar novo produto</Text>
-          </TouchableOpacity>
-        </View>
       </View>
     </View>
   );
@@ -1026,6 +1036,8 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: BRAND_COLORS.textMuted,
     marginBottom: 10,
+    textAlign:"center",
+    fontWeight:"600"
   },
   produtosRow: {
     gap: 10,
@@ -1033,35 +1045,67 @@ const styles = StyleSheet.create({
     paddingRight: 6,
     marginBottom: 14,
   },
-  carouselCard: {
-    width: CARD_WIDTH,
-    alignItems: "center",
+  gradeProdutosContainer: {
+    marginBottom: 14,
   },
-  cardImageArea: {
+  produtosCarrossel: {
+    paddingHorizontal: 2,
+    paddingBottom: 2,
+    alignItems: "flex-start",
+  },
+  celulaCarrosselProduto: {
+    width: GRADE_CARD_WIDTH,
+    marginRight: 12,
+  },
+  produtoLoadingCard: {
     width: "100%",
-    alignItems: "center",
-    marginBottom: 6,
-    position: "relative",
-  },
-  cardImageWrapper: {
-    width: IMG_SIZE,
-    height: IMG_SIZE,
-    borderRadius: IMG_SIZE / 4,
-    overflow: "hidden",
-  },
-  cardImage: {
-    width: "100%",
-    height: "100%",
-  },
-  cardImagePlaceholder: {
-    backgroundColor: "#f0f4fb",
+    minHeight: 236,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: BRAND_COLORS.border,
+    backgroundColor: BRAND_COLORS.surface,
     alignItems: "center",
     justifyContent: "center",
+    gap: 10,
+  },
+  produtoLoadingText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: BRAND_COLORS.textMuted,
+  },
+  novoProdutoButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: BRAND_COLORS.primary,
+    borderRadius: 10,
+    paddingVertical: 11,
+    marginTop: 7,
+    marginBottom: 14,
+  },
+  linhaGradeProdutos: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  celulaGradeProduto: {
+    width: GRADE_CARD_WIDTH,
+  },
+  // Sobrescreve a largura fixa padrao do ProductCardBase para ocupar toda a celula da grade
+  gradeProdutoCard: {
+    width: "100%",
+    marginHorizontal: 0,
+    marginBottom: 0,
+    alignItems: "center",
+  },
+  carouselCard: {
+    alignItems: "center",
   },
   overlayEditButton: {
     position: "absolute",
     top: 0,
-    left: 15,
+    left: 0,
     backgroundColor: "rgba(10,79,203,0.95)",
     borderRadius: 6,
     paddingHorizontal: 6,
@@ -1072,45 +1116,8 @@ const styles = StyleSheet.create({
   },
   overlayEditText: {
     color: BRAND_COLORS.white,
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "700",
-  },
-  overlayDeleteButton: {
-    position: "absolute",
-    bottom: 0,
-    left: 20,
-    width: 36,
-    height: 36,
-    borderRadius: 7,
-    backgroundColor: "rgba(217,58,58,0.95)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badgePrecoOverlay: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    backgroundColor: BRAND_COLORS.success,
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  badgePrecoText: {
-    color: BRAND_COLORS.white,
-    fontSize: 13,
-    fontWeight: "800",
-  },
-  cardDescricaoRow: {
-    width: "90%",
-    minHeight: 40,
-    marginBottom: 8,
-  },
-  cardDescricao: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: BRAND_COLORS.text,
-    lineHeight: 14,
-    textAlign: "center",
   },
   cardPalavrasChave: {
     marginTop: 4,
