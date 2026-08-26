@@ -203,6 +203,8 @@ const styles = StyleSheet.create({
         width: '100%',
         height: 140, // Mantido em 140px para qualificar para vídeos
         backgroundColor: BRAND_COLORS.surfaceSoft,
+        alignItems: 'center', 
+        justifyContent: 'center',
     },
     compactFooter: {
         flexDirection: 'row',

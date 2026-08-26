@@ -12,16 +12,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const FAQ_ITEMS = [
   {
-    pergunta: "Como faco login no aplicativo?",
-    resposta: "Use o botao Entrar na tela inicial e siga as instrucoes.",
+    pergunta: "Como faço login no aplicativo?",
+    resposta: "Use o botão Entrar na tela inicial e siga as instruções.",
   },
   {
     pergunta: "Como compartilho o app com meus contatos?",
-    resposta: "Toque na aba Compartilhar e use o botao Compartilhar agora.",
+    resposta: "Toque na aba Compartilhar e use o botão Compartilhar agora.",
   },
   {
-    pergunta: "Onde vejo informacoes da empresa?",
-    resposta: "Na aba Inicio e Produtos voce encontra conteudos da sua empresa.",
+    pergunta: "Onde vejo informações da empresa?",
+    resposta: "Na aba Início e Produtos você encontra conteúdos da sua empresa.",
   },
 ];
 
@@ -44,7 +44,7 @@ export default function DuvidasScreen() {
       router.replace("/(tabs)/homeScreen");
     } catch (error) {
       console.error("Erro ao fazer logout:", error);
-      Alert.alert("Erro", "Nao foi possivel sair da conta.");
+      Alert.alert("Erro", "Não foi possível sair da conta.");
     }
   };
 
@@ -69,7 +69,7 @@ export default function DuvidasScreen() {
   return (
     <View style={styles.screen}>
       <AppHeaderTitle
-        title="Duvidas"
+        title="Dúvidas"
         user={auth.currentUser}
         paddingTop={Math.max(insets.top, 8)}
         onBack={() => router.replace("/(empresa)/homeScreen")}
@@ -85,7 +85,7 @@ export default function DuvidasScreen() {
       />
 
       <ThemedView style={styles.container}>
-        <ThemedText type="title">Duvidas sobre o app</ThemedText>
+        <ThemedText type="title">Dúvidas sobre o app</ThemedText>
 
         {FAQ_ITEMS.map((item) => (
           <ThemedView key={item.pergunta} style={styles.card}>

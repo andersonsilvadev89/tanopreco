@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, memo } from "react";
 import {
   Dimensions,
   ScrollView,
@@ -48,15 +48,24 @@ function embaralhar<T>(itens: T[]) {
   return [...itens].sort(() => Math.random() - 0.5);
 }
 
-export function DestaquesNoticias({ produtos, onProdutoPress, userLocation }: DestaquesNoticiasProps) {
+function DestaquesNoticiasComponent({ produtos, onProdutoPress, userLocation }: DestaquesNoticiasProps) {
   const [produtosEmDestaque, setProdutosEmDestaque] = useState<ProdutoDestaque[]>([]);
   const [scrollX, setScrollX] = useState(0);
   const [larguraViewport, setLarguraViewport] = useState(0);
   const [larguraConteudo, setLarguraConteudo] = useState(0);
+  const prevIdsRef = useRef<string>("");
 
   useEffect(() => {
-    setProdutosEmDestaque(embaralhar(produtos));
-    setScrollX(0);
+    const currentIds = produtos.map((p) => p.id).join(",");
+    if (currentIds !== prevIdsRef.current) {
+      prevIdsRef.current = currentIds;
+      setProdutosEmDestaque(embaralhar(produtos));
+      setScrollX(0);
+    } else {
+      setProdutosEmDestaque((prev) =>
+        prev.map((item) => produtos.find((p) => p.id === item.id) ?? item)
+      );
+    }
   }, [produtos]);
 
   const atualizarIndicadores = useCallback((novoScrollX: number) => {
@@ -130,6 +139,8 @@ export function DestaquesNoticias({ produtos, onProdutoPress, userLocation }: De
     </View>
   );
 }
+
+export const DestaquesNoticias = memo(DestaquesNoticiasComponent);
 
 const styles = StyleSheet.create({
   container: {

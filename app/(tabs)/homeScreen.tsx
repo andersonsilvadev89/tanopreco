@@ -14,7 +14,6 @@ import {
   Platform,
   ScrollView,
   Dimensions,
-  Modal,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
@@ -33,6 +32,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { AppHeader } from "../components/shell/AppHeader";
 import { DrawerMenu } from "../components/shell/DrawerMenu";
+import { ProductDetailsModal } from "../components/ProductDetailsModal";
 import { BRAND_COLORS } from "@/constants/BrandColors";
 
 const isExpoGo = Constants.appOwnership === "expo" || Constants.executionEnvironment === "storeClient";
@@ -138,6 +138,43 @@ const categorias = [
 
 function removerAcentos(texto: string) {
   return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function tokenizarBusca(termo: string): string[] {
+  return termo
+    .split(/\s+/)
+    .map((parte) => removerAcentos(parte.trim()))
+    .filter((parte) => parte.length > 0);
+}
+
+function calcularRelevanciaBusca(produto: ProdutoComEmpresa, termos: string[]) {
+  if (!termos.length) {
+    return { total: 0, descricao: 0, categoria: 0, empresa: 0 };
+  }
+
+  const descricao = removerAcentos(produto.descricao || "");
+  const categoria = removerAcentos(produto.categoria || "");
+  const palavrasChave = removerAcentos(produto.palavrasChave || "");
+  const empresa = removerAcentos(produto.nomeEmpresa || "");
+
+  let descricaoHits = 0;
+  let categoriaHits = 0;
+  let empresaHits = 0;
+
+  for (const termo of termos) {
+    if (descricao.includes(termo)) descricaoHits += 1;
+    if (categoria.includes(termo) || palavrasChave.includes(termo)) categoriaHits += 1;
+    if (empresa.includes(termo)) empresaHits += 1;
+  }
+
+  const total = descricaoHits + categoriaHits + empresaHits;
+
+  return {
+    total,
+    descricao: descricaoHits,
+    categoria: categoriaHits,
+    empresa: empresaHits,
+  };
 }
 
 function isOfertaValida(dataFinalOferta?: string) {
@@ -271,7 +308,7 @@ export default function HomeScreen() {
     if (!imagemLargura || !imagemAltura || !modalDimensoes.width) return;
 
     const alturaProporcional = modalDimensoes.width * (imagemAltura / imagemLargura);
-    setImagemModalAltura(Math.min(alturaProporcional, 500));
+    setImagemModalAltura(Math.min(alturaProporcional, 600));
   }, [modalDimensoes.width]);
 
   const handleVerNoMapa = useCallback((produto: ProdutoComEmpresa) => {
@@ -425,21 +462,31 @@ export default function HomeScreen() {
     }
   }, [mostrarMapa, userLocation, selectedLocation]);
 
-  const produtosValidos = produtosComEmpresa.filter((produto) => {
-    if (categoriaSelecionada) {
-      if (!removerAcentos(produto.palavrasChave || "").includes(removerAcentos(categoriaSelecionada))) return false;
-    }
-    if (termoBusca.length >= 3) {
-      const termo = removerAcentos(termoBusca);
-      if (!removerAcentos(produto.descricao || "").includes(termo) &&
-        !removerAcentos(produto.palavrasChave || "").includes(termo) &&
-        !removerAcentos(produto.nomeEmpresa || "").includes(termo)) return false;
-    }
-    return true;
-  });
+  const termosBusca = useMemo(() => tokenizarBusca(termoBusca), [termoBusca]);
+
+  const produtosValidos = useMemo(() => {
+    return produtosComEmpresa.filter((produto) => {
+      if (categoriaSelecionada) {
+        const categoriaNormalizada = removerAcentos(categoriaSelecionada);
+        const categoriaExisteNoProduto =
+          removerAcentos(produto.categoria || "").includes(categoriaNormalizada) ||
+          removerAcentos(produto.palavrasChave || "").includes(categoriaNormalizada);
+
+        if (!categoriaExisteNoProduto) return false;
+      }
+
+      if (termosBusca.length > 0) {
+        const matchScore = calcularRelevanciaBusca(produto, termosBusca).total;
+        if (matchScore === 0) return false;
+      }
+
+      return true;
+    });
+  }, [produtosComEmpresa, categoriaSelecionada, termosBusca]);
 
   // Por padrão mostramos todos os produtos válidos (o filtro por destaque/busca já ocorre em produtosValidos).
   const produtosParaExibir = produtosValidos;
+
   const produtosDestaqueNoticias = useMemo(
     () => produtosValidos
       .filter((produto) => produto.destaque)
@@ -450,54 +497,95 @@ export default function HomeScreen() {
       })),
     [produtosValidos, empresas]
   );
+
+  const produtoModalAtualizado = useMemo(() => {
+    if (!produtoModal) return null;
+    return produtosComEmpresa.find((produto) => produto.id === produtoModal.id) ?? produtoModal;
+  }, [produtoModal, produtosComEmpresa]);
+
   const tituloDaLista = (termoBusca.length >= 3 && categoriaSelecionada) || (!(termoBusca.length >= 3) && categoriaSelecionada) ? `Resultados da busca (${categoriaSelecionada})` : termoBusca.length >= 3 && categoriaSelecionada === null ? `Resultados da busca`: "Veja todos os nossos produtos!";
 
-  const produtosOrdenados = [...produtosParaExibir].sort((a, b) => {
-    // 1. Se for ordenação aleatória inicial (sem busca e sem categoria)
-    if (!ordenacaoManual && termoBusca.length < 3 && !categoriaSelecionada) {
-      return (a.ordemAleatoria || 0) - (b.ordemAleatoria || 0);
-    }
+  const produtosOrdenados = useMemo(() => {
+    return [...produtosParaExibir].sort((a, b) => {
+      const buscaAtiva = termosBusca.length > 0;
 
-    // 2. Helpers para pegar os valores limpos
-    const getPreco = (p: ProdutoComEmpresa) => {
-      // CORREÇÃO DE PARSE: Remove R$, depois remove PONTOS de milhar, depois troca VÍRGULA por PONTO decimal
-      const valorLimpo = p.preco.replace("R$", "").replace(/\./g, "").replace(",", ".");
-      return parseFloat(valorLimpo.trim());
-    };
+      // 1. Se for ordenação aleatória inicial (sem busca e sem categoria)
+      if (!ordenacaoManual && !buscaAtiva && !categoriaSelecionada) {
+        return (a.ordemAleatoria || 0) - (b.ordemAleatoria || 0);
+      }
 
-    const getDist = (p: ProdutoComEmpresa) => {
-      const loc = getProdutoLocation(p);
-      // Se não tiver location do user ou do produto, joga para o final (Infinity)
-      return (userLocation && loc) ? (calcularDistancia(userLocation, loc) ?? Infinity) : Infinity;
-    };
+      // 2. Busca por relevância: descrição > categoria/palavras-chave > empresa
+      if (buscaAtiva) {
+        const scoreA = calcularRelevanciaBusca(a, termosBusca);
+        const scoreB = calcularRelevanciaBusca(b, termosBusca);
 
-    const precoA = getPreco(a);
-    const precoB = getPreco(b);
-    const distA = getDist(a);
-    const distB = getDist(b);
+        const prioridadeA = scoreA.descricao * 100 + scoreA.categoria * 10 + scoreA.empresa;
+        const prioridadeB = scoreB.descricao * 100 + scoreB.categoria * 10 + scoreB.empresa;
 
-    // 3. Lógica de Ordenação com Desempate
-    if (ordenarPorPreco) {
-      // PRIMÁRIO: Menor Preço
-      if (precoA !== precoB) {
+        if (prioridadeA !== prioridadeB) {
+          return prioridadeB - prioridadeA;
+        }
+
+        if (scoreA.total !== scoreB.total) {
+          return scoreB.total - scoreA.total;
+        }
+      }
+
+      // 3. Helpers para pegar os valores limpos
+      const getPreco = (p: ProdutoComEmpresa) => {
+        // CORREÇÃO DE PARSE: Remove R$, depois remove PONTOS de milhar, depois troca VÍRGULA por PONTO decimal
+        const valorLimpo = p.preco.replace("R$", "").replace(/\./g, "").replace(",", ".");
+        return parseFloat(valorLimpo.trim());
+      };
+
+      const getDist = (p: ProdutoComEmpresa) => {
+        const loc = getProdutoLocation(p);
+        // Se não tiver location do user ou do produto, joga para o final (Infinity)
+        return (userLocation && loc) ? (calcularDistancia(userLocation, loc) ?? Infinity) : Infinity;
+      };
+
+      const precoA = getPreco(a);
+      const precoB = getPreco(b);
+      const distA = getDist(a);
+      const distB = getDist(b);
+
+      // 4. Lógica de Ordenação com Desempate
+      if (ordenarPorPreco) {
+        // PRIMÁRIO: Menor Preço
+        if (precoA !== precoB) {
+          return precoA - precoB;
+        }
+        // SECUNDÁRIO (Desempate): Menor Distância
+        return distA - distB;
+      } else {
+        // PRIMÁRIO: Menor Distância
+        // Usamos uma pequena margem de erro para floats, mas geralmente a subtração direta funciona
+        const diffDist = distA - distB;
+
+        // Se a diferença de distância for significativa (maior que 5 metros, ex: 0.005km), ordena por distância
+        if (Math.abs(diffDist) > 0.005) {
+          return diffDist;
+        }
+
+        // SECUNDÁRIO (Desempate): Se estiverem na "mesma" distância, ordena pelo Menor Preço
         return precoA - precoB;
       }
-      // SECUNDÁRIO (Desempate): Menor Distância
-      return distA - distB;
-    } else {
-      // PRIMÁRIO: Menor Distância
-      // Usamos uma pequena margem de erro para floats, mas geralmente a subtração direta funciona
-      const diffDist = distA - distB;
-      
-      // Se a diferença de distância for significativa (maior que 5 metros, ex: 0.005km), ordena por distância
-      if (Math.abs(diffDist) > 0.005) {
-        return diffDist;
-      }
-      
-      // SECUNDÁRIO (Desempate): Se estiverem na "mesma" distância, ordena pelo Menor Preço
-      return precoA - precoB;
+    });
+  }, [produtosParaExibir, ordenacaoManual, termosBusca, categoriaSelecionada, ordenarPorPreco, userLocation]);
+
+  const handleDestaquePress = useCallback((produto: any) => {
+    const produtoCompleto = produtosComEmpresa.find((item) => item.id === produto.id);
+    if (produtoCompleto) {
+      handleImagePress(produtoCompleto);
     }
-  });
+  }, [produtosComEmpresa, handleImagePress]);
+
+  const handleDestaqueVerNoMapa = useCallback((produto: any) => {
+    const produtoCompleto = produtosComEmpresa.find((item) => item.id === produto.id);
+    if (produtoCompleto) {
+      handleVerNoMapa(produtoCompleto);
+    }
+  }, [produtosComEmpresa, handleVerNoMapa]);
 
   const openExternalMap = (lat: number, lon: number, label: string) => {
     const url = Platform.select({ ios: `maps:0,0?q=${lat},${lon}(${label})`, android: `geo:0,0?q=${lat},${lon}(${label})` });
@@ -821,18 +909,8 @@ export default function HomeScreen() {
 
                 <DestaquesNoticias
                   produtos={produtosDestaqueNoticias}
-                  onProdutoPress={(produto) => {
-                    const produtoCompleto = produtosComEmpresa.find((item) => item.id === produto.id);
-                    if (produtoCompleto) {
-                      handleImagePress(produtoCompleto);
-                    }
-                  }}
-                  onVerNoMapa={(produto) => {
-                    const produtoCompleto = produtosComEmpresa.find((item) => item.id === produto.id);
-                    if (produtoCompleto) {
-                      handleVerNoMapa(produtoCompleto);
-                    }
-                  }}
+                  onProdutoPress={handleDestaquePress}
+                  onVerNoMapa={handleDestaqueVerNoMapa}
                   onInstagram={openInstagramProfile}
                   onWhatsApp={openWhatsApp}
                   userLocation={userLocation}
@@ -861,132 +939,105 @@ export default function HomeScreen() {
             </View>
           </View>
         )}
-        {imagemModalVisivel && produtoModal && (
-          <Modal transparent animationType="fade" visible={imagemModalVisivel} onRequestClose={() => {
-            setImagemModalVisivel(false);
-            setProdutoModal(null);
-          }}>
-            <View style={styles.modalContainer}>
-              <View
-                style={styles.modalCard}
-                onLayout={(event) => {
-                  const { width: modalWidth, height: modalHeight } = event.nativeEvent.layout;
-                  setModalDimensoes((dimensoesAtuais) => (
-                    dimensoesAtuais.width === modalWidth && dimensoesAtuais.height === modalHeight
-                      ? dimensoesAtuais
-                      : { width: modalWidth, height: modalHeight }
-                  ));
-                }}
-              >
+        {imagemModalVisivel && produtoModalAtualizado && (
+          <ProductDetailsModal
+            visible={imagemModalVisivel}
+            onClose={() => {
+              setImagemModalVisivel(false);
+              setProdutoModal(null);
+            }}
+            onCardLayout={(event) => {
+              const { width: modalWidth, height: modalHeight } = event.nativeEvent.layout;
+              setModalDimensoes((dimensoesAtuais) => (
+                dimensoesAtuais.width === modalWidth && dimensoesAtuais.height === modalHeight
+                  ? dimensoesAtuais
+                  : { width: modalWidth, height: modalHeight }
+              ));
+            }}
+            onImageLoad={handleImagemModalCarregada}
+            imageUrl={imagemModalUrl}
+            imageHeight={imagemModalAltura}
+            title={produtoModalAtualizado.descricao}
+            price={produtoModalAtualizado.preco}
+            imageOverlay={(
+              <View style={styles.modalVoteActions}>
                 <TouchableOpacity
-                  style={styles.modalCloseButton}
-                  onPress={() => {
-                    setImagemModalVisivel(false);
-                    setProdutoModal(null);
-                  }}
+                  style={[styles.modalVoteButton, styles.modalActionLike]}
+                  onPress={() => votarProduto(produtoModalAtualizado.id, "like")}
+                  accessibilityLabel="Curtir produto"
                 >
-                  <Feather name="x" size={20} color={BRAND_COLORS.text} />
+                  <Feather name="thumbs-up" size={18} color={BRAND_COLORS.white} />
+                  <Text style={styles.modalActionText}>({produtoModalAtualizado.like || 0})</Text>
                 </TouchableOpacity>
-
-                <View style={[styles.modalImageArea, { height: imagemModalUrl ? imagemModalAltura : 180 }]}>
-                  {imagemModalUrl ? (
-                    <Image
-                      source={{ uri: imagemModalUrl }}
-                      style={[styles.imagemModal, { height: imagemModalAltura }]}
-                      resizeMode="cover"
-                      onLoad={handleImagemModalCarregada}
-                    />
-                  ) : (
-                    <View style={styles.imagemModalPlaceholder}>
-                      <Feather name="image" size={52} color={BRAND_COLORS.border} />
-                      <Text style={styles.modalPlaceholderText}>Imagem nao cadastrada</Text>
-                    </View>
-                  )}
-                  <View style={styles.modalVoteActions}>
-                    <TouchableOpacity
-                      style={[styles.modalVoteButton, styles.modalActionLike]}
-                      onPress={() => votarProduto(produtoModal.id, "like")}
-                      accessibilityLabel="Curtir produto"
-                    >
-                      <Feather name="thumbs-up" size={18} color={BRAND_COLORS.white} />
-                      <Text style={styles.modalActionText}>({produtoModal.like || 0})</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.modalVoteButton, styles.modalActionUnlike]}
-                      onPress={() => votarProduto(produtoModal.id, "unlike")}
-                      accessibilityLabel="Nao curtir produto"
-                    >
-                      <Feather name="thumbs-down" size={18} color={BRAND_COLORS.white} />
-                      <Text style={styles.modalActionText}>({produtoModal.unlike || 0})</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator>
-                  <Text style={styles.modalTitle}>{produtoModal.descricao}</Text>
-                  <Text style={styles.modalPrice}>{produtoModal.preco}</Text>
-
-                  {produtoModal.categoria && (
-                    <Text style={styles.modalMeta}>Categoria: {produtoModal.categoria}</Text>
-                  )}
-
-                  {produtoModal.palavrasChave && (
-                    <Text style={styles.modalMeta}>Palavras-chave: {produtoModal.palavrasChave}</Text>
-                  )}
-
-                  {produtoModal.dataFinalOferta && (
-                    <Text style={styles.modalMeta}>Validade: {produtoModal.dataFinalOferta}</Text>
-                  )}
-
-                  {produtoModal.enquantoDurarEstoque && (
-                    <Text style={styles.modalMeta}>Oferta valida enquanto durar o estoque</Text>
-                  )}
-
-                  {produtoModal.empresaId && empresas[produtoModal.empresaId]?.nomeEmpresa && (
-                    <Text style={styles.modalMeta}>Empresa: {empresas[produtoModal.empresaId].nomeEmpresa}</Text>
-                  )}
-
-                  {(() => {
-                    const location = getProdutoLocation(produtoModal);
-                    const distanciaModal = userLocation && location ? calcularDistancia(userLocation, { latitude: location.latitude, longitude: location.longitude }) : null;
-                    if (!location) return null;
-                    return (
-                      <>
-                        {distanciaModal !== null && <Text style={styles.modalMeta}>Distancia: {distanciaModal.toFixed(1)} km</Text>}
-                        <Text style={styles.modalMeta}>Localizacao: {location.isProdutoLocation ? "do produto" : "da empresa"}</Text>
-                        <Text style={styles.modalMeta}>Coordenadas: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</Text>
-                      </>
-                    );
-                  })()}
-
-                </ScrollView>
-
-                <View style={styles.modalActions}>
-                  {getProdutoLocation(produtoModal) && (
-                    <TouchableOpacity style={styles.modalAction} onPress={() => handleVerNoMapaViaModal(produtoModal)}>
-                      <Feather name="map-pin" size={18} color={BRAND_COLORS.white} />
-                      <Text style={styles.modalActionText}>Mapa</Text>
-                    </TouchableOpacity>
-                  )}
-                  {empresas[produtoModal.empresaId]?.instagram && (
-                    <TouchableOpacity style={[styles.modalAction, styles.modalActionInstagram]} onPress={() => openInstagramProfile(empresas[produtoModal.empresaId].instagram)}>
-                      <Feather name="instagram" size={18} color={BRAND_COLORS.white} />
-                      <Text style={styles.modalActionText}>Instagram</Text>
-                    </TouchableOpacity>
-                  )}
-                  {empresas[produtoModal.empresaId]?.telefone && (
-                    <TouchableOpacity
-                      style={[styles.modalAction, styles.modalActionWhatsApp]}
-                      onPress={() => openWhatsApp(empresas[produtoModal.empresaId].telefone, `Vi esse anuncio no app TaNoPreco e gostaria de saber mais sobre: ${produtoModal.descricao}.`)}
-                    >
-                      <Feather name="message-circle" size={18} color={BRAND_COLORS.white} />
-                      <Text style={styles.modalActionText}>WhatsApp</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+                <TouchableOpacity
+                  style={[styles.modalVoteButton, styles.modalActionUnlike]}
+                  onPress={() => votarProduto(produtoModalAtualizado.id, "unlike")}
+                  accessibilityLabel="Nao curtir produto"
+                >
+                  <Feather name="thumbs-down" size={18} color={BRAND_COLORS.white} />
+                  <Text style={styles.modalActionText}>({produtoModalAtualizado.unlike || 0})</Text>
+                </TouchableOpacity>
               </View>
-            </View>
-          </Modal>
+            )}
+            footer={(
+              <View style={styles.modalActions}>
+                {getProdutoLocation(produtoModalAtualizado) && (
+                  <TouchableOpacity style={styles.modalAction} onPress={() => handleVerNoMapaViaModal(produtoModalAtualizado)}>
+                    <Feather name="map-pin" size={18} color={BRAND_COLORS.white} />
+                    <Text style={styles.modalActionText}>Mapa</Text>
+                  </TouchableOpacity>
+                )}
+                {empresas[produtoModalAtualizado.empresaId]?.instagram && (
+                  <TouchableOpacity style={[styles.modalAction, styles.modalActionInstagram]} onPress={() => openInstagramProfile(empresas[produtoModalAtualizado.empresaId].instagram)}>
+                    <Feather name="instagram" size={18} color={BRAND_COLORS.white} />
+                    <Text style={styles.modalActionText}>Instagram</Text>
+                  </TouchableOpacity>
+                )}
+                {empresas[produtoModalAtualizado.empresaId]?.telefone && (
+                  <TouchableOpacity
+                    style={[styles.modalAction, styles.modalActionWhatsApp]}
+                    onPress={() => openWhatsApp(empresas[produtoModalAtualizado.empresaId].telefone, `Vi esse anuncio no app TaNoPreco e gostaria de saber mais sobre: ${produtoModalAtualizado.descricao}.`)}
+                  >
+                    <Feather name="message-circle" size={18} color={BRAND_COLORS.white} />
+                    <Text style={styles.modalActionText}>WhatsApp</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            )}
+          >
+            {produtoModalAtualizado.categoria && (
+              <Text style={styles.modalMeta}>Categoria: {produtoModalAtualizado.categoria}</Text>
+            )}
+
+            {produtoModalAtualizado.palavrasChave && (
+              <Text style={styles.modalMeta}>Palavras-chave: {produtoModalAtualizado.palavrasChave}</Text>
+            )}
+
+            {produtoModalAtualizado.dataFinalOferta && (
+              <Text style={styles.modalMeta}>Validade: {produtoModalAtualizado.dataFinalOferta}</Text>
+            )}
+
+            {produtoModalAtualizado.enquantoDurarEstoque && (
+              <Text style={styles.modalMeta}>Oferta valida enquanto durar o estoque</Text>
+            )}
+
+            {produtoModalAtualizado.empresaId && empresas[produtoModalAtualizado.empresaId]?.nomeEmpresa && (
+              <Text style={styles.modalMeta}>Empresa: {empresas[produtoModalAtualizado.empresaId].nomeEmpresa}</Text>
+            )}
+
+            {(() => {
+              const location = getProdutoLocation(produtoModalAtualizado);
+              const distanciaModal = userLocation && location ? calcularDistancia(userLocation, { latitude: location.latitude, longitude: location.longitude }) : null;
+              if (!location) return null;
+              return (
+                <>
+                  {distanciaModal !== null && <Text style={styles.modalMeta}>Distancia: {distanciaModal.toFixed(1)} km</Text>}
+                  <Text style={styles.modalMeta}>Localizacao: {location.isProdutoLocation ? "do produto" : "da empresa"}</Text>
+                  <Text style={styles.modalMeta}>Coordenadas: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</Text>
+                </>
+              );
+            })()}
+          </ProductDetailsModal>
         )}
 
       </View>
@@ -1263,56 +1314,6 @@ const styles = StyleSheet.create({
   externalMapButtonText: { color: BRAND_COLORS.white, fontWeight: "bold", fontSize: 14 },
   myLocationMarker: { backgroundColor: BRAND_COLORS.primary, padding: 6, borderRadius: 15, width: 30, height: 30, justifyContent: "center", alignItems: "center", borderColor: BRAND_COLORS.white, borderWidth: 1.5 },
   myLocationMarkerText: { color: BRAND_COLORS.white, fontWeight: "bold", fontSize: 10 },
-  modalContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: BRAND_COLORS.overlayStrong,
-    padding: 16,
-  },
-  modalCard: {
-    width: "100%",
-    maxWidth: 420,
-    maxHeight: "100%",
-    backgroundColor: BRAND_COLORS.white,
-    borderRadius: 20,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: "rgba(0,0,0,0.06)",
-  },
-  modalCloseButton: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    zIndex: 2,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(255,255,255,0.82)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalImageArea: {
-    width: "100%",
-    position: "relative",
-  },
-  imagemModal: {
-    width: "100%",
-    height: 280,
-    backgroundColor: BRAND_COLORS.surfaceSoft,
-  },
-  imagemModalPlaceholder: {
-    width: "100%",
-    height: 180,
-    backgroundColor: BRAND_COLORS.surfaceSoft,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  modalPlaceholderText: {
-    fontSize: 12,
-    color: BRAND_COLORS.textMuted,
-  },
   modalVoteActions: {
     position: "absolute",
     left: 10,
@@ -1327,24 +1328,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 9,
     paddingHorizontal: 12,
-  },
-  modalContent: {
-    padding: 16,
-  },
-  modalScroll: {
-    flexShrink: 1,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: BRAND_COLORS.text,
-    marginBottom: 8,
-  },
-  modalPrice: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: BRAND_COLORS.success,
-    marginBottom: 6,
   },
   modalMeta: {
     fontSize: 12,

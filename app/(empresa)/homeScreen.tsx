@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Image,
   StyleSheet,
   FlatList,
   ScrollView,
@@ -12,7 +11,6 @@ import {
   Linking,
   TextInput,
   Dimensions,
-  Modal,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -43,6 +41,7 @@ import AdCard from "../components/AdCard";
 import AdCardLargo from "../components/AdCardLargo";
 import { BRAND_COLORS } from "@/constants/BrandColors";
 import { ProductCardAction, ProductCardBase } from "../components/ProductCardBase";
+import { ProductDetailsModal } from "../components/ProductDetailsModal";
 
 interface ProdutoEmpresa {
   id: string;
@@ -344,6 +343,11 @@ export default function HomeScreen() {
     });
   }, [produtos, termoBuscaProdutos]);
 
+  const produtoModalAtualizado = useMemo(() => {
+    if (!produtoSelecionado) return null;
+    return produtos.find((produto) => produto.id === produtoSelecionado.id) ?? produtoSelecionado;
+  }, [produtoSelecionado, produtos]);
+
   const destaquesUtilizados = useMemo(
     () => produtos.filter((produto) => produto.destaque === true || produto.destaque === "true").length,
     [produtos]
@@ -459,7 +463,7 @@ export default function HomeScreen() {
     if (!imagemLargura || !imagemAltura || !produtoModalDimensoes.width) return;
 
     const alturaProporcional = produtoModalDimensoes.width * (imagemAltura / imagemLargura);
-    setProdutoModalAltura(Math.min(alturaProporcional, 500));
+    setProdutoModalAltura(Math.min(alturaProporcional, 600));
   };
 
   const renderProdutoCard = (produto: ProdutoEmpresa) => {
@@ -742,60 +746,33 @@ export default function HomeScreen() {
           </View>
         </ScrollView>
 
-        <Modal
-          visible={produtoSelecionado !== null}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setProdutoSelecionado(null)}
-        >
-          {produtoSelecionado && (
-            <View style={styles.produtoModalOverlay}>
-              <View
-                style={styles.produtoModalCard}
-                onLayout={(event) => {
-                  const { width: cardWidth, height: cardHeight } = event.nativeEvent.layout;
-                  setProdutoModalDimensoes((dimensoesAtuais) => (
-                    dimensoesAtuais.width === cardWidth && dimensoesAtuais.height === cardHeight
-                      ? dimensoesAtuais
-                      : { width: cardWidth, height: cardHeight }
-                  ));
-                }}
-              >
-                <TouchableOpacity
-                  style={styles.produtoModalClose}
-                  onPress={() => setProdutoSelecionado(null)}
-                  accessibilityLabel="Fechar detalhes do produto"
-                >
-                  <Feather name="x" size={20} color={BRAND_COLORS.text} />
-                </TouchableOpacity>
-                {produtoSelecionado.imagemUrl ? (
-                  <Image
-                    source={{ uri: produtoSelecionado.imagemUrl }}
-                    style={[styles.produtoModalImage, { height: produtoModalAltura }]}
-                    resizeMode="cover"
-                    onLoad={handleProdutoModalCarregado}
-                  />
-                ) : (
-                  <View style={styles.produtoModalPlaceholder}>
-                    <Package size={42} color={BRAND_COLORS.border} />
-                    <Text style={styles.produtoModalMuted}>Imagem nao cadastrada</Text>
-                  </View>
-                )}
-                <View style={styles.produtoModalContent}>
-                  <Text style={styles.produtoModalTitle}>{produtoSelecionado.descricao}</Text>
-                  {!!produtoSelecionado.preco && <Text style={styles.produtoModalPrice}>{produtoSelecionado.preco}</Text>}
-                  {!!produtoSelecionado.categoria && <Text style={styles.produtoModalMeta}>Categoria: {produtoSelecionado.categoria}</Text>}
-                  {!!produtoSelecionado.palavrasChave && <Text style={styles.produtoModalMeta}>Palavras-chave: {produtoSelecionado.palavrasChave}</Text>}
-                  {!!produtoSelecionado.dataFinalOferta && <Text style={styles.produtoModalMeta}>Validade: {produtoSelecionado.dataFinalOferta}</Text>}
-                  {produtoSelecionado.enquantoDurarEstoque && <Text style={styles.produtoModalMeta}>Oferta valida enquanto durar o estoque</Text>}
-                  {produtoSelecionado.localizacaoDiferente && typeof produtoSelecionado.latitudeProduto === "number" && typeof produtoSelecionado.longitudeProduto === "number" && (
-                    <Text style={styles.produtoModalMeta}>Coordenadas: {produtoSelecionado.latitudeProduto.toFixed(6)}, {produtoSelecionado.longitudeProduto.toFixed(6)}</Text>
-                  )}
-                </View>
-              </View>
-            </View>
-          )}
-        </Modal>
+        {produtoModalAtualizado && (
+          <ProductDetailsModal
+            visible={produtoModalAtualizado !== null}
+            onClose={() => setProdutoSelecionado(null)}
+            onCardLayout={(event) => {
+              const { width: cardWidth, height: cardHeight } = event.nativeEvent.layout;
+              setProdutoModalDimensoes((dimensoesAtuais) => (
+                dimensoesAtuais.width === cardWidth && dimensoesAtuais.height === cardHeight
+                  ? dimensoesAtuais
+                  : { width: cardWidth, height: cardHeight }
+              ));
+            }}
+            onImageLoad={handleProdutoModalCarregado}
+            imageUrl={produtoModalAtualizado.imagemUrl}
+            imageHeight={produtoModalAltura}
+            title={produtoModalAtualizado.descricao}
+            price={produtoModalAtualizado.preco}
+          >
+            {!!produtoModalAtualizado.categoria && <Text style={styles.produtoModalMeta}>Categoria: {produtoModalAtualizado.categoria}</Text>}
+            {!!produtoModalAtualizado.palavrasChave && <Text style={styles.produtoModalMeta}>Palavras-chave: {produtoModalAtualizado.palavrasChave}</Text>}
+            {!!produtoModalAtualizado.dataFinalOferta && <Text style={styles.produtoModalMeta}>Validade: {produtoModalAtualizado.dataFinalOferta}</Text>}
+            {produtoModalAtualizado.enquantoDurarEstoque && <Text style={styles.produtoModalMeta}>Oferta valida enquanto durar o estoque</Text>}
+            {produtoModalAtualizado.localizacaoDiferente && typeof produtoModalAtualizado.latitudeProduto === "number" && typeof produtoModalAtualizado.longitudeProduto === "number" && (
+              <Text style={styles.produtoModalMeta}>Coordenadas: {produtoModalAtualizado.latitudeProduto.toFixed(6)}, {produtoModalAtualizado.longitudeProduto.toFixed(6)}</Text>
+            )}
+          </ProductDetailsModal>
+        )}
 
       </View>
     </View>
@@ -1254,63 +1231,6 @@ const styles = StyleSheet.create({
     marginTop: 2,
     fontSize: 12,
     color: BRAND_COLORS.textMuted,
-  },
-  produtoModalOverlay: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 16,
-    backgroundColor: BRAND_COLORS.overlayStrong,
-  },
-  produtoModalCard: {
-    width: "100%",
-    maxWidth: 420,
-    overflow: "hidden",
-    borderRadius: 20,
-    backgroundColor: BRAND_COLORS.white,
-  },
-  produtoModalClose: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    zIndex: 2,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "rgba(255,255,255,0.82)",
-  },
-  produtoModalImage: {
-    width: "100%",
-    backgroundColor: BRAND_COLORS.surfaceSoft,
-  },
-  produtoModalPlaceholder: {
-    width: "100%",
-    height: 180,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: BRAND_COLORS.surfaceSoft,
-  },
-  produtoModalMuted: {
-    fontSize: 12,
-    color: BRAND_COLORS.textMuted,
-  },
-  produtoModalContent: {
-    padding: 16,
-  },
-  produtoModalTitle: {
-    marginBottom: 8,
-    fontSize: 18,
-    fontWeight: "800",
-    color: BRAND_COLORS.text,
-  },
-  produtoModalPrice: {
-    marginBottom: 6,
-    fontSize: 24,
-    fontWeight: "900",
-    color: BRAND_COLORS.success,
   },
   produtoModalMeta: {
     marginBottom: 6,
