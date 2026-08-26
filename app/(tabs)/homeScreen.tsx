@@ -267,12 +267,12 @@ export default function HomeScreen() {
   }, []);
 
   const handleImagemModalCarregada = useCallback((event: any) => {
-    const { width: imagemLargura, height: imagemAltura } = event.nativeEvent;
-    if (!imagemLargura || !imagemAltura || !modalDimensoes.width || !modalDimensoes.height) return;
+    const { width: imagemLargura, height: imagemAltura } = event.nativeEvent.source ?? {};
+    if (!imagemLargura || !imagemAltura || !modalDimensoes.width) return;
 
     const alturaProporcional = modalDimensoes.width * (imagemAltura / imagemLargura);
-    setImagemModalAltura(Math.min(alturaProporcional, modalDimensoes.height * 0.75));
-  }, [modalDimensoes]);
+    setImagemModalAltura(Math.min(alturaProporcional, 500));
+  }, [modalDimensoes.width]);
 
   const handleVerNoMapa = useCallback((produto: ProdutoComEmpresa) => {
     const location = getProdutoLocation(produto);
@@ -909,7 +909,7 @@ export default function HomeScreen() {
                       accessibilityLabel="Curtir produto"
                     >
                       <Feather name="thumbs-up" size={18} color={BRAND_COLORS.white} />
-                      <Text style={styles.modalActionText}>Gostei ({produtoModal.like || 0})</Text>
+                      <Text style={styles.modalActionText}>({produtoModal.like || 0})</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={[styles.modalVoteButton, styles.modalActionUnlike]}
@@ -917,7 +917,7 @@ export default function HomeScreen() {
                       accessibilityLabel="Nao curtir produto"
                     >
                       <Feather name="thumbs-down" size={18} color={BRAND_COLORS.white} />
-                      <Text style={styles.modalActionText}>Nao gostei ({produtoModal.unlike || 0})</Text>
+                      <Text style={styles.modalActionText}>({produtoModal.unlike || 0})</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1315,8 +1315,8 @@ const styles = StyleSheet.create({
   },
   modalVoteActions: {
     position: "absolute",
-    left: 12,
-    bottom: 12,
+    left: 10,
+    top: 10,
     flexDirection: "row",
     gap: 8,
   },

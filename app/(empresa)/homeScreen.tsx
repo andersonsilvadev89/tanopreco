@@ -131,6 +131,8 @@ export default function HomeScreen() {
   const [termoBuscaProdutos, setTermoBuscaProdutos] = useState("");
   const [mostrarDadosEmpresa, setMostrarDadosEmpresa] = useState(false);
   const [produtoSelecionado, setProdutoSelecionado] = useState<ProdutoEmpresa | null>(null);
+  const [produtoModalAltura, setProdutoModalAltura] = useState(220);
+  const [produtoModalDimensoes, setProdutoModalDimensoes] = useState({ width: 0, height: 0 });
   const [appStats, setAppStats] = useState<AppStatsSummary>({
     empresasCadastradas: 0,
     usuariosComLogin: 0,
@@ -447,6 +449,19 @@ export default function HomeScreen() {
     });
   };
 
+  const abrirProdutoModal = (produto: ProdutoEmpresa) => {
+    setProdutoSelecionado(produto);
+    setProdutoModalAltura(220);
+  };
+
+  const handleProdutoModalCarregado = (event: any) => {
+    const { width: imagemLargura, height: imagemAltura } = event.nativeEvent.source ?? {};
+    if (!imagemLargura || !imagemAltura || !produtoModalDimensoes.width) return;
+
+    const alturaProporcional = produtoModalDimensoes.width * (imagemAltura / imagemLargura);
+    setProdutoModalAltura(Math.min(alturaProporcional, 500));
+  };
+
   const renderProdutoCard = (produto: ProdutoEmpresa) => {
     const actions: ProductCardAction[] = [
       { icon: "trash-2" , onPress: () => excluirProduto(produto.id), backgroundColor: "rgba(217,58,58,0.95)", accessibilityLabel: "Excluir produto" },
@@ -454,7 +469,7 @@ export default function HomeScreen() {
     return (
       <ProductCardBase
         produto={{ ...produto, nomeEmpresa: nomeEmpresa || undefined }}
-        onCardPress={() => setProdutoSelecionado(produto)}
+        onCardPress={() => abrirProdutoModal(produto)}
         actions={actions}
         cardStyle={styles.gradeProdutoCard}
         descriptionNumberOfLines={2}
@@ -735,7 +750,17 @@ export default function HomeScreen() {
         >
           {produtoSelecionado && (
             <View style={styles.produtoModalOverlay}>
-              <View style={styles.produtoModalCard}>
+              <View
+                style={styles.produtoModalCard}
+                onLayout={(event) => {
+                  const { width: cardWidth, height: cardHeight } = event.nativeEvent.layout;
+                  setProdutoModalDimensoes((dimensoesAtuais) => (
+                    dimensoesAtuais.width === cardWidth && dimensoesAtuais.height === cardHeight
+                      ? dimensoesAtuais
+                      : { width: cardWidth, height: cardHeight }
+                  ));
+                }}
+              >
                 <TouchableOpacity
                   style={styles.produtoModalClose}
                   onPress={() => setProdutoSelecionado(null)}
@@ -744,7 +769,12 @@ export default function HomeScreen() {
                   <Feather name="x" size={20} color={BRAND_COLORS.text} />
                 </TouchableOpacity>
                 {produtoSelecionado.imagemUrl ? (
-                  <Image source={{ uri: produtoSelecionado.imagemUrl }} style={styles.produtoModalImage} resizeMode="contain" />
+                  <Image
+                    source={{ uri: produtoSelecionado.imagemUrl }}
+                    style={[styles.produtoModalImage, { height: produtoModalAltura }]}
+                    resizeMode="cover"
+                    onLoad={handleProdutoModalCarregado}
+                  />
                 ) : (
                   <View style={styles.produtoModalPlaceholder}>
                     <Package size={42} color={BRAND_COLORS.border} />
@@ -1253,7 +1283,6 @@ const styles = StyleSheet.create({
   },
   produtoModalImage: {
     width: "100%",
-    height: 220,
     backgroundColor: BRAND_COLORS.surfaceSoft,
   },
   produtoModalPlaceholder: {
