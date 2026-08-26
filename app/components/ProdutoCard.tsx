@@ -37,7 +37,8 @@ interface ProdutoCardProps {
 }
 
 const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({ produto, empresaInfo, userLocation, onImagePress, cardStyle }) => {
-  return <ProductCardBase produto={{ ...produto, nomeEmpresa: empresaInfo.nomeEmpresa || produto.nomeEmpresa }} userLocation={userLocation} onImagePress={() => onImagePress(produto)} cardStyle={cardStyle} />;
+  const abrirDetalhes = () => onImagePress(produto);
+  return <ProductCardBase produto={{ ...produto, nomeEmpresa: empresaInfo.nomeEmpresa || produto.nomeEmpresa }} userLocation={userLocation} onCardPress={abrirDetalhes} onImagePress={abrirDetalhes} cardStyle={cardStyle} />;
 };
 
 export const ProdutoCard = memo(ProdutoCardComponent);

@@ -15,6 +15,9 @@ export interface ProductCardData {
     longitudeProduto?: number;
     localizacaoDiferente?: boolean;
     dataFinalOferta?: string;
+    palavrasChave?: string;
+    categoria?: string;
+    enquantoDurarEstoque?: boolean;
 }
 
 export interface ProductCardAction {
@@ -142,7 +145,7 @@ function ProductCardBaseComponent({
                 </View>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={toggleDescription} activeOpacity={0.8} style={styles.descriptionRow}>
+            <TouchableOpacity onPress={cardPress} activeOpacity={0.8} style={styles.descriptionRow}>
                 <Text style={styles.description} numberOfLines={lines}>
                     {produto.descricao}
                     {showDescriptionHint && !expanded && (produto.descricao?.length ?? 0) > 28 && <Text style={styles.descriptionHint}> +ver</Text>}

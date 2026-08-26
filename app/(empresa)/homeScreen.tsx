@@ -3,6 +3,7 @@ import {
   View,
   Text,
   TouchableOpacity,
+  Image,
   StyleSheet,
   FlatList,
   ScrollView,
@@ -11,7 +12,9 @@ import {
   Linking,
   TextInput,
   Dimensions,
+  Modal,
 } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 import { FontAwesome } from "@expo/vector-icons";
@@ -48,6 +51,11 @@ interface ProdutoEmpresa {
   imagemUrl?: string;
   categoria?: string;
   palavrasChave?: string;
+  dataFinalOferta?: string;
+  enquantoDurarEstoque?: boolean;
+  latitudeProduto?: number;
+  longitudeProduto?: number;
+  localizacaoDiferente?: boolean;
   destaque?: boolean | string;
 }
 
@@ -75,7 +83,7 @@ const WHATSAPP_PATROCINIO_MESSAGE = encodeURIComponent(
 const WHATSAPP_DUVIDAS_MESSAGE = encodeURIComponent(
   "Olá estou com dúvidas sobre o app. Você pode me ajudar?"
 );
-const PACKAGES_HOSTING_URL = "https://www.eradevsystem.com.br/pacotes_expocrato";
+const PACKAGES_HOSTING_URL = "https://www.eradevsystem.com.br/pacotes_tanopreco";
 
 // Grade vertical de 2 colunas para os produtos da empresa, com AdCardLargo a cada 6 produtos.
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
@@ -122,6 +130,7 @@ export default function HomeScreen() {
   const [updatingLocation, setUpdatingLocation] = useState(false);
   const [termoBuscaProdutos, setTermoBuscaProdutos] = useState("");
   const [mostrarDadosEmpresa, setMostrarDadosEmpresa] = useState(false);
+  const [produtoSelecionado, setProdutoSelecionado] = useState<ProdutoEmpresa | null>(null);
   const [appStats, setAppStats] = useState<AppStatsSummary>({
     empresasCadastradas: 0,
     usuariosComLogin: 0,
@@ -445,6 +454,7 @@ export default function HomeScreen() {
     return (
       <ProductCardBase
         produto={{ ...produto, nomeEmpresa: nomeEmpresa || undefined }}
+        onCardPress={() => setProdutoSelecionado(produto)}
         actions={actions}
         cardStyle={styles.gradeProdutoCard}
         descriptionNumberOfLines={2}
@@ -716,6 +726,46 @@ export default function HomeScreen() {
             </TouchableOpacity>
           </View>
         </ScrollView>
+
+        <Modal
+          visible={produtoSelecionado !== null}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setProdutoSelecionado(null)}
+        >
+          {produtoSelecionado && (
+            <View style={styles.produtoModalOverlay}>
+              <View style={styles.produtoModalCard}>
+                <TouchableOpacity
+                  style={styles.produtoModalClose}
+                  onPress={() => setProdutoSelecionado(null)}
+                  accessibilityLabel="Fechar detalhes do produto"
+                >
+                  <Feather name="x" size={20} color={BRAND_COLORS.text} />
+                </TouchableOpacity>
+                {produtoSelecionado.imagemUrl ? (
+                  <Image source={{ uri: produtoSelecionado.imagemUrl }} style={styles.produtoModalImage} resizeMode="contain" />
+                ) : (
+                  <View style={styles.produtoModalPlaceholder}>
+                    <Package size={42} color={BRAND_COLORS.border} />
+                    <Text style={styles.produtoModalMuted}>Imagem nao cadastrada</Text>
+                  </View>
+                )}
+                <View style={styles.produtoModalContent}>
+                  <Text style={styles.produtoModalTitle}>{produtoSelecionado.descricao}</Text>
+                  {!!produtoSelecionado.preco && <Text style={styles.produtoModalPrice}>{produtoSelecionado.preco}</Text>}
+                  {!!produtoSelecionado.categoria && <Text style={styles.produtoModalMeta}>Categoria: {produtoSelecionado.categoria}</Text>}
+                  {!!produtoSelecionado.palavrasChave && <Text style={styles.produtoModalMeta}>Palavras-chave: {produtoSelecionado.palavrasChave}</Text>}
+                  {!!produtoSelecionado.dataFinalOferta && <Text style={styles.produtoModalMeta}>Validade: {produtoSelecionado.dataFinalOferta}</Text>}
+                  {produtoSelecionado.enquantoDurarEstoque && <Text style={styles.produtoModalMeta}>Oferta valida enquanto durar o estoque</Text>}
+                  {produtoSelecionado.localizacaoDiferente && typeof produtoSelecionado.latitudeProduto === "number" && typeof produtoSelecionado.longitudeProduto === "number" && (
+                    <Text style={styles.produtoModalMeta}>Coordenadas: {produtoSelecionado.latitudeProduto.toFixed(6)}, {produtoSelecionado.longitudeProduto.toFixed(6)}</Text>
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
+        </Modal>
 
       </View>
     </View>
@@ -1172,6 +1222,69 @@ const styles = StyleSheet.create({
   },
   contactSubtitle: {
     marginTop: 2,
+    fontSize: 12,
+    color: BRAND_COLORS.textMuted,
+  },
+  produtoModalOverlay: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 16,
+    backgroundColor: BRAND_COLORS.overlayStrong,
+  },
+  produtoModalCard: {
+    width: "100%",
+    maxWidth: 420,
+    overflow: "hidden",
+    borderRadius: 20,
+    backgroundColor: BRAND_COLORS.white,
+  },
+  produtoModalClose: {
+    position: "absolute",
+    top: 12,
+    right: 12,
+    zIndex: 2,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.82)",
+  },
+  produtoModalImage: {
+    width: "100%",
+    height: 220,
+    backgroundColor: BRAND_COLORS.surfaceSoft,
+  },
+  produtoModalPlaceholder: {
+    width: "100%",
+    height: 180,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: BRAND_COLORS.surfaceSoft,
+  },
+  produtoModalMuted: {
+    fontSize: 12,
+    color: BRAND_COLORS.textMuted,
+  },
+  produtoModalContent: {
+    padding: 16,
+  },
+  produtoModalTitle: {
+    marginBottom: 8,
+    fontSize: 18,
+    fontWeight: "800",
+    color: BRAND_COLORS.text,
+  },
+  produtoModalPrice: {
+    marginBottom: 6,
+    fontSize: 24,
+    fontWeight: "900",
+    color: BRAND_COLORS.success,
+  },
+  produtoModalMeta: {
+    marginBottom: 6,
     fontSize: 12,
     color: BRAND_COLORS.textMuted,
   },
