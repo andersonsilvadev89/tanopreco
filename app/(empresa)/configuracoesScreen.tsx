@@ -25,6 +25,7 @@ import { FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons';
 import LocalizacaoModal from '../components/LocalizacaoModal';
 import { BRAND_COLORS } from '@/constants/BrandColors';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { CompanyVerifiedBadge } from '../components/CompanyVerifiedBadge';
 
 // --- CONSTANTES CLOUDINARY ---
 const CLOUDINARY_URL = 'https://api.cloudinary.com/v1_1/dvekhdfgc/image/upload';
@@ -40,6 +41,7 @@ interface CompanyProfile {
     imagem?: string;
     latitude: number;
     longitude: number;
+    verificado?: boolean;
 }
 
 const ConfiguracoesEmpresaScreen = () => {
@@ -59,6 +61,7 @@ const ConfiguracoesEmpresaScreen = () => {
     const [novaImagemUri, setNovaImagemUri] = useState<string | null>(null);
     const [latitude, setLatitude] = useState<number | null>(null);
     const [longitude, setLongitude] = useState<number | null>(null);
+    const [dataVerificada, setDataVerificada] = useState(false);
 
     const [isLocationModalVisible, setIsLocationModalVisible] = useState(false);
     const [drawerMenuVisible, setDrawerMenuVisible] = useState(false);
@@ -88,6 +91,7 @@ const ConfiguracoesEmpresaScreen = () => {
                     setImagem(data.imagem || '');
                     setLatitude(data.latitude || null);
                     setLongitude(data.longitude || null);
+                    setDataVerificada(data.verificado === true);
                 }
             } catch {
                 Alert.alert("Erro", "Não foi possível carregar os dados.");
@@ -364,7 +368,10 @@ const ConfiguracoesEmpresaScreen = () => {
                         {!editando ? (
                             <View style={styles.profileDisplayContainer}>
                                 <Image source={displayImageSource} style={styles.profileImage} />
-                                <Text style={styles.profileName}>{nomeEmpresa}</Text>
+                                <View style={styles.profileNameRow}>
+                                    <Text style={styles.profileName}>{nomeEmpresa}</Text>
+                                    {dataVerificada && <CompanyVerifiedBadge />}
+                                </View>
                                 <Text style={styles.profileDescription}>{palavrasChave}</Text>
 
                                 <View style={styles.detailsSection}>
@@ -488,6 +495,7 @@ const styles = StyleSheet.create({
         marginBottom: 20
     },
     profileDisplayContainer: { alignItems: 'center' },
+    profileNameRow: { alignItems: 'center', flexDirection: 'row' },
     profileImage: {
         width: 120, height: 120, borderRadius: 100,
         marginBottom: 5, backgroundColor: BRAND_COLORS.surfaceSoft, alignSelf: 'center'

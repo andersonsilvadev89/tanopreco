@@ -34,6 +34,7 @@ import { AppHeader } from "../components/shell/AppHeader";
 import { DrawerMenu } from "../components/shell/DrawerMenu";
 import { ProductDetailsModal } from "../components/ProductDetailsModal";
 import { BRAND_COLORS } from "@/constants/BrandColors";
+import { CompanyVerifiedBadge } from "../components/CompanyVerifiedBadge";
 
 const isExpoGo = Constants.appOwnership === "expo" || Constants.executionEnvironment === "storeClient";
 let speechRecognitionModule: any = null;
@@ -76,6 +77,7 @@ interface ProdutoComEmpresa {
   palavrasChave?: string;
   empresaId: string;
   nomeEmpresa: string;
+  verificado?: boolean;
   latitudeEmpresa?: number;
   longitudeEmpresa?: number;
   latitudeProduto?: number;
@@ -98,6 +100,7 @@ interface EmpresaData {
   longitude?: number;
   instagram?: string;
   telefone?: string;
+  verificado?: boolean;
 }
 
 const categoriaImagens: { [key: string]: any } = {
@@ -255,7 +258,7 @@ export default function HomeScreen() {
   const [modalDimensoes, setModalDimensoes] = useState({ width: 0, height: 0 });
   const [produtoModal, setProdutoModal] = useState<ProdutoComEmpresa | null>(null);
   const mapRef = useRef<MapView>(null);
-  const listaRef = useRef<ScrollView>(null);
+  const listaRef = useRef<FlatList<any>>(null);
   const categoriasScrollXRef = useRef(0);
   const painelFiltroForaDaTelaRef = useRef(false);
   const filtrosVisiveis = mostrarFiltrosManual;
@@ -417,6 +420,7 @@ export default function HomeScreen() {
                   ...produto,
                   empresaId,
                   nomeEmpresa: empresaInfo.nomeEmpresa,
+                  verificado: empresaInfo.verificado === true,
                   latitudeEmpresa: empresaInfo.latitude || 0,
                   longitudeEmpresa: empresaInfo.longitude || 0,
                   latitudeProduto: produto.latitude || null,
@@ -487,17 +491,6 @@ export default function HomeScreen() {
   // Por padrão mostramos todos os produtos válidos (o filtro por destaque/busca já ocorre em produtosValidos).
   const produtosParaExibir = produtosValidos;
 
-  const produtosDestaqueNoticias = useMemo(
-    () => produtosValidos
-      .filter((produto) => produto.destaque)
-      .map((produto) => ({
-        ...produto,
-        instagram: empresas[produto.empresaId]?.instagram,
-        telefone: empresas[produto.empresaId]?.telefone,
-      })),
-    [produtosValidos, empresas]
-  );
-
   const produtoModalAtualizado = useMemo(() => {
     if (!produtoModal) return null;
     return produtosComEmpresa.find((produto) => produto.id === produtoModal.id) ?? produtoModal;
@@ -533,9 +526,11 @@ export default function HomeScreen() {
 
       // 3. Helpers para pegar os valores limpos
       const getPreco = (p: ProdutoComEmpresa) => {
+        if (!p.preco) return Infinity;
         // CORREÇÃO DE PARSE: Remove R$, depois remove PONTOS de milhar, depois troca VÍRGULA por PONTO decimal
         const valorLimpo = p.preco.replace("R$", "").replace(/\./g, "").replace(",", ".");
-        return parseFloat(valorLimpo.trim());
+        const valor = parseFloat(valorLimpo.trim());
+        return Number.isNaN(valor) ? Infinity : valor;
       };
 
       const getDist = (p: ProdutoComEmpresa) => {
@@ -573,6 +568,17 @@ export default function HomeScreen() {
     });
   }, [produtosParaExibir, ordenacaoManual, termosBusca, categoriaSelecionada, ordenarPorPreco, userLocation]);
 
+  const produtosDestaqueNoticias = useMemo(
+    () => produtosOrdenados
+      .filter((produto) => produto.destaque)
+      .map((produto) => ({
+        ...produto,
+        instagram: empresas[produto.empresaId]?.instagram,
+        telefone: empresas[produto.empresaId]?.telefone,
+      })),
+    [produtosOrdenados, empresas]
+  );
+
   const handleDestaquePress = useCallback((produto: any) => {
     const produtoCompleto = produtosComEmpresa.find((item) => item.id === produto.id);
     if (produtoCompleto) {
@@ -598,22 +604,13 @@ export default function HomeScreen() {
     return <ProdutoCard produto={item} empresaInfo={emp} userLocation={userLocation} deviceId={deviceId} votarProduto={votarProduto} handleVerNoMapa={handleVerNoMapa} openInstagramProfile={openInstagramProfile} openWhatsApp={openWhatsApp} onImagePress={handleImagePress} cardStyle={styles.produtoCardGrade} />;
   }, [empresas, userLocation, deviceId, handleImagePress, votarProduto, handleVerNoMapa, openInstagramProfile, openWhatsApp]);
 
-  // Grade vertical de 2 colunas, inserindo anuncios apos 3 e 6 produtos
   const linhasGradeProdutos = useMemo(() => {
-    const linhas: React.ReactNode[] = [];
+    const linhas: Array<{ key: string; produtos: ProdutoComEmpresa[]; isAd?: boolean }> = [];
     let parAtual: ProdutoComEmpresa[] = [];
 
     const flushPar = () => {
       if (parAtual.length === 0) return;
-      linhas.push(
-        <View key={`linha_${parAtual[0].id}`} style={styles.linhaGradeProdutos}>
-          {parAtual.map((produto) => (
-            <View key={produto.id} style={styles.celulaGradeProduto}>
-              {renderProduto(produto)}
-            </View>
-          ))}
-        </View>
-      );
+      linhas.push({ key: `linha_${parAtual[0].id}`, produtos: [...parAtual] });
       parAtual = [];
     };
 
@@ -623,13 +620,29 @@ export default function HomeScreen() {
 
       if ((index + 1) % PRODUTOS_POR_ADCARD_LARGO === 0) {
         flushPar();
-        linhas.push(<AdCardLargo key={`ad_${produto.id}`} />);
+        linhas.push({ key: `ad_${produto.id}`, produtos: [], isAd: true });
       }
     });
 
     flushPar();
     return linhas;
-  }, [produtosOrdenados, renderProduto]);
+  }, [produtosOrdenados]);
+
+  const renderLinhaGrade = useCallback(({ item }: { item: { key: string; produtos: ProdutoComEmpresa[]; isAd?: boolean } }) => {
+    if (item.isAd) {
+      return <AdCardLargo key={item.key} />;
+    }
+
+    return (
+      <View key={item.key} style={styles.linhaGradeProdutos}>
+        {item.produtos.map((produto) => (
+          <View key={produto.id} style={styles.celulaGradeProduto}>
+            {renderProduto(produto)}
+          </View>
+        ))}
+      </View>
+    );
+  }, [renderProduto]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -703,7 +716,7 @@ export default function HomeScreen() {
     // Se o painel existe mas saiu da tela, volta para o topo para exibir filtros novamente.
     if (filtrosVisiveis && painelFiltroForaDaTela) {
       setMostrarFiltrosManual(true);
-      listaRef.current?.scrollTo({ y: 0, animated: true });
+      listaRef.current?.scrollToOffset({ offset: 0, animated: true });
       return;
     }
 
@@ -806,13 +819,18 @@ export default function HomeScreen() {
         </View>
 
         {loadingInicial ? <ActivityIndicator size="large" color={BRAND_COLORS.primary} style={{ marginTop: 30 }} /> :
-          <ScrollView
+          <FlatList
             ref={listaRef}
+            data={linhasGradeProdutos}
+            keyExtractor={(item) => item.key}
+            renderItem={renderLinhaGrade}
             style={styles.productList}
+            contentContainerStyle={styles.flatListContent}
             onScroll={handleScrollLista}
             scrollEventThrottle={24}
-          >
-            <>
+            showsVerticalScrollIndicator={false}
+            ListHeaderComponent={(
+              <>
                 {filtrosVisiveis && (
                   <View
                     style={styles.filtrosPanel}
@@ -916,14 +934,10 @@ export default function HomeScreen() {
                   userLocation={userLocation}
                 />
                 <Text style={styles.listTitle}>{tituloDaLista}</Text>
-
-                {produtosOrdenados.length === 0 ? (
-                  <Text style={styles.mensagemNenhumResultado}>Nenhum produto encontrado.</Text>
-                ) : (
-                  <View style={styles.gradeProdutosContainer}>{linhasGradeProdutos}</View>
-                )}
-            </>
-          </ScrollView>
+              </>
+            )}
+            ListEmptyComponent={<Text style={styles.mensagemNenhumResultado}>Nenhum produto encontrado.</Text>}
+          />
         }
 
         {/* Mapa e Modal (Mantidos) */}
@@ -1022,7 +1036,10 @@ export default function HomeScreen() {
             )}
 
             {produtoModalAtualizado.empresaId && empresas[produtoModalAtualizado.empresaId]?.nomeEmpresa && (
-              <Text style={styles.modalMeta}>Empresa: {empresas[produtoModalAtualizado.empresaId].nomeEmpresa}</Text>
+              <View style={styles.modalCompanyRow}>
+                <Text style={styles.modalMeta}>Empresa: {empresas[produtoModalAtualizado.empresaId].nomeEmpresa}</Text>
+                {empresas[produtoModalAtualizado.empresaId].verificado === true && <CompanyVerifiedBadge />}
+              </View>
             )}
 
             {(() => {
@@ -1276,6 +1293,10 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   productList: { flex: 1 },
+  flatListContent: {
+    paddingHorizontal: CARD_MARGIN,
+    paddingBottom: 12,
+  },
   gradeProdutosContainer: {
     paddingHorizontal: CARD_MARGIN,
   },
@@ -1333,6 +1354,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: BRAND_COLORS.textMuted,
     marginBottom: 6,
+  },
+  modalCompanyRow: {
+    alignItems: "center",
+    flexDirection: "row",
   },
   modalActions: {
     flexDirection: "row",

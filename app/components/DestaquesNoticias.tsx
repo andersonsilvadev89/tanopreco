@@ -44,10 +44,6 @@ interface DestaquesNoticiasProps {
 }
 
 
-function embaralhar<T>(itens: T[]) {
-  return [...itens].sort(() => Math.random() - 0.5);
-}
-
 function DestaquesNoticiasComponent({ produtos, onProdutoPress, userLocation }: DestaquesNoticiasProps) {
   const [produtosEmDestaque, setProdutosEmDestaque] = useState<ProdutoDestaque[]>([]);
   const [scrollX, setScrollX] = useState(0);
@@ -59,7 +55,7 @@ function DestaquesNoticiasComponent({ produtos, onProdutoPress, userLocation }: 
     const currentIds = produtos.map((p) => p.id).join(",");
     if (currentIds !== prevIdsRef.current) {
       prevIdsRef.current = currentIds;
-      setProdutosEmDestaque(embaralhar(produtos));
+      setProdutosEmDestaque(produtos);
       setScrollX(0);
     } else {
       setProdutosEmDestaque((prev) =>

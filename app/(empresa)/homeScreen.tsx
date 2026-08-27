@@ -42,6 +42,7 @@ import AdCardLargo from "../components/AdCardLargo";
 import { BRAND_COLORS } from "@/constants/BrandColors";
 import { ProductCardAction, ProductCardBase } from "../components/ProductCardBase";
 import { ProductDetailsModal } from "../components/ProductDetailsModal";
+import { CompanyVerifiedBadge } from "../components/CompanyVerifiedBadge";
 
 interface ProdutoEmpresa {
   id: string;
@@ -67,11 +68,12 @@ interface EmpresaResumo {
     latitude: number;
     longitude: number;
   } | null;
+  verificado: boolean;
 }
 
 interface AppStatsSummary {
   empresasCadastradas: number;
-  usuariosComLogin: number;
+  usuariosAtivos: number;
   produtosCadastrados: number;
 }
 
@@ -124,6 +126,7 @@ export default function HomeScreen() {
     emailContato: "",
     instagram: "",
     localizacao: null,
+    verificado: false,
   });
   const [loadingProdutos, setLoadingProdutos] = useState(true);
   const [updatingLocation, setUpdatingLocation] = useState(false);
@@ -134,7 +137,7 @@ export default function HomeScreen() {
   const [produtoModalDimensoes, setProdutoModalDimensoes] = useState({ width: 0, height: 0 });
   const [appStats, setAppStats] = useState<AppStatsSummary>({
     empresasCadastradas: 0,
-    usuariosComLogin: 0,
+    usuariosAtivos: 0,
     produtosCadastrados: 0,
   });
 
@@ -161,6 +164,7 @@ export default function HomeScreen() {
         emailContato: "",
         instagram: "",
         localizacao: null,
+        verificado: false,
       });
       return;
     }
@@ -187,12 +191,14 @@ export default function HomeScreen() {
           emailContato: typeof empresaData?.email === "string" ? empresaData.email.trim() : "",
           instagram: typeof empresaData?.instagram === "string" ? empresaData.instagram.trim() : "",
           localizacao: latitude !== null && longitude !== null ? { latitude, longitude } : null,
+          verificado: empresaData?.verificado === true,
         });
       },
       () => {
         setNomeEmpresa("");
         setProdutosDisponiveis(5);
         setDestaquesDisponiveis(0);
+        setEmpresaResumo((current) => ({ ...current, verificado: false }));
       }
     );
 
@@ -245,10 +251,10 @@ export default function HomeScreen() {
       }));
     });
 
-    listen("usuarios", (value) => {
+    listen("dispositivosApp", (value) => {
       setAppStats((current) => ({
         ...current,
-        usuariosComLogin: countChildRecords(value),
+        usuariosAtivos: countChildRecords(value),
       }));
     });
 
@@ -515,9 +521,12 @@ export default function HomeScreen() {
 
       <View style={styles.safeAreaContent}>
         <ScrollView contentContainerStyle={styles.scrollViewContent} showsVerticalScrollIndicator={false}>
-          <Text style={styles.greeting}>
-            {user ? `Olá, ${nomeEmpresa || nomeUsuario}!` : "Bem-vindo ao ta no preco!"}
-          </Text>
+          <View style={styles.greetingRow}>
+            <Text style={styles.greeting}>
+              {user ? `Olá, ${nomeEmpresa || nomeUsuario}!` : "Bem-vindo ao ta no preco!"}
+            </Text>
+            {user && nomeEmpresa && empresaResumo.verificado === true && <CompanyVerifiedBadge />}
+          </View>
           <Text style={styles.subtitle}>Aqui está um resumo rápido da sua conta.</Text>
 
           <View style={styles.companyInfoCard}>
@@ -715,8 +724,8 @@ export default function HomeScreen() {
 
               <View style={styles.statsMiniCard}>
                 <Users size={18} color={BRAND_COLORS.primary} />
-                <Text style={styles.statsMiniValue}>{appStats.usuariosComLogin}</Text>
-                <Text style={styles.statsMiniLabel}>Usuarios com login</Text>
+                <Text style={styles.statsMiniValue}>{appStats.usuariosAtivos}</Text>
+                <Text style={styles.statsMiniLabel}>Usuarios utilizando o app</Text>
               </View>
 
               <View style={styles.statsMiniCard}>
@@ -792,6 +801,11 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     paddingBottom: 110,
     flexGrow: 1,
+  },
+  greetingRow: {
+    alignItems: "center",
+    flexDirection: "row",
+    marginBottom: 4,
   },
   greeting: {
     fontSize: 24,

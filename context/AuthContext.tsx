@@ -2,7 +2,8 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { v4 as uuidv4 } from 'uuid';
 import { onAuthStateChanged, User } from 'firebase/auth';
-import { auth } from '../firebaseConfig';
+import { get, ref, serverTimestamp, update } from 'firebase/database';
+import { auth, database } from '../firebaseConfig';
 
 interface AuthContextType {
   user: User | null;
@@ -11,6 +12,7 @@ interface AuthContextType {
 }
 
 const DEVICE_ID_KEY = 'app_unique_device_id';
+const DISPOSITIVOS_APP_PATH = 'dispositivosApp';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -32,6 +34,28 @@ const getOrCreateDeviceId = async (): Promise<string> => {
   }
 };
 
+// Registra o dispositivo em dispositivosApp/{deviceId} para contabilizar quem instalou/abriu o app,
+// independente de login. Usado nos indicadores do app.
+const registerDeviceUsage = async (id: string): Promise<void> => {
+  try {
+    const deviceRef = ref(database, `${DISPOSITIVOS_APP_PATH}/${id}`);
+    const snapshot = await get(deviceRef);
+
+    if (!snapshot.exists()) {
+      await update(deviceRef, {
+        primeiroAcesso: serverTimestamp(),
+        ultimoAcesso: serverTimestamp(),
+      });
+    } else {
+      await update(deviceRef, {
+        ultimoAcesso: serverTimestamp(),
+      });
+    }
+  } catch (error) {
+    console.error("Falha ao registrar uso do dispositivo:", error);
+  }
+};
+
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -47,6 +71,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         const id = await getOrCreateDeviceId();
         setDeviceId(id);
+        registerDeviceUsage(id);
       } catch (error) {
         console.error("Falha ao carregar Device ID:", error);
       } finally {

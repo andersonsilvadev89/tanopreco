@@ -7,6 +7,7 @@ export interface ProdutoComEmpresa extends ProductCardData {
   palavrasChave?: string;
   empresaId: string;
   nomeEmpresa: string;
+  verificado?: boolean;
   enquantoDurarEstoque?: boolean;
   destaque?: boolean;
   categoria?: string;
@@ -21,6 +22,7 @@ interface EmpresaData {
   longitude?: number;
   instagram?: string;
   telefone?: string;
+  verificado?: boolean;
 }
 
 interface ProdutoCardProps {
@@ -38,7 +40,7 @@ interface ProdutoCardProps {
 
 const ProdutoCardComponent: React.FC<ProdutoCardProps> = ({ produto, empresaInfo, userLocation, onImagePress, cardStyle }) => {
   const abrirDetalhes = () => onImagePress(produto);
-  return <ProductCardBase produto={{ ...produto, nomeEmpresa: empresaInfo.nomeEmpresa || produto.nomeEmpresa }} userLocation={userLocation} onCardPress={abrirDetalhes} onImagePress={abrirDetalhes} cardStyle={cardStyle} />;
+  return <ProductCardBase produto={{ ...produto, nomeEmpresa: empresaInfo.nomeEmpresa || produto.nomeEmpresa, verificado: empresaInfo.verificado === true }} userLocation={userLocation} onCardPress={abrirDetalhes} onImagePress={abrirDetalhes} cardStyle={cardStyle} />;
 };
 
 export const ProdutoCard = memo(ProdutoCardComponent);

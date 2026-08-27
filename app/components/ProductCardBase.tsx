@@ -2,6 +2,7 @@ import React, { memo, useEffect, useMemo, useState } from "react";
 import { Dimensions, Image, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { BRAND_COLORS } from "@/constants/BrandColors";
+import { CompanyVerifiedBadge } from "./CompanyVerifiedBadge";
 
 export interface ProductCardData {
     id: string;
@@ -9,6 +10,7 @@ export interface ProductCardData {
     preco?: string;
     imagemUrl?: string;
     nomeEmpresa?: string;
+    verificado?: boolean;
     latitudeEmpresa?: number;
     longitudeEmpresa?: number;
     latitudeProduto?: number;
@@ -152,7 +154,14 @@ function ProductCardBaseComponent({
                 </Text>
             </TouchableOpacity>
             {showCompanyBadge && !!produto.nomeEmpresa && (
-                <Text style={styles.companyName} numberOfLines={1}>{produto.nomeEmpresa}</Text>
+                <View style={styles.companyNameRow}>
+                    <Text style={styles.companyName} numberOfLines={1}>{produto.nomeEmpresa}</Text>
+                    {produto.verificado === true && (
+                        <View style={styles.companyBadgeWrapper}>
+                            <CompanyVerifiedBadge compact />
+                        </View>
+                    )}
+                </View>
             )}
             {additionalContent}
 
@@ -181,7 +190,9 @@ const styles = StyleSheet.create({
     descriptionRow: { width: "100%", marginTop: 8, paddingHorizontal: 3 },
     description: { fontSize: 10, fontWeight: "700", color: BRAND_COLORS.text, textAlign: "center", lineHeight: 13 },
     descriptionHint: { fontSize: 8, color: BRAND_COLORS.primary, fontWeight: "700" },
-    companyName: { width: "100%", fontSize: 9, fontWeight: "600", color: BRAND_COLORS.textMuted, textAlign: "center", marginTop: 3, paddingHorizontal: 3 },
+    companyName: { fontSize: 9, fontWeight: "600", color: BRAND_COLORS.textMuted, textAlign: "center", marginTop: 3, flexShrink: 1 },
+    companyNameRow: { width: "100%", flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 3, paddingHorizontal: 3 },
+    companyBadgeWrapper: { marginLeft: 3 },
     metaRow: { width: "100%", alignItems: "center", marginTop: 3 },
     distance: { fontSize: 9, color: BRAND_COLORS.primary, fontWeight: "700", textAlign: "center" },
 });
