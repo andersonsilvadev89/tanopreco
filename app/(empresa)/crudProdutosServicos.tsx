@@ -334,7 +334,7 @@ export default function CadastroProduto() {
     const produto: Produto = {
       descricao: descricao,
       preco,
-      imagemUrl,
+      ...(imagemUrl ? { imagemUrl } : {}),
       palavrasChave: [
         ...categoriasSelecionadas,
         ...palavrasChave
@@ -351,16 +351,29 @@ export default function CadastroProduto() {
       longitude: localizacaoDiferente ? longitude : null,
     };
 
-    if (editandoId) {
-      const produtoEditarRef = ref(
-        database,
-        `produtos/${userId}/${editandoId}`
+    try {
+      if (editandoId) {
+        const produtoEditarRef = ref(
+          database,
+          `produtos/${userId}/${editandoId}`
+        );
+        await update(produtoEditarRef, produto);
+      } else {
+        const novoRef = push(produtoRef);
+        await set(novoRef, produto);
+      }
+    } catch (error) {
+      console.error("Erro ao salvar produto:", error);
+      Alert.alert(
+        "Erro",
+        "Não foi possível salvar o produto. Verifique sua conexão e tente novamente."
       );
-      update(produtoEditarRef, produto);
+      return;
+    }
+
+    if (editandoId) {
       Alert.alert("Sucesso", "Produto atualizado!");
     } else {
-      const novoRef = push(produtoRef);
-      set(novoRef, produto);
       Alert.alert("Sucesso", "Produto salvo com sucesso!");
 
       if (destaque && destaquesDisponiveis !== null) {
@@ -424,7 +437,7 @@ export default function CadastroProduto() {
 
   const editarProduto = (produto: Produto) => {
     setDescricao(produto.descricao);
-    setPreco(produto.preco);
+    setPreco(produto.preco || "");
     const todasPalavras = (produto.palavrasChave || "")
       .split(",")
       .map((w) => w.trim())
@@ -706,11 +719,13 @@ export default function CadastroProduto() {
               }}
               onFocus={() => scrollToInput(descricaoY)}
             />
-            <Text>Preço</Text>
+            <Text>Preço (opcional)</Text>
             <TextInput
               value={preco}
-              onChangeText={(text) => setPreco(formatarPreco(text))}
-              placeholder="R$ 0,00"
+              onChangeText={(text) =>
+                setPreco(/\d/.test(text) ? formatarPreco(text) : "")
+              }
+              placeholder="Sem preço"
               keyboardType="numeric"
               style={styles.input}
               accessibilityLabel="Campo para inserir o preço do produto"

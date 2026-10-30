@@ -28,6 +28,7 @@ import {
   Search,
   Pencil,
 } from "lucide-react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { ref, onValue, remove, update } from "firebase/database";
 import { signOut } from "firebase/auth";
 import * as Location from "expo-location";
@@ -92,6 +93,7 @@ const GRADE_CARD_MARGIN = 12;
 const GRADE_CARD_WIDTH = (SCREEN_WIDTH - GRADE_CARD_MARGIN * 3) / 2;
 const PRODUTOS_POR_ADCARD_LARGO = 6;
 const PRODUTOS_POR_ADCARD = 3;
+const EMPRESA_HOME_CACHE_PREFIX = "empresa_home_cache_v1";
 
 type ProdutoCarrosselItem =
   | { type: "produto"; produto: ProdutoEmpresa }
@@ -140,6 +142,8 @@ export default function HomeScreen() {
     usuariosAtivos: 0,
     produtosCadastrados: 0,
   });
+
+  const cacheKey = user?.uid ? `${EMPRESA_HOME_CACHE_PREFIX}_${user.uid}` : null;
 
   const nomeUsuario = useMemo(() => {
     if (user?.displayName) return user.displayName.split(" ")[0];
@@ -193,17 +197,18 @@ export default function HomeScreen() {
           localizacao: latitude !== null && longitude !== null ? { latitude, longitude } : null,
           verificado: empresaData?.verificado === true,
         });
+
+        if (cacheKey) {
+          AsyncStorage.mergeItem(cacheKey, JSON.stringify({ empresa: empresaData })).catch(() => undefined);
+        }
       },
       () => {
-        setNomeEmpresa("");
-        setProdutosDisponiveis(5);
-        setDestaquesDisponiveis(0);
-        setEmpresaResumo((current) => ({ ...current, verificado: false }));
+        // Mantem os dados locais quando o Firebase estiver indisponivel.
       }
     );
 
     return () => unsubscribe();
-  }, [user?.uid]);
+  }, [user?.uid, cacheKey]);
 
   useEffect(() => {
     if (!user?.uid) {
@@ -222,15 +227,63 @@ export default function HomeScreen() {
           : [];
         setProdutos(lista.reverse());
         setLoadingProdutos(false);
+        if (cacheKey) {
+          AsyncStorage.mergeItem(cacheKey, JSON.stringify({ produtos: lista })).catch(() => undefined);
+        }
       },
       () => {
-        setProdutos([]);
-        setLoadingProdutos(false);
+        // Mantem os produtos locais quando o Firebase estiver indisponivel.
       }
     );
 
     return () => unsubscribe();
-  }, [user?.uid]);
+  }, [user?.uid, cacheKey]);
+
+  useEffect(() => {
+    if (!cacheKey) return;
+
+    let ativo = true;
+
+    AsyncStorage.getItem(cacheKey)
+      .then((valor) => {
+        if (!ativo || !valor) return;
+
+        const cache = JSON.parse(valor) as {
+          empresa?: Record<string, unknown>;
+          produtos?: ProdutoEmpresa[];
+        };
+
+        if (cache.empresa) {
+          const empresaData = cache.empresa;
+          const limiteProdutos = Number(empresaData.produtosDisponiveis);
+          const limiteDestaques = Number(empresaData.destaquesDisponiveis);
+          const latitude = typeof empresaData.latitude === "number" ? empresaData.latitude : null;
+          const longitude = typeof empresaData.longitude === "number" ? empresaData.longitude : null;
+
+          setNomeEmpresa(typeof empresaData.nomeEmpresa === "string" ? empresaData.nomeEmpresa.trim() : "");
+          setProdutosDisponiveis(Number.isFinite(limiteProdutos) && limiteProdutos > 0 ? limiteProdutos : 5);
+          setDestaquesDisponiveis(Number.isFinite(limiteDestaques) && limiteDestaques >= 0 ? limiteDestaques : 0);
+          setEmpresaResumo({
+            descricao: typeof empresaData.palavrasChave === "string" ? empresaData.palavrasChave.trim() : "",
+            telefoneContato: typeof empresaData.telefone === "string" ? empresaData.telefone.trim() : "",
+            emailContato: typeof empresaData.email === "string" ? empresaData.email.trim() : "",
+            instagram: typeof empresaData.instagram === "string" ? empresaData.instagram.trim() : "",
+            localizacao: latitude !== null && longitude !== null ? { latitude, longitude } : null,
+            verificado: empresaData.verificado === true,
+          });
+        }
+
+        if (cache.produtos) {
+          setProdutos(cache.produtos);
+          setLoadingProdutos(false);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      ativo = false;
+    };
+  }, [cacheKey]);
 
   useEffect(() => {
     const unsubs: Array<() => void> = [];

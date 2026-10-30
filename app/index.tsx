@@ -15,8 +15,6 @@ export default function Index() {
   const { user, loading } = useAuth();
   const { needsUpdate, forceUpdate, message, redirectToStore } = useVersionCheck(VERSION_URL);
 
-  const [isUpdating, setIsUpdating] = useState(false);
-
   // 1. NOVO ESTADO: Controla se o usuário fechou o modal manualmente
   const [updateDismissed, setUpdateDismissed] = useState(false);
 
@@ -54,11 +52,10 @@ export default function Index() {
     async function checkOTA() {
       if (__DEV__) {
         console.log("Dev mode → OTA ignorado.");
-        return setIsUpdating(false);
+        return;
       }
 
       try {
-        setIsUpdating(true);
         const update = await Updates.checkForUpdateAsync();
 
         if (update.isAvailable) {
@@ -79,8 +76,6 @@ export default function Index() {
         }
       } catch (error) {
         console.log("Erro verificando OTA:", error);
-      } finally {
-        setIsUpdating(false);
       }
     }
 
@@ -90,15 +85,10 @@ export default function Index() {
   // ---------------------------------------------------------
   // 3. Loading → Auth ou OTA
   // ---------------------------------------------------------
-  if (loading || isUpdating) {
+  if (loading) {
     return (
       <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
-        {isUpdating && (
-          <Text style={{ marginTop: 10, color: "gray" }}>
-            Verificando atualizações...
-          </Text>
-        )}
         {loading && (
           <Text style={{ marginTop: 10, color: "gray" }}>
             Carregando dados do usuário...

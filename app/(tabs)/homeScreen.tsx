@@ -24,6 +24,7 @@ import { useFocusEffect } from "@react-navigation/native";
 import MapView, { Marker, Callout, Region } from "react-native-maps";
 import * as Location from "expo-location";
 import Constants from "expo-constants";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import AdCardLargo from "../components/AdCardLargo";
 import { DestaquesNoticias } from "../components/DestaquesNoticias";
 import { useAuth } from "../../context/AuthContext";
@@ -35,6 +36,8 @@ import { DrawerMenu } from "../components/shell/DrawerMenu";
 import { ProductDetailsModal } from "../components/ProductDetailsModal";
 import { BRAND_COLORS } from "@/constants/BrandColors";
 import { CompanyVerifiedBadge } from "../components/CompanyVerifiedBadge";
+import { EmpresasDestaque } from "../components/EmpresasDestaque";
+import { EmpresaDetalhesModal } from "../components/EmpresaDetalhesModal";
 
 const isExpoGo = Constants.appOwnership === "expo" || Constants.executionEnvironment === "storeClient";
 let speechRecognitionModule: any = null;
@@ -66,8 +69,10 @@ const CARD_MARGIN = 12;
 const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2;
 const CARD_MIN_HEIGHT = 300;
 
-// A cada 6 produtos exibidos na grade vertical, insere um AdCardLargo
+const PRODUTOS_INICIAIS = 4;
+const PRODUTOS_POR_CARREGAMENTO = 8;
 const PRODUTOS_POR_ADCARD_LARGO = 4;
+const CATALOGO_CACHE_KEY = "catalogo_publico_cache_v1";
 
 interface ProdutoComEmpresa {
   id: string;
@@ -101,6 +106,7 @@ interface EmpresaData {
   instagram?: string;
   telefone?: string;
   verificado?: boolean;
+  imagem?: string;
 }
 
 const categoriaImagens: { [key: string]: any } = {
@@ -232,6 +238,7 @@ export default function HomeScreen() {
 
   const [ordenacaoManual, setOrdenacaoManual] = useState(false);
   const [produtosComEmpresa, setProdutosComEmpresa] = useState<ProdutoComEmpresa[]>([]);
+  const [quantidadeProdutosVisiveis, setQuantidadeProdutosVisiveis] = useState(PRODUTOS_INICIAIS);
   const [termoBusca, setTermoBusca] = useState("");
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null);
   const [ordenarPorPreco, setOrdenarPorPreco] = useState(true);
@@ -257,6 +264,7 @@ export default function HomeScreen() {
   const [imagemModalAltura, setImagemModalAltura] = useState(220);
   const [modalDimensoes, setModalDimensoes] = useState({ width: 0, height: 0 });
   const [produtoModal, setProdutoModal] = useState<ProdutoComEmpresa | null>(null);
+  const [empresaDetalhesId, setEmpresaDetalhesId] = useState<string | null>(null);
   const mapRef = useRef<MapView>(null);
   const listaRef = useRef<FlatList<any>>(null);
   const categoriasScrollXRef = useRef(0);
@@ -327,6 +335,14 @@ export default function HomeScreen() {
     }
   }, []);
 
+  const handleAbrirEmpresa = useCallback((empresaId: string) => {
+    setEmpresaDetalhesId(empresaId);
+  }, []);
+
+  const handleFecharEmpresaDetalhes = useCallback(() => {
+    setEmpresaDetalhesId(null);
+  }, []);
+
   const handleVerNoMapaViaModal = useCallback((produto: ProdutoComEmpresa) => {
     setImagemModalVisivel(false);
     setProdutoModal(null);
@@ -336,6 +352,16 @@ export default function HomeScreen() {
       handleVerNoMapa(produto);
     }, 140);
   }, [handleVerNoMapa]);
+
+  const handleVerMaisProdutosDaEmpresaViaModal = useCallback((produto: ProdutoComEmpresa) => {
+    setImagemModalVisivel(false);
+    setProdutoModal(null);
+
+    // Aguarda o fechamento visual do modal do produto para abrir o modal da empresa por cima.
+    setTimeout(() => {
+      handleAbrirEmpresa(produto.empresaId);
+    }, 140);
+  }, [handleAbrirEmpresa]);
 
   const openInstagramProfile = useCallback(async (username: string | undefined) => {
     if (!username) { Alert.alert("Instagram não informado", "Esta empresa não possui um Instagram cadastrado."); return; }
@@ -390,11 +416,38 @@ export default function HomeScreen() {
   }, [deviceId, produtosComEmpresa]);
 
   useEffect(() => {
-    onValue(ref(database, "usuariosEmpresa"), (snapshot) => {
+    const unsubscribe = onValue(ref(database, "usuariosEmpresa"), (snapshot) => {
       const data: { [key: string]: EmpresaData } = {};
       snapshot.forEach((snap) => { data[snap.key!] = snap.val(); });
       setEmpresas(data);
     });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    let ativo = true;
+
+    AsyncStorage.getItem(CATALOGO_CACHE_KEY)
+      .then((valor) => {
+        if (!ativo || !valor) return;
+
+        const cache = JSON.parse(valor) as {
+          empresas?: { [key: string]: EmpresaData };
+          produtos?: ProdutoComEmpresa[];
+        };
+
+        if (cache.empresas && cache.produtos) {
+          setEmpresas(cache.empresas);
+          setProdutosComEmpresa(cache.produtos.filter((produto) => isOfertaValida(produto.dataFinalOferta)));
+          setLoadingInicial(false);
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      ativo = false;
+    };
   }, []);
 
   // ... (useFocusEffect para produtos e localização)
@@ -404,7 +457,6 @@ export default function HomeScreen() {
       if (!Object.keys(empresas).length) {
         return;
       }
-      setLoadingInicial(true);
       const produtosRef = ref(database, "produtos");
       get(produtosRef).then((snapshot) => {
         const data: ProdutoComEmpresa[] = [];
@@ -441,7 +493,14 @@ export default function HomeScreen() {
             }
           });
         }
-        setProdutosComEmpresa(data.filter(p => isOfertaValida(p.dataFinalOferta)));
+        const produtosValidos = data.filter(p => isOfertaValida(p.dataFinalOferta));
+        setProdutosComEmpresa(produtosValidos);
+        AsyncStorage.setItem(CATALOGO_CACHE_KEY, JSON.stringify({
+          empresas,
+          produtos: produtosValidos,
+        })).catch(() => undefined);
+        setLoadingInicial(false);
+      }).catch(() => {
         setLoadingInicial(false);
       });
       (async () => {
@@ -495,6 +554,18 @@ export default function HomeScreen() {
     if (!produtoModal) return null;
     return produtosComEmpresa.find((produto) => produto.id === produtoModal.id) ?? produtoModal;
   }, [produtoModal, produtosComEmpresa]);
+
+  const empresaDetalhesSelecionada = useMemo(() => {
+    if (!empresaDetalhesId) return null;
+    const dados = empresas[empresaDetalhesId];
+    if (!dados) return null;
+    return { id: empresaDetalhesId, ...dados };
+  }, [empresaDetalhesId, empresas]);
+
+  const produtosDaEmpresaSelecionada = useMemo(() => {
+    if (!empresaDetalhesId) return [];
+    return produtosComEmpresa.filter((produto) => produto.empresaId === empresaDetalhesId);
+  }, [empresaDetalhesId, produtosComEmpresa]);
 
   const tituloDaLista = (termoBusca.length >= 3 && categoriaSelecionada) || (!(termoBusca.length >= 3) && categoriaSelecionada) ? `Resultados da busca (${categoriaSelecionada})` : termoBusca.length >= 3 && categoriaSelecionada === null ? `Resultados da busca`: "Veja todos os nossos produtos!";
 
@@ -568,6 +639,10 @@ export default function HomeScreen() {
     });
   }, [produtosParaExibir, ordenacaoManual, termosBusca, categoriaSelecionada, ordenarPorPreco, userLocation]);
 
+  useEffect(() => {
+    setQuantidadeProdutosVisiveis(PRODUTOS_INICIAIS);
+  }, [termoBusca, categoriaSelecionada, ordenarPorPreco]);
+
   const produtosDestaqueNoticias = useMemo(
     () => produtosOrdenados
       .filter((produto) => produto.destaque)
@@ -604,6 +679,11 @@ export default function HomeScreen() {
     return <ProdutoCard produto={item} empresaInfo={emp} userLocation={userLocation} deviceId={deviceId} votarProduto={votarProduto} handleVerNoMapa={handleVerNoMapa} openInstagramProfile={openInstagramProfile} openWhatsApp={openWhatsApp} onImagePress={handleImagePress} cardStyle={styles.produtoCardGrade} />;
   }, [empresas, userLocation, deviceId, handleImagePress, votarProduto, handleVerNoMapa, openInstagramProfile, openWhatsApp]);
 
+  const produtosVisiveis = useMemo(
+    () => produtosOrdenados.slice(0, quantidadeProdutosVisiveis),
+    [produtosOrdenados, quantidadeProdutosVisiveis]
+  );
+
   const linhasGradeProdutos = useMemo(() => {
     const linhas: Array<{ key: string; produtos: ProdutoComEmpresa[]; isAd?: boolean }> = [];
     let parAtual: ProdutoComEmpresa[] = [];
@@ -614,19 +694,27 @@ export default function HomeScreen() {
       parAtual = [];
     };
 
-    produtosOrdenados.forEach((produto, index) => {
+      produtosVisiveis.forEach((produto, index) => {
       parAtual.push(produto);
       if (parAtual.length === 2) flushPar();
 
-      if ((index + 1) % PRODUTOS_POR_ADCARD_LARGO === 0) {
-        flushPar();
-        linhas.push({ key: `ad_${produto.id}`, produtos: [], isAd: true });
-      }
+        if ((index + 1) % PRODUTOS_POR_ADCARD_LARGO === 0) {
+          flushPar();
+          linhas.push({ key: `ad_${produto.id}`, produtos: [], isAd: true });
+        }
     });
 
     flushPar();
     return linhas;
-  }, [produtosOrdenados]);
+  }, [produtosVisiveis]);
+
+  const existemMaisProdutos = quantidadeProdutosVisiveis < produtosOrdenados.length;
+
+  const carregarMaisProdutos = useCallback(() => {
+    setQuantidadeProdutosVisiveis((quantidadeAtual) =>
+      Math.min(quantidadeAtual + PRODUTOS_POR_CARREGAMENTO, produtosOrdenados.length)
+    );
+  }, [produtosOrdenados.length]);
 
   const renderLinhaGrade = useCallback(({ item }: { item: { key: string; produtos: ProdutoComEmpresa[]; isAd?: boolean } }) => {
     if (item.isAd) {
@@ -824,6 +912,20 @@ export default function HomeScreen() {
             data={linhasGradeProdutos}
             keyExtractor={(item) => item.key}
             renderItem={renderLinhaGrade}
+            ListFooterComponent={produtosVisiveis.length > 0 ? (
+              <View style={styles.rodapeProdutos}>
+                {existemMaisProdutos && (
+                  <TouchableOpacity
+                    style={styles.verMaisButton}
+                    onPress={carregarMaisProdutos}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.verMaisButtonText}>Ver mais</Text>
+                  </TouchableOpacity>
+                )}
+                <EmpresasDestaque empresas={empresas} onEmpresaPress={handleAbrirEmpresa} />
+              </View>
+            ) : null}
             style={styles.productList}
             contentContainerStyle={styles.flatListContent}
             onScroll={handleScrollLista}
@@ -1016,6 +1118,13 @@ export default function HomeScreen() {
                     <Text style={styles.modalActionText}>WhatsApp</Text>
                   </TouchableOpacity>
                 )}
+                <TouchableOpacity
+                  style={[styles.modalAction, styles.modalActionEmpresa]}
+                  onPress={() => handleVerMaisProdutosDaEmpresaViaModal(produtoModalAtualizado)}
+                >
+                  <Feather name="grid" size={18} color={BRAND_COLORS.white} />
+                  <Text style={styles.modalActionText}>Ver mais produtos dessa empresa</Text>
+                </TouchableOpacity>
               </View>
             )}
           >
@@ -1056,6 +1165,20 @@ export default function HomeScreen() {
             })()}
           </ProductDetailsModal>
         )}
+
+        <EmpresaDetalhesModal
+          visible={!!empresaDetalhesSelecionada}
+          empresa={empresaDetalhesSelecionada}
+          produtos={produtosDaEmpresaSelecionada}
+          userLocation={userLocation}
+          deviceId={deviceId}
+          onClose={handleFecharEmpresaDetalhes}
+          votarProduto={votarProduto}
+          handleVerNoMapa={handleVerNoMapa}
+          openInstagramProfile={openInstagramProfile}
+          openWhatsApp={openWhatsApp}
+          onProdutoPress={handleImagePress}
+        />
 
       </View>
 
@@ -1297,6 +1420,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: CARD_MARGIN,
     paddingBottom: 12,
   },
+  rodapeProdutos: {
+    paddingTop: 4,
+    paddingBottom: 12,
+  },
+  verMaisButton: {
+    minHeight: 46,
+    marginTop: 4,
+    borderRadius: 10,
+    backgroundColor: BRAND_COLORS.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  verMaisButtonText: {
+    color: BRAND_COLORS.white,
+    fontSize: 14,
+    fontWeight: "800",
+  },
   gradeProdutosContainer: {
     paddingHorizontal: CARD_MARGIN,
   },
@@ -1391,6 +1531,9 @@ const styles = StyleSheet.create({
   },
   modalActionWhatsApp: {
     backgroundColor: "#25D366",
+  },
+  modalActionEmpresa: {
+    backgroundColor: BRAND_COLORS.primaryDark,
   },
   modalActionText: {
     color: BRAND_COLORS.white,

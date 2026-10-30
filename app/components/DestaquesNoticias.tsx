@@ -154,7 +154,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   conteudo: {
-    paddingHorizontal: 8,
+    paddingHorizontal: 0,
   },
   noticia: {
     width: CARD_WIDTH,
@@ -163,7 +163,8 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: BRAND_COLORS.primary,
     padding: 6,
-    marginHorizontal: 6,
+    marginHorizontal: 0,
+    marginRight: 12,
     alignItems: "center",
     shadowColor: BRAND_COLORS.primaryDark,
     shadowOffset: { width: 0, height: 3 },
