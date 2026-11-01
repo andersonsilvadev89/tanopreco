@@ -408,12 +408,30 @@ const ConfiguracoesEmpresaScreen = () => {
                                     <Text style={styles.changePhotoText}>Alterar Imagem de Capa</Text>
                                 </TouchableOpacity>
 
-                                <TextInput style={styles.input} value={nomeEmpresa} onChangeText={setNomeEmpresa} placeholder="Nome da Empresa" />
-                                <TextInput style={styles.input} value={nome} onChangeText={setNome} placeholder="Nome Completo" />
-                                <TextInput style={styles.input} value={palavrasChave} onChangeText={setPalavrasChave} placeholder="Palavras-chave" multiline />
-                                <TextInput style={styles.input} value={telefone} onChangeText={setTelefone} placeholder="Telefone" keyboardType="phone-pad" />
-                                <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" />
-                                <TextInput style={styles.input} value={instagram} onChangeText={setInstagram} placeholder="Instagram (sem @)" />
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.inputLabel}>Nome da Empresa</Text>
+                                    <TextInput style={styles.input} value={nomeEmpresa} onChangeText={setNomeEmpresa} placeholder="Nome da Empresa" />
+                                </View>
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.inputLabel}>Nome Completo</Text>
+                                    <TextInput style={styles.input} value={nome} onChangeText={setNome} placeholder="Nome Completo" />
+                                </View>
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.inputLabel}>Palavras-chave</Text>
+                                    <TextInput style={styles.input} value={palavrasChave} onChangeText={setPalavrasChave} placeholder="Palavras-chave" multiline />
+                                </View>
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.inputLabel}>Telefone</Text>
+                                    <TextInput style={styles.input} value={telefone} onChangeText={setTelefone} placeholder="Telefone" keyboardType="phone-pad" />
+                                </View>
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.inputLabel}>E-mail</Text>
+                                    <TextInput style={styles.input} value={email} onChangeText={setEmail} placeholder="E-mail" keyboardType="email-address" />
+                                </View>
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.inputLabel}>Instagram</Text>
+                                    <TextInput style={styles.input} value={instagram} onChangeText={setInstagram} placeholder="Instagram (sem @)" />
+                                </View>
 
                                 <View style={styles.editActionsContainer}>
                                     <TouchableOpacity style={[styles.actionButton, styles.saveButton]} onPress={handleSalvarDadosEmpresa} disabled={isSaving}>
@@ -517,6 +535,8 @@ const styles = StyleSheet.create({
 
     profileEditContainer: { width: '100%', alignItems: 'center' },
     changePhotoText: { color: BRAND_COLORS.primaryDark, marginBottom: 10 },
+    inputGroup: { width: '100%' },
+    inputLabel: { color: BRAND_COLORS.text, fontWeight: 'bold', marginBottom: 5 },
     input: {
         width: '100%',
         backgroundColor: BRAND_COLORS.surface,
