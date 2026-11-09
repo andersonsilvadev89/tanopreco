@@ -18,7 +18,7 @@ import {
   Switch,
   Dimensions,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
+import ImageCropPicker from "react-native-image-crop-picker";
 import {
   ref,
   push,
@@ -43,6 +43,18 @@ const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dvekhdfgc/image/upload";
 const UPLOAD_PRESET = "tanopreco";
 
 const { height } = Dimensions.get("window");
+
+const getImagePickerErrorCode = (error: unknown) => {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    typeof error.code === "string"
+  ) {
+    return error.code;
+  }
+  return undefined;
+};
 
 const getThirtyDaysFromNow = () => {
   const date = new Date();
@@ -495,37 +507,42 @@ export default function CadastroProduto() {
   };
 
   const selecionarDaGaleria = async () => {
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.5,
-    });
-
-    if (!result.canceled) {
-      const uri = result.assets[0].uri;
-      await enviarImagemParaCloudinary(uri);
+    try {
+      const result = await ImageCropPicker.openPicker({
+        mediaType: "photo",
+        cropping: true,
+        freeStyleCropEnabled: true,
+        forceJpg: true,
+        compressImageQuality: 0.5,
+      });
+      await enviarImagemParaCloudinary(result.path);
+    } catch (error: unknown) {
+      if (getImagePickerErrorCode(error) !== "E_PICKER_CANCELLED") {
+        Alert.alert("Erro", "Nao foi possivel selecionar a imagem.");
+      }
     }
   };
 
   const selecionarDaCamera = async () => {
-    const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
-    if (permissionResult.granted === false) {
-      Alert.alert(
-        "Permissão necessária",
-        "Você precisa permitir o acesso à câmera."
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      quality: 0.5,
-    });
-
-    if (!result.canceled) {
-      const uri = result.assets[0].uri;
-      await enviarImagemParaCloudinary(uri);
+    try {
+      const result = await ImageCropPicker.openCamera({
+        mediaType: "photo",
+        cropping: true,
+        freeStyleCropEnabled: true,
+        forceJpg: true,
+        compressImageQuality: 0.5,
+      });
+      await enviarImagemParaCloudinary(result.path);
+    } catch (error: unknown) {
+      const errorCode = getImagePickerErrorCode(error);
+      if (errorCode === "E_NO_CAMERA_PERMISSION") {
+        Alert.alert(
+          "Permissao necessaria",
+          "Voce precisa permitir o acesso a camera."
+        );
+      } else if (errorCode !== "E_PICKER_CANCELLED") {
+        Alert.alert("Erro", "Nao foi possivel capturar a imagem.");
+      }
     }
   };
 
