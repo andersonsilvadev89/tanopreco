@@ -110,7 +110,7 @@ const AdCardLargo: React.FC = () => {
         <NativeAdView nativeAd={nativeAd} style={styles.adContainer}>
             <View style={styles.cardContainer}>
                 
-                {/* 1. MÍDIA NO TOPO: Altura mínima de 140px para garantir vídeos de alto valor */}
+                {/* 1. MÍDIA NO TOPO: Ajustado com aspectRatio para não cortar as imagens */}
                 <NativeMediaView style={styles.mediaView} />
 
                 {/* 2. RODAPÉ COMPACTO: Tudo na mesma linha para poupar espaço vertical */}
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
     },
     loadingContainer: { 
         width: '100%', 
-        height: 200, // Altura aproximada do card montado
+        height: 260, // Aumentado para corresponder à nova altura média do card com o aspectRatio
         justifyContent: 'center', 
         alignItems: 'center',
         marginVertical: 8,
@@ -201,19 +201,18 @@ const styles = StyleSheet.create({
     },
     mediaView: {
         width: '100%',
-        height: 140, // Mantido em 140px para qualificar para vídeos
+        // Proporção padrão recomendada pelo Google Ads para mídias nativas (1.91:1)
+        aspectRatio: 1.91, 
         backgroundColor: BRAND_COLORS.surfaceSoft,
-        alignItems: 'center', 
-        justifyContent: 'center',
     },
     compactFooter: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 10,
+        padding: 12, // Um pouco mais de respiro para harmonizar com a imagem maior
     },
     iconPlaceholder: {
-        width: 36,
-        height: 36,
+        width: 40, // Aumentado levemente para acompanhar o novo layout
+        height: 40,
         borderRadius: 8,
         backgroundColor: BRAND_COLORS.surfaceSoft,
         marginRight: 10,
@@ -253,11 +252,11 @@ const styles = StyleSheet.create({
     ctaButtonCompact: {
         backgroundColor: BRAND_COLORS.primary,
         paddingHorizontal: 12,
-        paddingVertical: 8,
+        paddingVertical: 10, // Um pouco mais de área de toque no botão
         borderRadius: 8,
         justifyContent: 'center',
         alignItems: 'center',
-        minWidth: 80,
+        minWidth: 90,
     },
     ctaButtonText: {
         color: '#FFFFFF',

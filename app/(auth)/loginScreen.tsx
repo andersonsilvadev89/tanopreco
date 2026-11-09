@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Alert,
   TextInput,
@@ -7,7 +7,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
-  Image,
   Dimensions,
   Platform,
   Keyboard,
@@ -33,16 +32,12 @@ import { BRAND_COLORS } from "@/constants/BrandColors";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { buildSocialUserProfile } from "./socialUserDefaults";
 
-const defaultLogoLocal = require('../../assets/images/logoEvento.png');
 const isExpoGo = Constants.appOwnership === 'expo';
 const webClientId =
   (Constants.expoConfig?.extra?.googleWebClientId as string | undefined) ||
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
   '';
-const iosClientId =
-  (Constants.expoConfig?.extra?.googleIosClientId as string | undefined) ||
-  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
-  '';
+
 const hasValidGoogleClientId = (clientId: string) =>
   /^[0-9]+-[a-z0-9-]+\.apps\.googleusercontent\.com$/i.test(clientId);
 
@@ -106,16 +101,19 @@ const LoginScreen = ({ navigation }: any) => {
 
   const screenWidth = Dimensions.get('window').width;
   const showGoogleButton = Platform.OS === 'android' || Platform.OS === 'ios';
+  
+  // Condição simplificada sem exigir iosClientId no código JS
   const isGoogleLoginAvailable =
     !!GoogleSignin &&
     !isExpoGo &&
-    hasValidGoogleClientId(webClientId) &&
-    ((Platform.OS !== 'ios' && Platform.OS !== 'android') || hasValidGoogleClientId(iosClientId));
+    hasValidGoogleClientId(webClientId);
+
   const googleButtonLabel = isGoogleLoginAvailable
     ? 'Entrar com Google'
     : isExpoGo
       ? 'Google (Expo Go)'
       : 'Google (configuração pendente)';
+
   const showAppleButton = Platform.OS === 'ios';
   const isAppleLoginAvailable = Platform.OS === 'ios' && !!AppleAuthentication;
   const appleButtonLabel = isAppleLoginAvailable ? 'Entrar com Apple' : 'Apple (build nativa)';
@@ -502,8 +500,8 @@ const styles = StyleSheet.create({
   },
   overlay: {
     flex: 1,
-    justifyContent: 'center', // Centraliza verticalmente
-    alignItems: 'center', // Centraliza horizontalmente
+    justifyContent: 'center', 
+    alignItems: 'center', 
   },
   loadingContainer: {
     flex: 1,
@@ -521,7 +519,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
     marginHorizontal: 20,
     borderRadius: 12,
-    width: '95%', // Mantém a largura do formulário
+    width: '95%', 
   },
   passwordContainer: {
     flexDirection: 'row',
