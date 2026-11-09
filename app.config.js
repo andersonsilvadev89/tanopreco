@@ -95,27 +95,12 @@ export default {
       }
     ],
     "expo-apple-authentication",
-    "@react-native-google-signin/google-signin",
-    (config) => {
-      if (!googleIosClientId) {
-        return config;
+    [
+      "@react-native-google-signin/google-signin",
+      {
+        "iosUrlScheme": "com.googleusercontent.apps.662489416845-0jt9lns53lt5j6s2l6ho8n72ftm6gtso"
       }
-
-      const clientIdMatch = googleIosClientId.match(/^(.+)\.apps\.googleusercontent\.com$/);
-      if (!clientIdMatch) {
-        throw new Error('EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID deve ser um OAuth Client ID iOS valido.');
-      }
-
-      const { IOSConfig, withInfoPlist } = require('@expo/config-plugins');
-      const iosUrlScheme = `com.googleusercontent.apps.${clientIdMatch[1]}`;
-
-      return withInfoPlist(config, (config) => {
-        if (!IOSConfig.Scheme.hasScheme(iosUrlScheme, config.modResults)) {
-          config.modResults = IOSConfig.Scheme.appendScheme(iosUrlScheme, config.modResults);
-        }
-        return config;
-      });
-    },
+    ],
     [
       "react-native-google-mobile-ads",
       {
