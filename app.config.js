@@ -1,5 +1,7 @@
 import 'dotenv/config';
 
+const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+
 export default {
   name: "TaNoPreco",
   slug: "TaNoPreco",
@@ -94,6 +96,26 @@ export default {
     ],
     "expo-apple-authentication",
     "@react-native-google-signin/google-signin",
+    (config) => {
+      if (!googleIosClientId) {
+        return config;
+      }
+
+      const clientIdMatch = googleIosClientId.match(/^(.+)\.apps\.googleusercontent\.com$/);
+      if (!clientIdMatch) {
+        throw new Error('EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID deve ser um OAuth Client ID iOS valido.');
+      }
+
+      const { IOSConfig, withInfoPlist } = require('@expo/config-plugins');
+      const iosUrlScheme = `com.googleusercontent.apps.${clientIdMatch[1]}`;
+
+      return withInfoPlist(config, (config) => {
+        if (!IOSConfig.Scheme.hasScheme(iosUrlScheme, config.modResults)) {
+          config.modResults = IOSConfig.Scheme.appendScheme(iosUrlScheme, config.modResults);
+        }
+        return config;
+      });
+    },
     [
       "react-native-google-mobile-ads",
       {
@@ -156,6 +178,7 @@ export default {
     firebaseMeasurementId: process.env.EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID,
     googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
     googleWebClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID,
+    googleIosClientId,
     eas: {
       projectId: "24f376e8-afe2-4c3e-bab9-035b5e089295"
     }

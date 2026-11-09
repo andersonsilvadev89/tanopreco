@@ -39,6 +39,12 @@ const webClientId =
   (Constants.expoConfig?.extra?.googleWebClientId as string | undefined) ||
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
   '';
+const iosClientId =
+  (Constants.expoConfig?.extra?.googleIosClientId as string | undefined) ||
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+  '';
+const hasValidGoogleClientId = (clientId: string) =>
+  /^[0-9]+-[a-z0-9-]+\.apps\.googleusercontent\.com$/i.test(clientId);
 
 const GOOGLE_STATUS_CODES = {
   SIGN_IN_CANCELLED: 'SIGN_IN_CANCELLED',
@@ -77,7 +83,10 @@ const appleAuthenticationModule = (() => {
 
 const AppleAuthentication = appleAuthenticationModule ?? null;
 
-if (GoogleSignin) {
+if (
+  GoogleSignin &&
+  hasValidGoogleClientId(webClientId)
+) {
   GoogleSignin.configure({
     webClientId,
   });
@@ -97,7 +106,16 @@ const LoginScreen = ({ navigation }: any) => {
 
   const screenWidth = Dimensions.get('window').width;
   const showGoogleButton = Platform.OS === 'android' || Platform.OS === 'ios';
-  const isGoogleLoginAvailable = !!GoogleSignin && !isExpoGo;
+  const isGoogleLoginAvailable =
+    !!GoogleSignin &&
+    !isExpoGo &&
+    hasValidGoogleClientId(webClientId) &&
+    ((Platform.OS !== 'ios' && Platform.OS !== 'android') || hasValidGoogleClientId(iosClientId));
+  const googleButtonLabel = isGoogleLoginAvailable
+    ? 'Entrar com Google'
+    : isExpoGo
+      ? 'Google (Expo Go)'
+      : 'Google (configuração pendente)';
   const showAppleButton = Platform.OS === 'ios';
   const isAppleLoginAvailable = Platform.OS === 'ios' && !!AppleAuthentication;
   const appleButtonLabel = isAppleLoginAvailable ? 'Entrar com Apple' : 'Apple (build nativa)';
@@ -215,7 +233,7 @@ const LoginScreen = ({ navigation }: any) => {
       return;
     }
 
-    if (!webClientId || webClientId === 'COLE_SEU_WEB_CLIENT_ID_AQUI') {
+    if (!hasValidGoogleClientId(webClientId)) {
       setError('Configure EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID para habilitar o login com Google.');
       return;
     }
@@ -436,7 +454,7 @@ const LoginScreen = ({ navigation }: any) => {
                 >
                   <Feather name="chrome" size={20} color={BRAND_COLORS.text} />
                   <Text style={styles.googleButtonText}>
-                    {isGoogleLoginAvailable ? 'Entrar com Google' : 'Google (Expo Go)'}
+                    {googleButtonLabel}
                   </Text>
                 </TouchableOpacity>
               )}

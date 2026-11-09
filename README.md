@@ -25,6 +25,19 @@ In the output, you'll find options to open the app in a
 
 You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
 
+## Google Sign-In no iOS
+
+Configure no `.env` os OAuth Client IDs do tipo Web e iOS:
+
+```env
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=seu-client-id-web.apps.googleusercontent.com
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=seu-client-id-ios.apps.googleusercontent.com
+```
+
+O Client ID iOS deve corresponder ao aplicativo registrado com o bundle ID `com.tanopreco`. Ele é usado pelo Google Sign-In nativo, e seu esquema de retorno é adicionado automaticamente à configuração iOS em novas builds.
+
+Uma atualização JavaScript/OTA pode fornecer o Client ID iOS ao código atualizado e usar o esquema que já estiver registrado no app instalado. Ela não consegue adicionar um esquema de retorno ausente do binário; nesse caso, o login com Google no iOS só funcionará depois de uma nova build. Sem o Client ID iOS, o app não inicia o fluxo nativo.
+
 ## Get a fresh project
 
 When you're ready, run:
