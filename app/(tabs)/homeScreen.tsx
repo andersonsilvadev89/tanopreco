@@ -186,26 +186,6 @@ function calcularRelevanciaBusca(produto: ProdutoComEmpresa, termos: string[]) {
   };
 }
 
-function isOfertaValida(dataFinalOferta?: string) {
-  if (!dataFinalOferta) return false;
-  
-  const [dia, mes, ano] = dataFinalOferta.split("/");
-  
-  // CORREÇÃO: Usamos o construtor (ano, mesIndex, dia). 
-  // O Mês no JS começa em 0 (Janeiro = 0, Novembro = 10), por isso subtraímos 1.
-  // Isso cria a data no horário local (00:00:00), evitando o bug de fuso horário.
-  const dataFinal = new Date(Number(ano), Number(mes) - 1, Number(dia));
-  
-  const hoje = new Date();
-  
-  // Zeramos as horas de ambas as datas para garantir que estamos comparando apenas o DIA
-  hoje.setHours(0, 0, 0, 0);
-  dataFinal.setHours(0, 0, 0, 0);
-  
-  // Usamos .getTime() para comparar os timestamps numéricos
-  return dataFinal.getTime() >= hoje.getTime();
-}
-
 function calcularDistancia(userLocation: any, empresaLocation: any) {
   if (!userLocation || !empresaLocation) return null;
   const toRad = (value: number) => (value * Math.PI) / 180;
@@ -439,7 +419,7 @@ export default function HomeScreen() {
 
         if (cache.empresas && cache.produtos) {
           setEmpresas(cache.empresas);
-          setProdutosComEmpresa(cache.produtos.filter((produto) => isOfertaValida(produto.dataFinalOferta)));
+          setProdutosComEmpresa(cache.produtos);
           setLoadingInicial(false);
         }
       })
@@ -493,11 +473,10 @@ export default function HomeScreen() {
             }
           });
         }
-        const produtosValidos = data.filter(p => isOfertaValida(p.dataFinalOferta));
-        setProdutosComEmpresa(produtosValidos);
+        setProdutosComEmpresa(data);
         AsyncStorage.setItem(CATALOGO_CACHE_KEY, JSON.stringify({
           empresas,
-          produtos: produtosValidos,
+          produtos: data,
         })).catch(() => undefined);
         setLoadingInicial(false);
       }).catch(() => {

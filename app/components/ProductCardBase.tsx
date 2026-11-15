@@ -76,6 +76,19 @@ function formatPrice(preco?: string) {
     return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function isOfertaExpirada(dataFinalOferta?: string) {
+    if (!dataFinalOferta) return false;
+
+    const [dia, mes, ano] = dataFinalOferta.split("/");
+    const dataFinal = new Date(Number(ano), Number(mes) - 1, Number(dia));
+    const hoje = new Date();
+
+    hoje.setHours(0, 0, 0, 0);
+    dataFinal.setHours(0, 0, 0, 0);
+
+    return dataFinal.getTime() < hoje.getTime();
+}
+
 function ProductCardBaseComponent({
     produto,
     userLocation,
@@ -127,6 +140,11 @@ function ProductCardBaseComponent({
                     {showPriceBadge && !!produto.preco && (
                         <View style={styles.priceBadge}>
                             <Text style={styles.priceBadgeText} numberOfLines={1}>{formatPrice(produto.preco)}</Text>
+                        </View>
+                    )}
+                    {isOfertaExpirada(produto.dataFinalOferta) && (
+                        <View style={styles.expiredOfferBadge}>
+                            <Text style={styles.expiredOfferBadgeText}>OFERTA EXPIRADA</Text>
                         </View>
                     )}
                     {actions.length > 0 && (
@@ -185,6 +203,8 @@ const styles = StyleSheet.create({
     imagePlaceholder: { width: "100%", height: 125, borderRadius: 40, backgroundColor: BRAND_COLORS.surfaceSoft, justifyContent: "center", alignItems: "center" },
     priceBadge: { position: "absolute", right: 0, bottom: 0, backgroundColor: "rgba(16,117,60,1)", borderTopLeftRadius: 16, paddingHorizontal: 6, paddingVertical: 4 },
     priceBadgeText: { color: BRAND_COLORS.white, fontSize: 14, fontWeight: "800" },
+    expiredOfferBadge: { position: "absolute", top: 20, left: 0, backgroundColor: "rgba(192,57,43,0.94)", borderTopRightRadius: 8, borderBottomRightRadius: 8, paddingHorizontal: 7, paddingVertical: 5 },
+    expiredOfferBadgeText: { color: BRAND_COLORS.white, fontSize: 10, fontWeight: "800" },
     actionOverlay: { position: "absolute", left: 0, bottom: 0, flexDirection: "column", gap: 5 },
     actionButton: { width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(10,79,203,0.82)", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "rgba(255,255,255,0.4)" },
     descriptionRow: { width: "100%", marginTop: 8, paddingHorizontal: 3 },
