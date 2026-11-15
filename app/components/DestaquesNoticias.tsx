@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useRef, useState, memo } from "react";
 import {
   Dimensions,
-  ScrollView,
+  FlatList,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
@@ -45,30 +44,27 @@ interface DestaquesNoticiasProps {
 
 
 function DestaquesNoticiasComponent({ produtos, onProdutoPress, userLocation }: DestaquesNoticiasProps) {
-  const [produtosEmDestaque, setProdutosEmDestaque] = useState<ProdutoDestaque[]>([]);
   const [scrollX, setScrollX] = useState(0);
   const [larguraViewport, setLarguraViewport] = useState(0);
   const [larguraConteudo, setLarguraConteudo] = useState(0);
-  const prevIdsRef = useRef<string>("");
+  const scrollXRef = useRef(0);
+  const prevIdsRef = useRef("");
 
   useEffect(() => {
-    const currentIds = produtos.map((p) => p.id).join(",");
+    const currentIds = produtos.map((produto) => produto.id).join(",");
     if (currentIds !== prevIdsRef.current) {
       prevIdsRef.current = currentIds;
-      setProdutosEmDestaque(produtos);
+      scrollXRef.current = 0;
       setScrollX(0);
-    } else {
-      setProdutosEmDestaque((prev) =>
-        prev.map((item) => produtos.find((p) => p.id === item.id) ?? item)
-      );
     }
   }, [produtos]);
 
   const atualizarIndicadores = useCallback((novoScrollX: number) => {
+    scrollXRef.current = novoScrollX;
     setScrollX(novoScrollX);
   }, []);
 
-  if (produtosEmDestaque.length === 0) {
+  if (produtos.length === 0) {
     return null;
   }
 
@@ -81,16 +77,13 @@ function DestaquesNoticiasComponent({ produtos, onProdutoPress, userLocation }: 
       <Text style={styles.titulo}>Confira nossas melhores ofertas!</Text>
 
       <View style={styles.scrollWrapper}>
-        <ScrollView
+        <FlatList
+          data={produtos}
+          keyExtractor={(produto) => produto.id}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.conteudo}
-          scrollEventThrottle={16}
-          onScroll={(event) => atualizarIndicadores(event.nativeEvent.contentOffset.x)}
-          onLayout={(event) => setLarguraViewport(event.nativeEvent.layout.width)}
-          onContentSizeChange={(contentWidth) => setLarguraConteudo(contentWidth)}
-        >
-          {produtosEmDestaque.map((produto, index) => (
+          renderItem={({ item: produto, index }) => (
             <React.Fragment key={produto.id}>
               <ProductCardBase
                 produto={produto}
@@ -99,10 +92,22 @@ function DestaquesNoticiasComponent({ produtos, onProdutoPress, userLocation }: 
                 cardStyle={styles.noticia}
                 imageOverlay={<View style={styles.seloDestaque}><Feather name="star" size={11} color={BRAND_COLORS.white} /><Text style={styles.seloDestaqueTexto}>Destaque</Text></View>}
               />
-              {(index + 1) % PRODUTOS_POR_ADCARD === 0 && <AdCard key={`ad_${produto.id}`} />}
+              {(index + 1) % PRODUTOS_POR_ADCARD === 0 && <AdCard />}
             </React.Fragment>
-          ))}
-        </ScrollView>
+          )}
+          initialNumToRender={4}
+          maxToRenderPerBatch={4}
+          windowSize={3}
+          removeClippedSubviews
+          scrollEventThrottle={16}
+          onScroll={(event) => {
+            scrollXRef.current = event.nativeEvent.contentOffset.x;
+          }}
+          onScrollEndDrag={(event) => atualizarIndicadores(event.nativeEvent.contentOffset.x)}
+          onMomentumScrollEnd={(event) => atualizarIndicadores(event.nativeEvent.contentOffset.x)}
+          onLayout={(event) => setLarguraViewport(event.nativeEvent.layout.width)}
+          onContentSizeChange={(contentWidth) => setLarguraConteudo(contentWidth)}
+        />
 
         {mostrarDicaEsquerda && (
           <View pointerEvents="none" style={[styles.dicaLateral, styles.dicaEsquerda]}>
