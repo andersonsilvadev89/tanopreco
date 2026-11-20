@@ -37,6 +37,10 @@ const webClientId =
   (Constants.expoConfig?.extra?.googleWebClientId as string | undefined) ||
   process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID ||
   '';
+const iosClientId =
+  (Constants.expoConfig?.extra?.googleIosClientId as string | undefined) ||
+  process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+  '';
 
 const hasValidGoogleClientId = (clientId: string) =>
   /^[0-9]+-[a-z0-9-]+\.apps\.googleusercontent\.com$/i.test(clientId);
@@ -84,6 +88,9 @@ if (
 ) {
   GoogleSignin.configure({
     webClientId,
+    ...(Platform.OS === 'ios' && hasValidGoogleClientId(iosClientId)
+      ? { iosClientId }
+      : {}),
   });
 }
 
@@ -246,7 +253,9 @@ const LoginScreen = ({ navigation }: any) => {
           console.warn('Nao foi possivel limpar sessao do Google Sign-In:', signOutError);
         }
 
-        await GoogleSignin.hasPlayServices();
+        if (Platform.OS === 'android') {
+          await GoogleSignin.hasPlayServices();
+        }
       }
 
       const response = await GoogleSignin?.signIn();

@@ -1,13 +1,19 @@
 import 'dotenv/config';
 
 const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+const hasValidGoogleIosClientId = /^[0-9]+-[a-z0-9-]+\.apps\.googleusercontent\.com$/i.test(
+  googleIosClientId || ''
+);
+const googleIosUrlScheme = hasValidGoogleIosClientId
+  ? `com.googleusercontent.apps.${googleIosClientId.replace('.apps.googleusercontent.com', '')}`
+  : "com.googleusercontent.apps.662489416845-0jt9lns53lt5j6s2l6ho8n72ftm6gtso";
 
 export default {
   name: "TaNoPreco",
   slug: "TaNoPreco",
   "newArchEnabled": true,
   platforms: ["android", "ios"],
-  version: "1.0.6",
+  version: "1.0.7",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   splash: {
@@ -29,7 +35,7 @@ export default {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       }
     },
-    versionCode: 34,
+    versionCode: 35,
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff"
@@ -58,7 +64,7 @@ export default {
   },
   ios: {
     bundleIdentifier: "com.tanopreco",
-    buildNumber: "8",
+    buildNumber: "9",
     usesAppleSignIn: true,
     config: {
       googleMobileAdsAppId: "ca-app-pub-5241782827769638~8974053643"
@@ -98,7 +104,7 @@ export default {
     [
       "@react-native-google-signin/google-signin",
       {
-        "iosUrlScheme": "com.googleusercontent.apps.662489416845-0jt9lns53lt5j6s2l6ho8n72ftm6gtso"
+        "iosUrlScheme": googleIosUrlScheme
       }
     ],
     [
