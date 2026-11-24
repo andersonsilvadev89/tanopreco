@@ -18,7 +18,6 @@ import {
   Switch,
   Dimensions,
 } from "react-native";
-import ImageCropPicker from "react-native-image-crop-picker";
 import {
   ref,
   push,
@@ -36,6 +35,8 @@ import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker"; // ✅ IMPORTADO
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { signOut } from "firebase/auth";
+import Constants from "expo-constants";
+import * as ImagePicker from "expo-image-picker";
 
 import LocalizacaoModal from "../components/LocalizacaoModal";
 import { BRAND_COLORS } from "@/constants/BrandColors";
@@ -43,6 +44,19 @@ const CLOUDINARY_URL = "https://api.cloudinary.com/v1_1/dvekhdfgc/image/upload";
 const UPLOAD_PRESET = "tanopreco";
 
 const { height } = Dimensions.get("window");
+const isExpoGo =
+  Constants.appOwnership === "expo" ||
+  Constants.executionEnvironment === "storeClient";
+
+let ImageCropPicker: any = null;
+if (!isExpoGo && Platform.OS !== "web") {
+  try {
+    const cropPickerModule = require("react-native-image-crop-picker");
+    ImageCropPicker = cropPickerModule.default ?? cropPickerModule;
+  } catch {
+    ImageCropPicker = null;
+  }
+}
 
 const getImagePickerErrorCode = (error: unknown) => {
   if (
@@ -508,6 +522,30 @@ export default function CadastroProduto() {
 
   const selecionarDaGaleria = async () => {
     try {
+      if (isExpoGo || !ImageCropPicker) {
+        const permission =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert(
+            "Permissao necessaria",
+            "Voce precisa permitir o acesso a galeria."
+          );
+          return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.5,
+        });
+
+        if (!result.canceled && result.assets.length > 0) {
+          await enviarImagemParaCloudinary(result.assets[0].uri);
+        }
+        return;
+      }
+
       const result = await ImageCropPicker.openPicker({
         mediaType: "photo",
         cropping: true,
@@ -525,6 +563,30 @@ export default function CadastroProduto() {
 
   const selecionarDaCamera = async () => {
     try {
+      if (isExpoGo || !ImageCropPicker) {
+        const permission =
+          await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert(
+            "Permissao necessaria",
+            "Voce precisa permitir o acesso a camera."
+          );
+          return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.5,
+        });
+
+        if (!result.canceled && result.assets.length > 0) {
+          await enviarImagemParaCloudinary(result.assets[0].uri);
+        }
+        return;
+      }
+
       const result = await ImageCropPicker.openCamera({
         mediaType: "photo",
         cropping: true,

@@ -1,6 +1,7 @@
 import 'dotenv/config';
 
-const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
+const googleIosClientId = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID ||
+  "662489416845-0jt9lns53lt5j6s2l6ho8n72ftm6gtso.apps.googleusercontent.com";
 const hasValidGoogleIosClientId = /^[0-9]+-[a-z0-9-]+\.apps\.googleusercontent\.com$/i.test(
   googleIosClientId || ''
 );
@@ -13,7 +14,7 @@ export default {
   slug: "TaNoPreco",
   "newArchEnabled": true,
   platforms: ["android", "ios"],
-  version: "1.0.7",
+  version: "1.0.9",
   orientation: "portrait",
   icon: "./assets/images/icon.png",
   splash: {
@@ -35,7 +36,7 @@ export default {
         apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       }
     },
-    versionCode: 35,
+    versionCode: 37,
     adaptiveIcon: {
       foregroundImage: "./assets/images/adaptive-icon.png",
       backgroundColor: "#ffffff"
@@ -64,7 +65,7 @@ export default {
   },
   ios: {
     bundleIdentifier: "com.tanopreco",
-    buildNumber: "9",
+    buildNumber: "11",
     usesAppleSignIn: true,
     config: {
       googleMobileAdsAppId: "ca-app-pub-5241782827769638~8974053643"

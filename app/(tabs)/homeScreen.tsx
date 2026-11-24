@@ -21,7 +21,7 @@ import { database, auth } from "../../firebaseConfig";
 import { ref, onValue, set, get, update, increment } from "firebase/database";
 import { signOut } from "firebase/auth";
 import { useFocusEffect } from "@react-navigation/native";
-import MapView, { Marker, Callout, Region } from "react-native-maps";
+import MapView, { Marker, Region } from "react-native-maps";
 import * as Location from "expo-location";
 import Constants from "expo-constants";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -38,8 +38,10 @@ import { BRAND_COLORS } from "@/constants/BrandColors";
 import { CompanyVerifiedBadge } from "../components/CompanyVerifiedBadge";
 import { EmpresasDestaque } from "../components/EmpresasDestaque";
 import { EmpresaDetalhesModal } from "../components/EmpresaDetalhesModal";
+import { OfertasWebSection } from "../components/OfertasWebSection";
 
-const isExpoGo = Constants.appOwnership === "expo" || Constants.executionEnvironment === "storeClient";
+const isExpoGo =
+  Constants.appOwnership === "expo" || Constants.executionEnvironment === "storeClient";
 let speechRecognitionModule: any = null;
 
 if (!isExpoGo) {
@@ -64,10 +66,8 @@ function useOptionalSpeechRecognitionEvent(eventName: string, listener: (event: 
 
 const { width } = Dimensions.get("window");
 
-// Tamanho do card de produto: grade vertical de 2 colunas (mesma largura usada nos Destaques)
 const CARD_MARGIN = 12;
 const CARD_WIDTH = (width - CARD_MARGIN * 3) / 2;
-const CARD_MIN_HEIGHT = 300;
 
 const PRODUTOS_INICIAIS = 4;
 const PRODUTOS_POR_CARREGAMENTO = 8;
@@ -89,8 +89,7 @@ interface ProdutoComEmpresa {
   longitudeProduto?: number;
   localizacaoDiferente?: boolean;
   dataFinalOferta?: string;
-  // ✅ 1. ADICIONADO O CAMPO NA INTERFACE
-  enquantoDurarEstoque?: boolean; 
+  enquantoDurarEstoque?: boolean;
   destaque?: boolean;
   categoria?: string;
   isAd?: boolean;
@@ -194,16 +193,28 @@ function calcularDistancia(userLocation: any, empresaLocation: any) {
   const dLon = toRad(empresaLocation.longitude - userLocation.longitude);
   const lat1 = toRad(userLocation.latitude);
   const lat2 = toRad(empresaLocation.latitude);
-  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) + Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.sin(dLon / 2) * Math.sin(dLon / 2) * Math.cos(lat1) * Math.cos(lat2);
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 }
 
-function getProdutoLocation(produto: ProdutoComEmpresa): { latitude: number; longitude: number; isProdutoLocation: boolean } | null {
+function getProdutoLocation(
+  produto: ProdutoComEmpresa
+): { latitude: number; longitude: number; isProdutoLocation: boolean } | null {
   if (produto.localizacaoDiferente && produto.latitudeProduto && produto.longitudeProduto) {
-    return { latitude: produto.latitudeProduto, longitude: produto.longitudeProduto, isProdutoLocation: true };
+    return {
+      latitude: produto.latitudeProduto,
+      longitude: produto.longitudeProduto,
+      isProdutoLocation: true,
+    };
   } else if (produto.latitudeEmpresa && produto.longitudeEmpresa) {
-    return { latitude: produto.latitudeEmpresa, longitude: produto.longitudeEmpresa, isProdutoLocation: false };
+    return {
+      latitude: produto.latitudeEmpresa,
+      longitude: produto.longitudeEmpresa,
+      isProdutoLocation: false,
+    };
   }
   return null;
 }
@@ -223,7 +234,9 @@ export default function HomeScreen() {
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string | null>(null);
   const [ordenarPorPreco, setOrdenarPorPreco] = useState(true);
   const [loadingInicial, setLoadingInicial] = useState(true);
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number; } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(
+    null
+  );
   const [mostrarFiltrosManual, setMostrarFiltrosManual] = useState(true);
   const [painelFiltroForaDaTela, setPainelFiltroForaDaTela] = useState(false);
   const [alturaPainelFiltro, setAlturaPainelFiltro] = useState(0);
@@ -236,7 +249,10 @@ export default function HomeScreen() {
   const [larguraConteudoCategorias, setLarguraConteudoCategorias] = useState(0);
   const [selectedLocation, setSelectedLocation] = useState<any>(null);
   const [mapRegion, setMapRegion] = useState<Region>({
-    latitude: -7.2345, longitude: -39.4056, latitudeDelta: 0.0922, longitudeDelta: 0.0421,
+    latitude: -7.2345,
+    longitude: -39.4056,
+    latitudeDelta: 0.0922,
+    longitudeDelta: 0.0421,
   });
   const [empresas, setEmpresas] = useState<{ [key: string]: EmpresaData }>({});
   const [imagemModalVisivel, setImagemModalVisivel] = useState(false);
@@ -245,10 +261,12 @@ export default function HomeScreen() {
   const [modalDimensoes, setModalDimensoes] = useState({ width: 0, height: 0 });
   const [produtoModal, setProdutoModal] = useState<ProdutoComEmpresa | null>(null);
   const [empresaDetalhesId, setEmpresaDetalhesId] = useState<string | null>(null);
+
   const mapRef = useRef<MapView>(null);
   const listaRef = useRef<FlatList<any>>(null);
   const categoriasScrollXRef = useRef(0);
   const painelFiltroForaDaTelaRef = useRef(false);
+
   const filtrosVisiveis = mostrarFiltrosManual;
   const mostrarBotaoFiltro = !filtrosVisiveis || painelFiltroForaDaTela;
 
@@ -274,18 +292,21 @@ export default function HomeScreen() {
     }
   });
 
-  const atualizarDicasCategorias = useCallback((scrollX: number, contentWidth: number, viewportWidth: number) => {
-    const temOverflow = contentWidth > viewportWidth + 1;
+  const atualizarDicasCategorias = useCallback(
+    (scrollX: number, contentWidth: number, viewportWidth: number) => {
+      const temOverflow = contentWidth > viewportWidth + 1;
 
-    if (!temOverflow) {
-      setMostrarDicaEsquerda(false);
-      setMostrarDicaDireita(false);
-      return;
-    }
+      if (!temOverflow) {
+        setMostrarDicaEsquerda(false);
+        setMostrarDicaDireita(false);
+        return;
+      }
 
-    setMostrarDicaEsquerda(scrollX > 8);
-    setMostrarDicaDireita(scrollX + viewportWidth < contentWidth - 8);
-  }, []);
+      setMostrarDicaEsquerda(scrollX > 8);
+      setMostrarDicaDireita(scrollX + viewportWidth < contentWidth - 8);
+    },
+    []
+  );
 
   const handleImagePress = useCallback((produto: ProdutoComEmpresa) => {
     setProdutoModal(produto);
@@ -294,24 +315,39 @@ export default function HomeScreen() {
     setImagemModalVisivel(true);
   }, []);
 
-  const handleImagemModalCarregada = useCallback((event: any) => {
-    const { width: imagemLargura, height: imagemAltura } = event.nativeEvent.source ?? {};
-    if (!imagemLargura || !imagemAltura || !modalDimensoes.width) return;
+  const handleImagemModalCarregada = useCallback(
+    (event: any) => {
+      const { width: imagemLargura, height: imagemAltura } = event.nativeEvent.source ?? {};
+      if (!imagemLargura || !imagemAltura || !modalDimensoes.width) return;
 
-    const alturaProporcional = modalDimensoes.width * (imagemAltura / imagemLargura);
-    setImagemModalAltura(Math.min(alturaProporcional, 600));
-  }, [modalDimensoes.width]);
+      const alturaProporcional = modalDimensoes.width * (imagemAltura / imagemLargura);
+      setImagemModalAltura(Math.min(alturaProporcional, 600));
+    },
+    [modalDimensoes.width]
+  );
 
   const handleVerNoMapa = useCallback((produto: ProdutoComEmpresa) => {
     const location = getProdutoLocation(produto);
     if (location) {
       setSelectedLocation({
-        latitude: location.latitude, longitude: location.longitude, nome: produto.nomeEmpresa, empresaId: produto.empresaId, produtoId: produto.id,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        nome: produto.nomeEmpresa,
+        empresaId: produto.empresaId,
+        produtoId: produto.id,
       });
-      setMapRegion({ latitude: location.latitude, longitude: location.longitude, latitudeDelta: 0.0922, longitudeDelta: 0.0421 });
+      setMapRegion({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
       setMostrarMapa(true);
     } else {
-      Alert.alert("Localização Indisponível", "Esta empresa/produto não possui uma localização cadastrada.");
+      Alert.alert(
+        "Localização Indisponível",
+        "Esta empresa/produto não possui uma localização cadastrada."
+      );
     }
   }, []);
 
@@ -323,82 +359,121 @@ export default function HomeScreen() {
     setEmpresaDetalhesId(null);
   }, []);
 
-  const handleVerNoMapaViaModal = useCallback((produto: ProdutoComEmpresa) => {
-    setImagemModalVisivel(false);
-    setProdutoModal(null);
+  const handleVerNoMapaViaModal = useCallback(
+    (produto: ProdutoComEmpresa) => {
+      setImagemModalVisivel(false);
+      setProdutoModal(null);
 
-    // Aguarda o fechamento visual do modal da imagem para abrir o mapa por cima.
-    setTimeout(() => {
-      handleVerNoMapa(produto);
-    }, 140);
-  }, [handleVerNoMapa]);
+      setTimeout(() => {
+        handleVerNoMapa(produto);
+      }, 140);
+    },
+    [handleVerNoMapa]
+  );
 
-  const handleVerMaisProdutosDaEmpresaViaModal = useCallback((produto: ProdutoComEmpresa) => {
-    setImagemModalVisivel(false);
-    setProdutoModal(null);
+  const handleVerMaisProdutosDaEmpresaViaModal = useCallback(
+    (produto: ProdutoComEmpresa) => {
+      setImagemModalVisivel(false);
+      setProdutoModal(null);
 
-    // Aguarda o fechamento visual do modal do produto para abrir o modal da empresa por cima.
-    setTimeout(() => {
-      handleAbrirEmpresa(produto.empresaId);
-    }, 140);
-  }, [handleAbrirEmpresa]);
+      setTimeout(() => {
+        handleAbrirEmpresa(produto.empresaId);
+      }, 140);
+    },
+    [handleAbrirEmpresa]
+  );
 
   const openInstagramProfile = useCallback(async (username: string | undefined) => {
-    if (!username) { Alert.alert("Instagram não informado", "Esta empresa não possui um Instagram cadastrado."); return; }
+    if (!username) {
+      Alert.alert("Instagram não informado", "Esta empresa não possui um Instagram cadastrado.");
+      return;
+    }
     const user = username.replace("@", "");
-    try { await Linking.openURL(`https://www.instagram.com/${user}`); } catch { Alert.alert("Erro", "Erro ao abrir Instagram."); }
+    try {
+      await Linking.openURL(`https://www.instagram.com/${user}`);
+    } catch {
+      Alert.alert("Erro", "Erro ao abrir Instagram.");
+    }
   }, []);
 
   const openWhatsApp = useCallback((telefone: string | undefined, mensagem?: string) => {
-    if (!telefone) { Alert.alert("WhatsApp não informado", "Esta empresa não possui telefone."); return; }
+    if (!telefone) {
+      Alert.alert("WhatsApp não informado", "Esta empresa não possui telefone.");
+      return;
+    }
     const numeroLimpo = telefone.replace(/\D/g, "");
+    const numeroComDdi = numeroLimpo.startsWith("55") ? numeroLimpo : `55${numeroLimpo}`;
     const texto = mensagem ? `?text=${encodeURIComponent(mensagem)}` : "";
-    Linking.openURL(`https://wa.me/55${numeroLimpo}${texto}`).catch(() => Alert.alert("Erro", "Não foi possível abrir o WhatsApp."));
+    Linking.openURL(`https://wa.me/${numeroComDdi}${texto}`).catch(() =>
+      Alert.alert("Erro", "Não foi possível abrir o WhatsApp.")
+    );
   }, []);
 
-  const votarProduto = useCallback(async (produtoId: string, tipo: "like" | "unlike") => {
-    if (!deviceId) return;
-    const produtoVotado = produtosComEmpresa.find(p => p.id === produtoId);
-    if (!produtoVotado) return;
+  const handleReivindicarLoja = useCallback(
+    (nomeLoja: string) => {
+      const msg = `Olá! Sou responsável pela loja ${nomeLoja} e gostaria de gerenciar minhas ofertas no TaNoPreco.`;
+      openWhatsApp("5588981026505", msg);
+    },
+    [openWhatsApp]
+  );
 
-    const empresaId = produtoVotado.empresaId;
-    const votoRef = ref(database, `votos/${produtoId}/${deviceId}`);
-    const votoSnapshot = await get(votoRef);
-    const produtoRef = ref(database, `produtos/${empresaId}/${produtoId}`);
+  const votarProduto = useCallback(
+    async (produtoId: string, tipo: "like" | "unlike") => {
+      if (!deviceId) return;
+      const produtoVotado = produtosComEmpresa.find((p) => p.id === produtoId);
+      if (!produtoVotado) return;
 
-    if (votoSnapshot.exists()) {
-      if (votoSnapshot.val().tipo === tipo) {
-        Alert.alert("Voto Já Registrado", `Retirar seu voto?`, [
-          { text: "Não", style: 'cancel' },
-          {
-            text: "Sim", onPress: async () => {
-              await set(votoRef, null);
-              await update(produtoRef, { [tipo]: increment(-1) });
-              setProdutosComEmpresa(prev => prev.map(p => p.id === produtoId ? { ...p, [tipo]: Math.max(0, (p[tipo] || 0) - 1) } : p));
-              Alert.alert("Sucesso", "Voto retirado.");
-            }, style: 'destructive'
-          }
-        ]);
-        return;
-      }
-    }
+      const empresaId = produtoVotado.empresaId;
+      const votoRef = ref(database, `votos/${produtoId}/${deviceId}`);
+      const votoSnapshot = await get(votoRef);
+      const produtoRef = ref(database, `produtos/${empresaId}/${produtoId}`);
 
-    Alert.alert(tipo === 'like' ? 'VOTO POSITIVO' : 'VOTO NEGATIVO', "Confirmar voto?", [
-      { text: "Cancelar", style: 'cancel' },
-      {
-        text: "Confirmar", onPress: async () => {
-          await set(votoRef, { tipo });
-          await update(produtoRef, { [tipo]: increment(1) });
-          setProdutosComEmpresa(prev => prev.map(p => p.id === produtoId ? { ...p, [tipo]: (p[tipo] || 0) + 1 } : p));
+      if (votoSnapshot.exists()) {
+        if (votoSnapshot.val().tipo === tipo) {
+          Alert.alert("Voto Já Registrado", `Retirar seu voto?`, [
+            { text: "Não", style: "cancel" },
+            {
+              text: "Sim",
+              onPress: async () => {
+                await set(votoRef, null);
+                await update(produtoRef, { [tipo]: increment(-1) });
+                setProdutosComEmpresa((prev) =>
+                  prev.map((p) =>
+                    p.id === produtoId ? { ...p, [tipo]: Math.max(0, (p[tipo] || 0) - 1) } : p
+                  )
+                );
+                Alert.alert("Sucesso", "Voto retirado.");
+              },
+              style: "destructive",
+            },
+          ]);
+          return;
         }
       }
-    ]);
-  }, [deviceId, produtosComEmpresa]);
+
+      Alert.alert(tipo === "like" ? "VOTO POSITIVO" : "VOTO NEGATIVO", "Confirmar voto?", [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Confirmar",
+          onPress: async () => {
+            await set(votoRef, { tipo });
+            await update(produtoRef, { [tipo]: increment(1) });
+            setProdutosComEmpresa((prev) =>
+              prev.map((p) => (p.id === produtoId ? { ...p, [tipo]: (p[tipo] || 0) + 1 } : p))
+            );
+          },
+        },
+      ]);
+    },
+    [deviceId, produtosComEmpresa]
+  );
 
   useEffect(() => {
     const unsubscribe = onValue(ref(database, "usuariosEmpresa"), (snapshot) => {
       const data: { [key: string]: EmpresaData } = {};
-      snapshot.forEach((snap) => { data[snap.key!] = snap.val(); });
+      snapshot.forEach((snap) => {
+        data[snap.key!] = snap.val();
+      });
       setEmpresas(data);
     });
 
@@ -430,58 +505,58 @@ export default function HomeScreen() {
     };
   }, []);
 
-  // ... (useFocusEffect para produtos e localização)
-
   useFocusEffect(
     useCallback(() => {
       if (!Object.keys(empresas).length) {
         return;
       }
       const produtosRef = ref(database, "produtos");
-      get(produtosRef).then((snapshot) => {
-        const data: ProdutoComEmpresa[] = [];
-        if (snapshot.exists()) {
-          snapshot.forEach((userSnapshot) => {
-            const empresaId = userSnapshot.key!;
-            const empresaInfo = empresas[empresaId];
-            if (empresaInfo) {
-              userSnapshot.forEach((produtoSnapshot) => {
-                const produto = produtoSnapshot.val();
-                data.push({
-                  id: produtoSnapshot.key!,
-                  ...produto,
-                  empresaId,
-                  nomeEmpresa: empresaInfo.nomeEmpresa,
-                  verificado: empresaInfo.verificado === true,
-                  latitudeEmpresa: empresaInfo.latitude || 0,
-                  longitudeEmpresa: empresaInfo.longitude || 0,
-                  latitudeProduto: produto.latitude || null,
-                  longitudeProduto: produto.longitude || null,
-                  localizacaoDiferente: !!produto.localizacaoDiferente,
-                  dataFinalOferta: produto.dataFinalOferta,
-                  
-                  // ✅ 2. CAPTURANDO O VALOR DO BANCO DE DADOS
-                  enquantoDurarEstoque: !!produto.enquantoDurarEstoque,
-                  
-                  destaque: produto.destaque,
-                  palavrasChave: produto.palavrasChave,
-                  like: produto.like || 0,
-                  unlike: produto.unlike || 0,
-                  ordemAleatoria: Math.random(),
+      get(produtosRef)
+        .then((snapshot) => {
+          const data: ProdutoComEmpresa[] = [];
+          if (snapshot.exists()) {
+            snapshot.forEach((userSnapshot) => {
+              const empresaId = userSnapshot.key!;
+              const empresaInfo = empresas[empresaId];
+              if (empresaInfo) {
+                userSnapshot.forEach((produtoSnapshot) => {
+                  const produto = produtoSnapshot.val();
+                  data.push({
+                    id: produtoSnapshot.key!,
+                    ...produto,
+                    empresaId,
+                    nomeEmpresa: empresaInfo.nomeEmpresa,
+                    verificado: empresaInfo.verificado === true,
+                    latitudeEmpresa: empresaInfo.latitude || 0,
+                    longitudeEmpresa: empresaInfo.longitude || 0,
+                    latitudeProduto: produto.latitude || null,
+                    longitudeProduto: produto.longitude || null,
+                    localizacaoDiferente: !!produto.localizacaoDiferente,
+                    dataFinalOferta: produto.dataFinalOferta,
+                    enquantoDurarEstoque: !!produto.enquantoDurarEstoque,
+                    destaque: produto.destaque,
+                    palavrasChave: produto.palavrasChave,
+                    like: produto.like || 0,
+                    unlike: produto.unlike || 0,
+                    ordemAleatoria: Math.random(),
+                  });
                 });
-              });
-            }
-          });
-        }
-        setProdutosComEmpresa(data);
-        AsyncStorage.setItem(CATALOGO_CACHE_KEY, JSON.stringify({
-          empresas,
-          produtos: data,
-        })).catch(() => undefined);
-        setLoadingInicial(false);
-      }).catch(() => {
-        setLoadingInicial(false);
-      });
+              }
+            });
+          }
+          setProdutosComEmpresa(data);
+          AsyncStorage.setItem(
+            CATALOGO_CACHE_KEY,
+            JSON.stringify({
+              empresas,
+              produtos: data,
+            })
+          ).catch(() => undefined);
+          setLoadingInicial(false);
+        })
+        .catch(() => {
+          setLoadingInicial(false);
+        });
       (async () => {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status === "granted") {
@@ -499,8 +574,18 @@ export default function HomeScreen() {
 
   useEffect(() => {
     if (mostrarMapa && userLocation && selectedLocation && mapRef.current) {
-      const coords = [userLocation, { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }];
-      setTimeout(() => mapRef.current?.fitToCoordinates(coords, { edgePadding: { top: 100, right: 50, bottom: 50, left: 50 }, animated: true }), 300);
+      const coords = [
+        userLocation,
+        { latitude: selectedLocation.latitude, longitude: selectedLocation.longitude },
+      ];
+      setTimeout(
+        () =>
+          mapRef.current?.fitToCoordinates(coords, {
+            edgePadding: { top: 100, right: 50, bottom: 50, left: 50 },
+            animated: true,
+          }),
+        300
+      );
     }
   }, [mostrarMapa, userLocation, selectedLocation]);
 
@@ -526,9 +611,6 @@ export default function HomeScreen() {
     });
   }, [produtosComEmpresa, categoriaSelecionada, termosBusca]);
 
-  // Por padrão mostramos todos os produtos válidos (o filtro por destaque/busca já ocorre em produtosValidos).
-  const produtosParaExibir = produtosValidos;
-
   const produtoModalAtualizado = useMemo(() => {
     if (!produtoModal) return null;
     return produtosComEmpresa.find((produto) => produto.id === produtoModal.id) ?? produtoModal;
@@ -546,18 +628,22 @@ export default function HomeScreen() {
     return produtosComEmpresa.filter((produto) => produto.empresaId === empresaDetalhesId);
   }, [empresaDetalhesId, produtosComEmpresa]);
 
-  const tituloDaLista = (termoBusca.length >= 3 && categoriaSelecionada) || (!(termoBusca.length >= 3) && categoriaSelecionada) ? `Resultados da busca (${categoriaSelecionada})` : termoBusca.length >= 3 && categoriaSelecionada === null ? `Resultados da busca`: "Veja todos os nossos produtos!";
+  const tituloDaLista =
+    (termoBusca.length >= 3 && categoriaSelecionada) ||
+    (!(termoBusca.length >= 3) && categoriaSelecionada)
+      ? `Resultados da busca (${categoriaSelecionada})`
+      : termoBusca.length >= 3 && categoriaSelecionada === null
+      ? `Resultados da busca`
+      : "Veja todos os nossos produtos!";
 
   const produtosOrdenados = useMemo(() => {
-    return [...produtosParaExibir].sort((a, b) => {
+    return [...produtosValidos].sort((a, b) => {
       const buscaAtiva = termosBusca.length > 0;
 
-      // 1. Se for ordenação aleatória inicial (sem busca e sem categoria)
       if (!ordenacaoManual && !buscaAtiva && !categoriaSelecionada) {
         return (a.ordemAleatoria || 0) - (b.ordemAleatoria || 0);
       }
 
-      // 2. Busca por relevância: descrição > categoria/palavras-chave > empresa
       if (buscaAtiva) {
         const scoreA = calcularRelevanciaBusca(a, termosBusca);
         const scoreB = calcularRelevanciaBusca(b, termosBusca);
@@ -574,10 +660,8 @@ export default function HomeScreen() {
         }
       }
 
-      // 3. Helpers para pegar os valores limpos
       const getPreco = (p: ProdutoComEmpresa) => {
         if (!p.preco) return Infinity;
-        // CORREÇÃO DE PARSE: Remove R$, depois remove PONTOS de milhar, depois troca VÍRGULA por PONTO decimal
         const valorLimpo = p.preco.replace("R$", "").replace(/\./g, "").replace(",", ".");
         const valor = parseFloat(valorLimpo.trim());
         return Number.isNaN(valor) ? Infinity : valor;
@@ -585,8 +669,7 @@ export default function HomeScreen() {
 
       const getDist = (p: ProdutoComEmpresa) => {
         const loc = getProdutoLocation(p);
-        // Se não tiver location do user ou do produto, joga para o final (Infinity)
-        return (userLocation && loc) ? (calcularDistancia(userLocation, loc) ?? Infinity) : Infinity;
+        return userLocation && loc ? calcularDistancia(userLocation, loc) ?? Infinity : Infinity;
       };
 
       const precoA = getPreco(a);
@@ -594,69 +677,106 @@ export default function HomeScreen() {
       const distA = getDist(a);
       const distB = getDist(b);
 
-      // 4. Lógica de Ordenação com Desempate
       if (ordenarPorPreco) {
-        // PRIMÁRIO: Menor Preço
         if (precoA !== precoB) {
           return precoA - precoB;
         }
-        // SECUNDÁRIO (Desempate): Menor Distância
         return distA - distB;
       } else {
-        // PRIMÁRIO: Menor Distância
-        // Usamos uma pequena margem de erro para floats, mas geralmente a subtração direta funciona
         const diffDist = distA - distB;
 
-        // Se a diferença de distância for significativa (maior que 5 metros, ex: 0.005km), ordena por distância
         if (Math.abs(diffDist) > 0.005) {
           return diffDist;
         }
 
-        // SECUNDÁRIO (Desempate): Se estiverem na "mesma" distância, ordena pelo Menor Preço
         return precoA - precoB;
       }
     });
-  }, [produtosParaExibir, ordenacaoManual, termosBusca, categoriaSelecionada, ordenarPorPreco, userLocation]);
+  }, [
+    produtosValidos,
+    ordenacaoManual,
+    termosBusca,
+    categoriaSelecionada,
+    ordenarPorPreco,
+    userLocation,
+  ]);
 
   useEffect(() => {
     setQuantidadeProdutosVisiveis(PRODUTOS_INICIAIS);
   }, [termoBusca, categoriaSelecionada, ordenarPorPreco]);
 
   const produtosDestaqueNoticias = useMemo(
-    () => produtosOrdenados
-      .filter((produto) => produto.destaque)
-      .map((produto) => ({
-        ...produto,
-        instagram: empresas[produto.empresaId]?.instagram,
-        telefone: empresas[produto.empresaId]?.telefone,
-      })),
+    () =>
+      produtosOrdenados
+        .filter((produto) => produto.destaque)
+        .map((produto) => ({
+          ...produto,
+          instagram: empresas[produto.empresaId]?.instagram,
+          telefone: empresas[produto.empresaId]?.telefone,
+        })),
     [produtosOrdenados, empresas]
   );
 
-  const handleDestaquePress = useCallback((produto: any) => {
-    const produtoCompleto = produtosComEmpresa.find((item) => item.id === produto.id);
-    if (produtoCompleto) {
-      handleImagePress(produtoCompleto);
-    }
-  }, [produtosComEmpresa, handleImagePress]);
+  const handleDestaquePress = useCallback(
+    (produto: any) => {
+      const produtoCompleto = produtosComEmpresa.find((item) => item.id === produto.id);
+      if (produtoCompleto) {
+        handleImagePress(produtoCompleto);
+      }
+    },
+    [produtosComEmpresa, handleImagePress]
+  );
 
-  const handleDestaqueVerNoMapa = useCallback((produto: any) => {
-    const produtoCompleto = produtosComEmpresa.find((item) => item.id === produto.id);
-    if (produtoCompleto) {
-      handleVerNoMapa(produtoCompleto);
-    }
-  }, [produtosComEmpresa, handleVerNoMapa]);
+  const handleDestaqueVerNoMapa = useCallback(
+    (produto: any) => {
+      const produtoCompleto = produtosComEmpresa.find((item) => item.id === produto.id);
+      if (produtoCompleto) {
+        handleVerNoMapa(produtoCompleto);
+      }
+    },
+    [produtosComEmpresa, handleVerNoMapa]
+  );
 
   const openExternalMap = (lat: number, lon: number, label: string) => {
-    const url = Platform.select({ ios: `maps:0,0?q=${lat},${lon}(${label})`, android: `geo:0,0?q=${lat},${lon}(${label})` });
-    Linking.openURL(url!).catch(() => Linking.openURL(`http://maps.google.com/maps?q=${lat},${lon}`));
+    const url = Platform.select({
+      ios: `maps:0,0?q=${lat},${lon}(${label})`,
+      android: `geo:0,0?q=${lat},${lon}(${label})`,
+    });
+    Linking.openURL(url!).catch(() =>
+      Linking.openURL(`http://maps.google.com/maps?q=${lat},${lon}`)
+    );
   };
 
-  const renderProduto = useCallback((item: ProdutoComEmpresa) => {
-    const emp = empresas[item.empresaId];
-    if (!emp) return null;
-    return <ProdutoCard produto={item} empresaInfo={emp} userLocation={userLocation} deviceId={deviceId} votarProduto={votarProduto} handleVerNoMapa={handleVerNoMapa} openInstagramProfile={openInstagramProfile} openWhatsApp={openWhatsApp} onImagePress={handleImagePress} cardStyle={styles.produtoCardGrade} />;
-  }, [empresas, userLocation, deviceId, handleImagePress, votarProduto, handleVerNoMapa, openInstagramProfile, openWhatsApp]);
+  const renderProduto = useCallback(
+    (item: ProdutoComEmpresa) => {
+      const emp = empresas[item.empresaId];
+      if (!emp) return null;
+      return (
+        <ProdutoCard
+          produto={item}
+          empresaInfo={emp}
+          userLocation={userLocation}
+          deviceId={deviceId}
+          votarProduto={votarProduto}
+          handleVerNoMapa={handleVerNoMapa}
+          openInstagramProfile={openInstagramProfile}
+          openWhatsApp={openWhatsApp}
+          onImagePress={handleImagePress}
+          cardStyle={styles.produtoCardGrade}
+        />
+      );
+    },
+    [
+      empresas,
+      userLocation,
+      deviceId,
+      handleImagePress,
+      votarProduto,
+      handleVerNoMapa,
+      openInstagramProfile,
+      openWhatsApp,
+    ]
+  );
 
   const produtosVisiveis = useMemo(
     () => produtosOrdenados.slice(0, quantidadeProdutosVisiveis),
@@ -673,14 +793,14 @@ export default function HomeScreen() {
       parAtual = [];
     };
 
-      produtosVisiveis.forEach((produto, index) => {
+    produtosVisiveis.forEach((produto, index) => {
       parAtual.push(produto);
       if (parAtual.length === 2) flushPar();
 
-        if ((index + 1) % PRODUTOS_POR_ADCARD_LARGO === 0) {
-          flushPar();
-          linhas.push({ key: `ad_${produto.id}`, produtos: [], isAd: true });
-        }
+      if ((index + 1) % PRODUTOS_POR_ADCARD_LARGO === 0) {
+        flushPar();
+        linhas.push({ key: `ad_${produto.id}`, produtos: [], isAd: true });
+      }
     });
 
     flushPar();
@@ -695,21 +815,24 @@ export default function HomeScreen() {
     );
   }, [produtosOrdenados.length]);
 
-  const renderLinhaGrade = useCallback(({ item }: { item: { key: string; produtos: ProdutoComEmpresa[]; isAd?: boolean } }) => {
-    if (item.isAd) {
-      return <AdCardLargo key={item.key} />;
-    }
+  const renderLinhaGrade = useCallback(
+    ({ item }: { item: { key: string; produtos: ProdutoComEmpresa[]; isAd?: boolean } }) => {
+      if (item.isAd) {
+        return <AdCardLargo key={item.key} />;
+      }
 
-    return (
-      <View key={item.key} style={styles.linhaGradeProdutos}>
-        {item.produtos.map((produto) => (
-          <View key={produto.id} style={styles.celulaGradeProduto}>
-            {renderProduto(produto)}
-          </View>
-        ))}
-      </View>
-    );
-  }, [renderProduto]);
+      return (
+        <View key={item.key} style={styles.linhaGradeProdutos}>
+          {item.produtos.map((produto) => (
+            <View key={produto.id} style={styles.celulaGradeProduto}>
+              {renderProduto(produto)}
+            </View>
+          ))}
+        </View>
+      );
+    },
+    [renderProduto]
+  );
 
   const handleLogout = useCallback(async () => {
     try {
@@ -728,25 +851,25 @@ export default function HomeScreen() {
     setDrawerMenuVisible(false);
   }, []);
 
-  const handleNavigateTo = useCallback((path: string, requiresAuth: boolean) => {
-    if (requiresAuth && !user) {
-      Alert.alert("Login necessário", "Entre na sua conta para acessar esta área.");
-      router.push("/(auth)/loginScreen");
-      return;
-    }
+  const handleNavigateTo = useCallback(
+    (path: string, requiresAuth: boolean) => {
+      if (requiresAuth && !user) {
+        Alert.alert("Login necessário", "Entre na sua conta para acessar esta área.");
+        router.push("/(auth)/loginScreen");
+        return;
+      }
 
-    router.push(path as any);
-  }, [user]);
-
-  useEffect(() => {
-    if (Platform.OS === "web") {
-      return;
-    }
-  }, []);
+      router.push(path as any);
+    },
+    [user]
+  );
 
   const handleBuscaPorVoz = useCallback(async () => {
     if (!speechRecognitionModule || Platform.OS === "web") {
-      Alert.alert("Indisponível", "A busca por voz está disponível apenas na versão instalada do aplicativo.");
+      Alert.alert(
+        "Indisponível",
+        "A busca por voz está disponível apenas na versão instalada do aplicativo."
+      );
       return;
     }
 
@@ -763,7 +886,10 @@ export default function HomeScreen() {
     try {
       const permission = await speechRecognitionModule.requestPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert("Permissão necessária", "Permita o acesso ao microfone para usar a busca por voz.");
+        Alert.alert(
+          "Permissão necessária",
+          "Permita o acesso ao microfone para usar a busca por voz."
+        );
         return;
       }
 
@@ -780,7 +906,6 @@ export default function HomeScreen() {
   }, [isListening]);
 
   const handleBotaoFiltro = useCallback(() => {
-    // Se o painel existe mas saiu da tela, volta para o topo para exibir filtros novamente.
     if (filtrosVisiveis && painelFiltroForaDaTela) {
       setMostrarFiltrosManual(true);
       listaRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -790,42 +915,27 @@ export default function HomeScreen() {
     setMostrarFiltrosManual((prev) => !prev);
   }, [filtrosVisiveis, painelFiltroForaDaTela]);
 
-  const handleScrollLista = useCallback((event: any) => {
-    if (!filtrosVisiveis) {
-      if (!painelFiltroForaDaTelaRef.current) {
-        painelFiltroForaDaTelaRef.current = true;
-        setPainelFiltroForaDaTela(true);
+  const handleScrollLista = useCallback(
+    (event: any) => {
+      if (!filtrosVisiveis) {
+        if (!painelFiltroForaDaTelaRef.current) {
+          painelFiltroForaDaTelaRef.current = true;
+          setPainelFiltroForaDaTela(true);
+        }
+        return;
       }
-      return;
-    }
 
-    const offsetY = event.nativeEvent.contentOffset.y ?? 0;
-    const limiteSaida = Math.max(alturaPainelFiltro - 12, 24);
-    const foraDaTela = offsetY > limiteSaida;
+      const offsetY = event.nativeEvent.contentOffset.y ?? 0;
+      const limiteSaida = Math.max(alturaPainelFiltro - 12, 24);
+      const foraDaTela = offsetY > limiteSaida;
 
-    if (foraDaTela !== painelFiltroForaDaTelaRef.current) {
-      painelFiltroForaDaTelaRef.current = foraDaTela;
-      setPainelFiltroForaDaTela(foraDaTela);
-    }
-  }, [filtrosVisiveis, alturaPainelFiltro]);
-
-  const contadorOfertas = () =>{
-    {/* --- NOVO: CONTADOR DE PRODUTOS CADASTRADOS --- */}
-    return(
-        <View style={styles.contadorContainer}>
-        <Text style={styles.contadorTexto}>
-        {produtosComEmpresa.length < 100 ? (
-        <>
-        Estamos com <Text style={styles.textoDestaque}>novas ofertas</Text> todos os dias!
-        </>
-        ) : (
-        <>
-        Estamos com mais de <Text style={styles.textoDestaque}>{produtosComEmpresa.length - 1} ofertas</Text> até agora
-        </>
-        )}
-        </Text>
-        </View>);
-  }
+      if (foraDaTela !== painelFiltroForaDaTelaRef.current) {
+        painelFiltroForaDaTelaRef.current = foraDaTela;
+        setPainelFiltroForaDaTela(foraDaTela);
+      }
+    },
+    [filtrosVisiveis, alturaPainelFiltro]
+  );
 
   return (
     <View style={styles.background}>
@@ -843,12 +953,16 @@ export default function HomeScreen() {
         navigateTo={handleNavigateTo}
       />
       <View style={styles.container}>
-
         <View style={styles.topBarContainer}>
           <View style={styles.buscaOverlayContainer}>
             <View style={styles.buscaBar}>
               <View style={styles.buscaInputWrapper}>
-                <Feather name="search" size={18} color={BRAND_COLORS.textMuted} style={styles.searchIcon} />
+                <Feather
+                  name="search"
+                  size={18}
+                  color={BRAND_COLORS.textMuted}
+                  style={styles.searchIcon}
+                />
                 <TextInput
                   style={styles.inputBuscaOverlay}
                   placeholder="Busque produtos ou serviços..."
@@ -864,12 +978,20 @@ export default function HomeScreen() {
                 activeOpacity={0.8}
                 accessibilityLabel={isListening ? "Parar busca por voz" : "Iniciar busca por voz"}
               >
-                <Feather name={isListening ? "mic-off" : "mic"} size={18} color={isListening ? BRAND_COLORS.white : BRAND_COLORS.primaryDark} />
+                <Feather
+                  name={isListening ? "mic-off" : "mic"}
+                  size={18}
+                  color={isListening ? BRAND_COLORS.white : BRAND_COLORS.primaryDark}
+                />
               </TouchableOpacity>
 
               {mostrarBotaoFiltro && (
                 <TouchableOpacity
-                  style={[styles.botaoVoz, styles.botaoFiltros, filtrosVisiveis && styles.botaoFiltrosAtivo]}
+                  style={[
+                    styles.botaoVoz,
+                    styles.botaoFiltros,
+                    filtrosVisiveis && styles.botaoFiltrosAtivo,
+                  ]}
                   onPress={handleBotaoFiltro}
                   activeOpacity={0.8}
                 >
@@ -882,35 +1004,44 @@ export default function HomeScreen() {
               )}
             </View>
           </View>
-
         </View>
 
-        {loadingInicial ? <ActivityIndicator size="large" color={BRAND_COLORS.primary} style={{ marginTop: 30 }} /> :
+        {loadingInicial ? (
+          <ActivityIndicator size="large" color={BRAND_COLORS.primary} style={{ marginTop: 30 }} />
+        ) : (
           <FlatList
             ref={listaRef}
             data={linhasGradeProdutos}
             keyExtractor={(item) => item.key}
             renderItem={renderLinhaGrade}
-            ListFooterComponent={produtosVisiveis.length > 0 ? (
-              <View style={styles.rodapeProdutos}>
-                {existemMaisProdutos && (
-                  <TouchableOpacity
-                    style={styles.verMaisButton}
-                    onPress={carregarMaisProdutos}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.verMaisButtonText}>Ver mais</Text>
-                  </TouchableOpacity>
-                )}
-                <EmpresasDestaque empresas={empresas} onEmpresaPress={handleAbrirEmpresa} />
-              </View>
-            ) : null}
+            ListFooterComponent={
+              produtosVisiveis.length > 0 ? (
+                <View style={styles.rodapeProdutos}>
+                  {existemMaisProdutos && (
+                    <TouchableOpacity
+                      style={styles.verMaisButton}
+                      onPress={carregarMaisProdutos}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.verMaisButtonText}>Ver mais</Text>
+                    </TouchableOpacity>
+                  )}
+
+                  <OfertasWebSection
+                    termoBusca={termoBusca}
+                    onReivindicarLoja={handleReivindicarLoja}
+                  />
+
+                  <EmpresasDestaque empresas={empresas} onEmpresaPress={handleAbrirEmpresa} />
+                </View>
+              ) : null
+            }
             style={styles.productList}
             contentContainerStyle={styles.flatListContent}
             onScroll={handleScrollLista}
             scrollEventThrottle={24}
             showsVerticalScrollIndicator={false}
-            ListHeaderComponent={(
+            ListHeaderComponent={
               <>
                 {filtrosVisiveis && (
                   <View
@@ -925,14 +1056,31 @@ export default function HomeScreen() {
                     {/* Ordenação */}
                     <View style={styles.ordenacaoContainer}>
                       <Text style={{ color: "#063494", fontWeight: "bold" }}>Ordenar por:</Text>
-                      <Text style={[styles.ordenacaoText, !ordenarPorPreco && styles.ordenacaoTextActive]}>Proximidade</Text>
+                      <Text
+                        style={[
+                          styles.ordenacaoText,
+                          !ordenarPorPreco && styles.ordenacaoTextActive,
+                        ]}
+                      >
+                        Proximidade
+                      </Text>
                       <Switch
                         value={ordenarPorPreco}
-                        onValueChange={(v) => { setOrdenarPorPreco(v); setOrdenacaoManual(true); }}
+                        onValueChange={(v) => {
+                          setOrdenarPorPreco(v);
+                          setOrdenacaoManual(true);
+                        }}
                         thumbColor={BRAND_COLORS.white}
                         trackColor={{ false: BRAND_COLORS.border, true: BRAND_COLORS.border }}
                       />
-                      <Text style={[styles.ordenacaoText, ordenarPorPreco && styles.ordenacaoTextActive]}>Menor Preço</Text>
+                      <Text
+                        style={[
+                          styles.ordenacaoText,
+                          ordenarPorPreco && styles.ordenacaoTextActive,
+                        ]}
+                      >
+                        Menor Preço
+                      </Text>
                     </View>
 
                     {/* Categorias */}
@@ -946,36 +1094,71 @@ export default function HomeScreen() {
                           onScroll={(event) => {
                             const scrollX = event.nativeEvent.contentOffset.x;
                             categoriasScrollXRef.current = scrollX;
-                            atualizarDicasCategorias(scrollX, larguraConteudoCategorias, larguraViewportCategorias);
+                            atualizarDicasCategorias(
+                              scrollX,
+                              larguraConteudoCategorias,
+                              larguraViewportCategorias
+                            );
                           }}
                           onLayout={(event) => {
                             const largura = event.nativeEvent.layout.width;
                             setLarguraViewportCategorias(largura);
-                            atualizarDicasCategorias(categoriasScrollXRef.current, larguraConteudoCategorias, largura);
+                            atualizarDicasCategorias(
+                              categoriasScrollXRef.current,
+                              larguraConteudoCategorias,
+                              largura
+                            );
                           }}
                           onContentSizeChange={(contentWidth) => {
                             setLarguraConteudoCategorias(contentWidth);
-                            atualizarDicasCategorias(categoriasScrollXRef.current, contentWidth, larguraViewportCategorias);
+                            atualizarDicasCategorias(
+                              categoriasScrollXRef.current,
+                              contentWidth,
+                              larguraViewportCategorias
+                            );
                           }}
                         >
                           {categorias.map((cat) => (
                             <View key={cat.nome} style={styles.categoriaItem}>
                               <TouchableOpacity
-                                style={[styles.categoriaBotaoRedondo, categoriaSelecionada === cat.nome && styles.categoriaBotaoSelecionado]}
-                                onPress={() => setCategoriaSelecionada(cat.nome === categoriaSelecionada ? null : cat.nome)}
+                                style={[
+                                  styles.categoriaBotaoRedondo,
+                                  categoriaSelecionada === cat.nome &&
+                                    styles.categoriaBotaoSelecionado,
+                                ]}
+                                onPress={() =>
+                                  setCategoriaSelecionada(
+                                    cat.nome === categoriaSelecionada ? null : cat.nome
+                                  )
+                                }
                               >
-                                <Image source={categoriaImagens[cat.nome]} style={styles.categoriaImagem} resizeMode="contain" />
+                                <Image
+                                  source={categoriaImagens[cat.nome]}
+                                  style={styles.categoriaImagem}
+                                  resizeMode="contain"
+                                />
                               </TouchableOpacity>
-                              <Text style={[styles.categoriaLegenda, categoriaSelecionada === cat.nome && styles.categoriaLegendaSelecionada]}>
+                              <Text
+                                style={[
+                                  styles.categoriaLegenda,
+                                  categoriaSelecionada === cat.nome &&
+                                    styles.categoriaLegendaSelecionada,
+                                ]}
+                              >
                                 {cat.nome}
                               </Text>
-                              {categoriaSelecionada === cat.nome && <View style={styles.categoriaSelecionadaIndicador} />}
+                              {categoriaSelecionada === cat.nome && (
+                                <View style={styles.categoriaSelecionadaIndicador} />
+                              )}
                             </View>
                           ))}
                         </ScrollView>
 
                         {mostrarDicaEsquerda && (
-                          <View pointerEvents="none" style={[styles.categoriaHintSide, styles.categoriaHintLeft]}>
+                          <View
+                            pointerEvents="none"
+                            style={[styles.categoriaHintSide, styles.categoriaHintLeft]}
+                          >
                             <LinearGradient
                               colors={["rgba(248, 250, 255, 0.96)", "rgba(248, 250, 255, 0)"]}
                               start={{ x: 0, y: 0.5 }}
@@ -983,13 +1166,20 @@ export default function HomeScreen() {
                               style={styles.categoriaFade}
                             />
                             <View style={styles.categoriaArrowBubble}>
-                              <Feather name="chevron-left" size={14} color={BRAND_COLORS.primaryDark} />
+                              <Feather
+                                name="chevron-left"
+                                size={14}
+                                color={BRAND_COLORS.primaryDark}
+                              />
                             </View>
                           </View>
                         )}
 
                         {mostrarDicaDireita && (
-                          <View pointerEvents="none" style={[styles.categoriaHintSide, styles.categoriaHintRight]}>
+                          <View
+                            pointerEvents="none"
+                            style={[styles.categoriaHintSide, styles.categoriaHintRight]}
+                          >
                             <LinearGradient
                               colors={["rgba(248, 250, 255, 0)", "rgba(248, 250, 255, 0.96)"]}
                               start={{ x: 0, y: 0.5 }}
@@ -997,7 +1187,11 @@ export default function HomeScreen() {
                               style={styles.categoriaFade}
                             />
                             <View style={styles.categoriaArrowBubble}>
-                              <Feather name="chevron-right" size={14} color={BRAND_COLORS.primaryDark} />
+                              <Feather
+                                name="chevron-right"
+                                size={14}
+                                color={BRAND_COLORS.primaryDark}
+                              />
                             </View>
                           </View>
                         )}
@@ -1016,24 +1210,64 @@ export default function HomeScreen() {
                 />
                 <Text style={styles.listTitle}>{tituloDaLista}</Text>
               </>
-            )}
-            ListEmptyComponent={<Text style={styles.mensagemNenhumResultado}>Nenhum produto encontrado.</Text>}
+            }
+            ListEmptyComponent={
+              <View>
+                <Text style={styles.mensagemNenhumResultado}>
+                  Nenhum produto cadastrado diretamente por lojas parceiras.
+                </Text>
+                <OfertasWebSection
+                  termoBusca={termoBusca}
+                  onReivindicarLoja={handleReivindicarLoja}
+                />
+              </View>
+            }
           />
-        }
+        )}
 
-        {/* Mapa e Modal (Mantidos) */}
+        {/* Mapa */}
         {mostrarMapa && mapRegion && userLocation && (
           <View style={styles.mapOverlayContainer}>
             <View style={styles.mapDisplayBox}>
               <MapView style={styles.mapViewStyle} region={mapRegion} ref={mapRef}>
-                <Marker coordinate={userLocation}><View style={styles.myLocationMarker}><Text style={styles.myLocationMarkerText}>EU</Text></View></Marker>
-                {selectedLocation && <Marker coordinate={{ latitude: selectedLocation.latitude, longitude: selectedLocation.longitude }} pinColor="red" />}
+                <Marker coordinate={userLocation}>
+                  <View style={styles.myLocationMarker}>
+                    <Text style={styles.myLocationMarkerText}>EU</Text>
+                  </View>
+                </Marker>
+                {selectedLocation && (
+                  <Marker
+                    coordinate={{
+                      latitude: selectedLocation.latitude,
+                      longitude: selectedLocation.longitude,
+                    }}
+                    pinColor="red"
+                  />
+                )}
               </MapView>
-              <TouchableOpacity style={styles.closeMapButtonOverlay} onPress={() => setMostrarMapa(false)}><Feather name="x" size={24} color={BRAND_COLORS.text} /></TouchableOpacity>
-              <TouchableOpacity style={styles.externalMapButton} onPress={() => openExternalMap(selectedLocation.latitude, selectedLocation.longitude, selectedLocation.nome)}><Text style={styles.externalMapButtonText}>Abrir Rota</Text></TouchableOpacity>
+              <TouchableOpacity
+                style={styles.closeMapButtonOverlay}
+                onPress={() => setMostrarMapa(false)}
+              >
+                <Feather name="x" size={24} color={BRAND_COLORS.text} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.externalMapButton}
+                onPress={() =>
+                  openExternalMap(
+                    selectedLocation.latitude,
+                    selectedLocation.longitude,
+                    selectedLocation.nome
+                  )
+                }
+              >
+                <Text style={styles.externalMapButtonText}>Abrir Rota</Text>
+              </TouchableOpacity>
             </View>
           </View>
         )}
+
+        {/* Modal de Detalhes do Produto */}
         {imagemModalVisivel && produtoModalAtualizado && (
           <ProductDetailsModal
             visible={imagemModalVisivel}
@@ -1043,18 +1277,18 @@ export default function HomeScreen() {
             }}
             onCardLayout={(event) => {
               const { width: modalWidth, height: modalHeight } = event.nativeEvent.layout;
-              setModalDimensoes((dimensoesAtuais) => (
+              setModalDimensoes((dimensoesAtuais) =>
                 dimensoesAtuais.width === modalWidth && dimensoesAtuais.height === modalHeight
                   ? dimensoesAtuais
                   : { width: modalWidth, height: modalHeight }
-              ));
+              );
             }}
             onImageLoad={handleImagemModalCarregada}
             imageUrl={imagemModalUrl}
             imageHeight={imagemModalAltura}
             title={produtoModalAtualizado.descricao}
             price={produtoModalAtualizado.preco}
-            imageOverlay={(
+            imageOverlay={
               <View style={styles.modalVoteActions}>
                 <TouchableOpacity
                   style={[styles.modalVoteButton, styles.modalActionLike]}
@@ -1073,17 +1307,25 @@ export default function HomeScreen() {
                   <Text style={styles.modalActionText}>({produtoModalAtualizado.unlike || 0})</Text>
                 </TouchableOpacity>
               </View>
-            )}
-            footer={(
+            }
+            footer={
               <View style={styles.modalActions}>
                 {getProdutoLocation(produtoModalAtualizado) && (
-                  <TouchableOpacity style={styles.modalAction} onPress={() => handleVerNoMapaViaModal(produtoModalAtualizado)}>
+                  <TouchableOpacity
+                    style={styles.modalAction}
+                    onPress={() => handleVerNoMapaViaModal(produtoModalAtualizado)}
+                  >
                     <Feather name="map-pin" size={18} color={BRAND_COLORS.white} />
                     <Text style={styles.modalActionText}>Mapa</Text>
                   </TouchableOpacity>
                 )}
                 {empresas[produtoModalAtualizado.empresaId]?.instagram && (
-                  <TouchableOpacity style={[styles.modalAction, styles.modalActionInstagram]} onPress={() => openInstagramProfile(empresas[produtoModalAtualizado.empresaId].instagram)}>
+                  <TouchableOpacity
+                    style={[styles.modalAction, styles.modalActionInstagram]}
+                    onPress={() =>
+                      openInstagramProfile(empresas[produtoModalAtualizado.empresaId].instagram)
+                    }
+                  >
                     <Feather name="instagram" size={18} color={BRAND_COLORS.white} />
                     <Text style={styles.modalActionText}>Instagram</Text>
                   </TouchableOpacity>
@@ -1091,7 +1333,12 @@ export default function HomeScreen() {
                 {empresas[produtoModalAtualizado.empresaId]?.telefone && (
                   <TouchableOpacity
                     style={[styles.modalAction, styles.modalActionWhatsApp]}
-                    onPress={() => openWhatsApp(empresas[produtoModalAtualizado.empresaId].telefone, `Vi esse anuncio no app TaNoPreco e gostaria de saber mais sobre: ${produtoModalAtualizado.descricao}.`)}
+                    onPress={() =>
+                      openWhatsApp(
+                        empresas[produtoModalAtualizado.empresaId].telefone,
+                        `Vi esse anuncio no app TaNoPreco e gostaria de saber mais sobre: ${produtoModalAtualizado.descricao}.`
+                      )
+                    }
                   >
                     <Feather name="message-circle" size={18} color={BRAND_COLORS.white} />
                     <Text style={styles.modalActionText}>WhatsApp</Text>
@@ -1105,40 +1352,61 @@ export default function HomeScreen() {
                   <Text style={styles.modalActionText}>Ver mais produtos dessa empresa</Text>
                 </TouchableOpacity>
               </View>
-            )}
+            }
           >
             {produtoModalAtualizado.categoria && (
               <Text style={styles.modalMeta}>Categoria: {produtoModalAtualizado.categoria}</Text>
             )}
 
             {produtoModalAtualizado.palavrasChave && (
-              <Text style={styles.modalMeta}>Palavras-chave: {produtoModalAtualizado.palavrasChave}</Text>
+              <Text style={styles.modalMeta}>
+                Palavras-chave: {produtoModalAtualizado.palavrasChave}
+              </Text>
             )}
 
             {produtoModalAtualizado.dataFinalOferta && (
-              <Text style={styles.modalMeta}>Validade: {produtoModalAtualizado.dataFinalOferta}</Text>
+              <Text style={styles.modalMeta}>
+                Validade: {produtoModalAtualizado.dataFinalOferta}
+              </Text>
             )}
 
             {produtoModalAtualizado.enquantoDurarEstoque && (
               <Text style={styles.modalMeta}>Oferta valida enquanto durar o estoque</Text>
             )}
 
-            {produtoModalAtualizado.empresaId && empresas[produtoModalAtualizado.empresaId]?.nomeEmpresa && (
-              <View style={styles.modalCompanyRow}>
-                <Text style={styles.modalMeta}>Empresa: {empresas[produtoModalAtualizado.empresaId].nomeEmpresa}</Text>
-                {empresas[produtoModalAtualizado.empresaId].verificado === true && <CompanyVerifiedBadge />}
-              </View>
-            )}
+            {produtoModalAtualizado.empresaId &&
+              empresas[produtoModalAtualizado.empresaId]?.nomeEmpresa && (
+                <View style={styles.modalCompanyRow}>
+                  <Text style={styles.modalMeta}>
+                    Empresa: {empresas[produtoModalAtualizado.empresaId].nomeEmpresa}
+                  </Text>
+                  {empresas[produtoModalAtualizado.empresaId].verificado === true && (
+                    <CompanyVerifiedBadge />
+                  )}
+                </View>
+              )}
 
             {(() => {
               const location = getProdutoLocation(produtoModalAtualizado);
-              const distanciaModal = userLocation && location ? calcularDistancia(userLocation, { latitude: location.latitude, longitude: location.longitude }) : null;
+              const distanciaModal =
+                userLocation && location
+                  ? calcularDistancia(userLocation, {
+                      latitude: location.latitude,
+                      longitude: location.longitude,
+                    })
+                  : null;
               if (!location) return null;
               return (
                 <>
-                  {distanciaModal !== null && <Text style={styles.modalMeta}>Distancia: {distanciaModal.toFixed(1)} km</Text>}
-                  <Text style={styles.modalMeta}>Localizacao: {location.isProdutoLocation ? "do produto" : "da empresa"}</Text>
-                  <Text style={styles.modalMeta}>Coordenadas: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}</Text>
+                  {distanciaModal !== null && (
+                    <Text style={styles.modalMeta}>Distancia: {distanciaModal.toFixed(1)} km</Text>
+                  )}
+                  <Text style={styles.modalMeta}>
+                    Localizacao: {location.isProdutoLocation ? "do produto" : "da empresa"}
+                  </Text>
+                  <Text style={styles.modalMeta}>
+                    Coordenadas: {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
+                  </Text>
                 </>
               );
             })()}
@@ -1158,15 +1426,13 @@ export default function HomeScreen() {
           openWhatsApp={openWhatsApp}
           onProdutoPress={handleImagePress}
         />
-
       </View>
-
     </View>
   );
 }
 
 // ----------------------------------------------------
-// 5. ESTILOS ATUALIZADOS
+// 3. ESTILOS
 // ----------------------------------------------------
 
 const styles = StyleSheet.create({
@@ -1178,41 +1444,9 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 30,
     paddingTop: 5,
     paddingBottom: 8,
-    shadowColor: "transparent",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0,
-    shadowRadius: 0,
     elevation: 0,
     zIndex: 10,
   },
-
-  // --- NOVO ESTILO: CONTADOR ---
-  contadorContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12, // Espaço entre o texto e a barra de busca
-  },
-  contadorTexto: {
-    color: BRAND_COLORS.text,
-    fontSize: 14,
-    fontWeight: "bold",
-    textShadowColor: 'rgba(255, 255, 255, 0.6)',
-    textShadowOffset: { width: 0, height: 0 },
-    textShadowRadius: 0,
-  },
-  
-  textoDestaque: {
-    color: BRAND_COLORS.primaryDark,
-    backgroundColor: "rgba(10, 79, 203, 0.12)",
-    fontSize: 16,
-    fontWeight: "900",
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 6,
-  },
-  // -----------------------------
-
   buscaOverlayContainer: {
     justifyContent: "center",
     alignItems: "center",
@@ -1284,19 +1518,17 @@ const styles = StyleSheet.create({
     color: BRAND_COLORS.primaryDark,
     textDecorationLine: "underline",
   },
-
-  // 💡 ESTILOS DA GRADE DE CATEGORIAS
   categoriasContainer: {
-    width: '100%',
-    backgroundColor:"#9ac7ff",
+    width: "100%",
+    backgroundColor: "#9ac7ff",
     borderRadius: 20,
   },
   categoriasScrollWrapper: {
     position: "relative",
   },
   categoriasGrid: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    alignItems: "flex-start",
     paddingHorizontal: 2,
     paddingTop: 10,
     gap: 2,
@@ -1305,8 +1537,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "flex-start",
     width: 60,
-    marginBottom: 0,
-    marginHorizontal: 0,
   },
   categoriaBotaoRedondo: {
     width: 46,
@@ -1377,16 +1607,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-
-  // Outros estilos (mantidos)
-  listTitleContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginHorizontal: 10,
-    borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.92)",
-  },
-  listTitle: { 
+  listTitle: {
     marginHorizontal: 12,
     marginBottom: 8,
     marginTop: 20,
@@ -1416,9 +1637,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "800",
   },
-  gradeProdutosContainer: {
-    paddingHorizontal: CARD_MARGIN,
-  },
   linhaGradeProdutos: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1427,13 +1645,11 @@ const styles = StyleSheet.create({
   celulaGradeProduto: {
     width: CARD_WIDTH,
   },
-  // Sobrescreve a largura fixa padrão do ProductCardBase para ocupar toda a célula da grade
   produtoCardGrade: {
     width: "100%",
     marginHorizontal: 0,
     marginBottom: 0,
   },
-  bannerListItem: { width: "100%", marginTop: 4 },
   mensagemNenhumResultado: {
     textAlign: "center",
     marginTop: 20,
@@ -1446,13 +1662,64 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
   },
-  mapOverlayContainer: { position: "absolute", left: 0, right: 0, top: 0, bottom: 0, backgroundColor: BRAND_COLORS.overlayStrong, justifyContent: "center", alignItems: "center", zIndex: 1000 },
-  mapDisplayBox: { width: "90%", height: "70%", backgroundColor: BRAND_COLORS.surface, borderRadius: 15, overflow: "hidden", elevation: 10, padding: 5, justifyContent: 'space-between' },
+  mapOverlayContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    top: 0,
+    bottom: 0,
+    backgroundColor: BRAND_COLORS.overlayStrong,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  mapDisplayBox: {
+    width: "90%",
+    height: "70%",
+    backgroundColor: BRAND_COLORS.surface,
+    borderRadius: 15,
+    overflow: "hidden",
+    elevation: 10,
+    padding: 5,
+    justifyContent: "space-between",
+  },
   mapViewStyle: { flex: 1, borderRadius: 10, marginBottom: 10 },
-  closeMapButtonOverlay: { position: "absolute", top: 10, right: 10, backgroundColor: "rgba(255, 255, 255, 0.96)", padding: 8, borderRadius: 20, elevation: 12, zIndex: 10, borderWidth: 1, borderColor: BRAND_COLORS.border },
-  externalMapButton: { backgroundColor: BRAND_COLORS.success, paddingVertical: 10, paddingHorizontal: 15, borderRadius: 8, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 5, alignSelf: 'center', width: '95%' },
+  closeMapButtonOverlay: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.96)",
+    padding: 8,
+    borderRadius: 20,
+    elevation: 12,
+    zIndex: 10,
+    borderWidth: 1,
+    borderColor: BRAND_COLORS.border,
+  },
+  externalMapButton: {
+    backgroundColor: BRAND_COLORS.success,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    borderRadius: 8,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 5,
+    alignSelf: "center",
+    width: "95%",
+  },
   externalMapButtonText: { color: BRAND_COLORS.white, fontWeight: "bold", fontSize: 14 },
-  myLocationMarker: { backgroundColor: BRAND_COLORS.primary, padding: 6, borderRadius: 15, width: 30, height: 30, justifyContent: "center", alignItems: "center", borderColor: BRAND_COLORS.white, borderWidth: 1.5 },
+  myLocationMarker: {
+    backgroundColor: BRAND_COLORS.primary,
+    padding: 6,
+    borderRadius: 15,
+    width: 30,
+    height: 30,
+    justifyContent: "center",
+    alignItems: "center",
+    borderColor: BRAND_COLORS.white,
+    borderWidth: 1.5,
+  },
   myLocationMarkerText: { color: BRAND_COLORS.white, fontWeight: "bold", fontSize: 10 },
   modalVoteActions: {
     position: "absolute",
