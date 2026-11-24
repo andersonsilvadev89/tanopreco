@@ -38,6 +38,33 @@ function normalizarTexto(texto: string) {
     .toLowerCase();
 }
 
+// Embaralha um array (Fisher-Yates) para variar os produtos exibidos primeiro
+function embaralhar<T>(array: T[]): T[] {
+  const copia = [...array];
+  for (let i = copia.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copia[i], copia[j]] = [copia[j], copia[i]];
+  }
+  return copia;
+}
+
+// Intercala produtos de todas as lojas (1 de cada loja por vez)
+function intercalarPorLoja(gruposPorLoja: OfertaWeb[][]): OfertaWeb[] {
+  const gruposEmbaralhados = gruposPorLoja.map((grupo) => embaralhar(grupo));
+  const resultado: OfertaWeb[] = [];
+  const maiorGrupo = Math.max(0, ...gruposEmbaralhados.map((g) => g.length));
+
+  for (let i = 0; i < maiorGrupo; i++) {
+    for (const grupo of gruposEmbaralhados) {
+      if (grupo[i]) {
+        resultado.push(grupo[i]);
+      }
+    }
+  }
+
+  return resultado;
+}
+
 export function OfertasWebSection({
   termoBusca,
   onReivindicarLoja,
@@ -50,18 +77,24 @@ export function OfertasWebSection({
     const unsubscribe = onValue(
       ofertasRef,
       (snapshot) => {
-        const lista: OfertaWeb[] = [];
+        const gruposPorLoja: OfertaWeb[][] = [];
+
         if (snapshot.exists()) {
           snapshot.forEach((lojaSnapshot) => {
+            const itensDaLoja: OfertaWeb[] = [];
             lojaSnapshot.forEach((produtoSnapshot) => {
-              lista.push({
+              itensDaLoja.push({
                 id: produtoSnapshot.key!,
                 ...produtoSnapshot.val(),
               });
             });
+            if (itensDaLoja.length > 0) {
+              gruposPorLoja.push(itensDaLoja);
+            }
           });
         }
-        setOfertas(lista);
+
+        setOfertas(intercalarPorLoja(gruposPorLoja));
         setCarregando(false);
       },
       () => setCarregando(false)
@@ -72,7 +105,7 @@ export function OfertasWebSection({
 
   const ofertasFiltradas = useMemo(() => {
     const busca = normalizarTexto(termoBusca.trim());
-    if (!busca) return ofertas.slice(0, 15);
+    if (!busca) return ofertas;
 
     const termos = busca.split(/\s+/).filter(Boolean);
     return ofertas.filter((item) => {
@@ -119,6 +152,9 @@ export function OfertasWebSection({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
+        initialNumToRender={8}
+        maxToRenderPerBatch={10}
+        windowSize={5}
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.webTag}>
