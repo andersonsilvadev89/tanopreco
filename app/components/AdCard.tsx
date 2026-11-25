@@ -11,6 +11,10 @@ const IOS_AD_UNIT_ID = "ca-app-pub-5241782827769638/1260262961";
 const ANDROID_AD_UNIT_ID = "ca-app-pub-5241782827769638/2862164767";
 
 const CARD_WIDTH = 175;
+const CARD_PADDING = 10;
+const CARD_BORDER = 1;
+const MEDIA_WIDTH = CARD_WIDTH - CARD_PADDING * 2 - CARD_BORDER * 2;
+const MEDIA_HEIGHT = 120;
 
 const AdCard: React.FC = () => {
   const googleMobileAds = getGoogleMobileAdsModule();
@@ -127,7 +131,7 @@ const AdCard: React.FC = () => {
 
         {/* Mídia do Anúncio */}
         <View style={styles.imageArea}>
-          <NativeMediaView style={styles.imagemProduto} />
+          <NativeMediaView style={styles.imagemProduto} resizeMode="cover" />
         </View>
 
         {/* Título */}
@@ -183,8 +187,8 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: BRAND_COLORS.surface,
     borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
+    padding: CARD_PADDING,
+    borderWidth: CARD_BORDER,
     borderColor: BRAND_COLORS.border,
     elevation: 2,
     shadowColor: "#000",
@@ -227,15 +231,19 @@ const styles = StyleSheet.create({
     color: BRAND_COLORS.primaryDark,
   },
   imageArea: {
-    width: "100%",
+    width: MEDIA_WIDTH,
+    height: MEDIA_HEIGHT,
+    alignSelf: "center",
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: BRAND_COLORS.surfaceSoft,
     marginBottom: 8,
   },
   imagemProduto: {
-    width: "100%",
-    height: 115,
-    borderRadius: 8,
-    backgroundColor: BRAND_COLORS.surfaceSoft,
-    overflow: "hidden",
+    width: MEDIA_WIDTH,
+    height: MEDIA_HEIGHT,
   },
   descricao: {
     fontSize: 13,
