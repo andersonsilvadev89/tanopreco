@@ -1,19 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState, memo } from "react";
-import {
-  Dimensions,
-  FlatList,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { BRAND_COLORS } from "@/constants/BrandColors";
 import { ProductCardBase } from "./ProductCardBase";
 import AdCard from "./AdCard";
 
-const { width } = Dimensions.get("window");
-const CARD_WIDTH = (width - 32) / 2;
+const CARD_WIDTH = 175;
 const PRODUTOS_POR_ADCARD = 3;
 
 interface ProdutoDestaque {
@@ -22,6 +15,8 @@ interface ProdutoDestaque {
   preco: string;
   imagemUrl?: string;
   nomeEmpresa: string;
+  verificado?: boolean;
+  categoria?: string;
   latitudeEmpresa?: number;
   longitudeEmpresa?: number;
   latitudeProduto?: number;
@@ -42,8 +37,11 @@ interface DestaquesNoticiasProps {
   userLocation: { latitude: number; longitude: number } | null;
 }
 
-
-function DestaquesNoticiasComponent({ produtos, onProdutoPress, userLocation }: DestaquesNoticiasProps) {
+function DestaquesNoticiasComponent({
+  produtos,
+  onProdutoPress,
+  userLocation,
+}: DestaquesNoticiasProps) {
   const [scrollX, setScrollX] = useState(0);
   const [larguraViewport, setLarguraViewport] = useState(0);
   const [larguraConteudo, setLarguraConteudo] = useState(0);
@@ -90,7 +88,12 @@ function DestaquesNoticiasComponent({ produtos, onProdutoPress, userLocation }: 
                 userLocation={userLocation}
                 onCardPress={() => onProdutoPress(produto)}
                 cardStyle={styles.noticia}
-                imageOverlay={<View style={styles.seloDestaque}><Feather name="star" size={11} color={BRAND_COLORS.white} /><Text style={styles.seloDestaqueTexto}>Destaque</Text></View>}
+                topTag={
+                  <View style={styles.seloDestaque}>
+                    <Feather name="star" size={10} color={BRAND_COLORS.white} />
+                    <Text style={styles.seloDestaqueTexto}>Destaque</Text>
+                  </View>
+                }
               />
               {(index + 1) % PRODUTOS_POR_ADCARD === 0 && <AdCard />}
             </React.Fragment>
@@ -150,7 +153,7 @@ const styles = StyleSheet.create({
   },
   titulo: {
     marginHorizontal: 12,
-    marginBottom: 8,
+    marginBottom: 10,
     color: "#063494",
     fontSize: 18,
     fontWeight: "800",
@@ -159,153 +162,39 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   conteudo: {
-    paddingHorizontal: 0,
+    paddingHorizontal: 4,
+    paddingBottom: 4,
   },
   noticia: {
     width: CARD_WIDTH,
-    backgroundColor: "rgb(255, 255, 255)",
-    borderRadius: 14,
+    backgroundColor: BRAND_COLORS.surface,
+    borderRadius: 12,
     borderWidth: 1.5,
     borderColor: BRAND_COLORS.primary,
-    padding: 6,
+    padding: 10,
     marginHorizontal: 0,
-    marginRight: 12,
-    alignItems: "center",
+    marginRight: 10,
+    marginBottom: 0,
     shadowColor: BRAND_COLORS.primaryDark,
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.18,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  imageArea: {
-    position: "relative",
-    width: "100%",
-    alignItems: "center",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.14,
+    shadowRadius: 4,
+    elevation: 3,
   },
   seloDestaque: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    zIndex: 2,
+    alignSelf: "flex-start",
     flexDirection: "row",
     alignItems: "center",
     gap: 3,
     backgroundColor: BRAND_COLORS.primary,
-    borderTopLeftRadius: 10,
-    borderBottomRightRadius: 10,
+    borderRadius: 6,
     paddingHorizontal: 6,
-    paddingVertical: 3,
-    shadowColor: BRAND_COLORS.primaryDark,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.24,
-    shadowRadius: 2,
-    elevation: 3,
+    paddingVertical: 2,
   },
   seloDestaqueTexto: {
     color: BRAND_COLORS.white,
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  imagem: {
-    width: "80%",
-    alignSelf: "flex-end",
-    height: 104,
-    borderRadius: 32,
-    backgroundColor: BRAND_COLORS.surfaceSoft,
-  },
-  imagemSemFoto: {
-    width: "100%",
-    borderRadius: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badgeEmpresa: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    maxWidth: "64%",
-    backgroundColor: "rgba(0,0,0,1)",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-  badgeEmpresaText: {
-    color: BRAND_COLORS.white,
-    fontSize: 8,
-    fontWeight: "700",
-  },
-  badgePreco: {
-    position: "absolute",
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(16,117,60,1)",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 4,
-  },
-  badgePrecoText: {
-    color: BRAND_COLORS.white,
-    fontSize: 12,
-    fontWeight: "800",
-  },
-  descRow: {
-    width: "100%",
-    marginTop: 8,
-    paddingHorizontal: 3,
-  },
-  descricao: {
-    color: BRAND_COLORS.text,
     fontSize: 10,
-    fontWeight: "700",
-    lineHeight: 13,
-    textAlign: "center",
-  },
-  descHint: {
-    fontSize: 8,
-    color: BRAND_COLORS.primary,
-    fontWeight: "700",
-  },
-  metaRow: {
-    width: "100%",
-    alignItems: "center",
-    marginTop: 3,
-    marginBottom: 0,
-  },
-  distancia: {
-    color: BRAND_COLORS.primary,
-    fontSize: 9,
-    fontWeight: "700",
-    textAlign: "center",
-  },
-  dataOferta: {
-    color: BRAND_COLORS.textMuted,
-    fontSize: 8,
-    textAlign: "center",
-    marginTop: 1,
-    marginBottom:20,
-  },
-  actionOverlay: {
-    position: "absolute",
-    left: 0,
-    bottom: 0,
-    flexDirection: "column",
-    gap: 5,
-  },
-  smallActionButton: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: "rgba(10,79,203,0.82)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.4)",
-  },
-  instagramButton: {
-    backgroundColor: "rgba(225,48,108,0.82)",
-  },
-  whatsappButton: {
-    backgroundColor: "rgba(37,211,102,0.82)",
+    fontWeight: "800",
   },
   dicaLateral: {
     position: "absolute",
@@ -332,8 +221,6 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: "transparent",
-    borderWidth: 0,
-    borderColor: BRAND_COLORS.border,
     justifyContent: "center",
     alignItems: "center",
   },

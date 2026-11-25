@@ -14,6 +14,9 @@ import { Feather } from "@expo/vector-icons";
 import { ref, onValue } from "firebase/database";
 import { database } from "../../firebaseConfig";
 import { BRAND_COLORS } from "@/constants/BrandColors";
+import AdCard from "./AdCard";
+
+const PRODUTOS_POR_ADCARD = 3;
 
 export interface UnidadeLoja {
   nome: string;
@@ -249,76 +252,80 @@ export function OfertasWebSection({
         initialNumToRender={8}
         maxToRenderPerBatch={10}
         windowSize={5}
-        renderItem={({ item }) => {
+        renderItem={({ item, index }) => {
           const proxima = getUnidadeMaisProxima(unidadesPorLoja[item.lojaId], userLocation);
 
           return (
-            <View style={styles.card}>
-              <View style={styles.webTag}>
-                <Text style={styles.webTagText}>Preço na Web</Text>
-              </View>
-
-              {item.imagemUrl ? (
-                <Image source={{ uri: item.imagemUrl }} style={styles.image} resizeMode="contain" />
-              ) : (
-                <View style={[styles.image, styles.imagePlaceholder]}>
-                  <Feather name="shopping-bag" size={24} color={BRAND_COLORS.textMuted} />
+            <React.Fragment key={item.id}>
+              <View style={styles.card}>
+                <View style={styles.webTag}>
+                  <Text style={styles.webTagText}>Preço na Web</Text>
                 </View>
-              )}
 
-              <Text style={styles.descricao} numberOfLines={2}>
-                {item.descricao}
-              </Text>
+                {item.imagemUrl ? (
+                  <Image source={{ uri: item.imagemUrl }} style={styles.image} resizeMode="contain" />
+                ) : (
+                  <View style={[styles.image, styles.imagePlaceholder]}>
+                    <Feather name="shopping-bag" size={24} color={BRAND_COLORS.textMuted} />
+                  </View>
+                )}
 
-              <Text style={styles.preco}>{item.preco}</Text>
-
-              <Text style={styles.lojaNome} numberOfLines={1}>
-                {item.nomeLoja}
-              </Text>
-
-              {proxima && (
-                <Text style={styles.distanciaTexto} numberOfLines={1}>
-                  ≈ {proxima.distanciaKm.toFixed(1)} km • {proxima.unidade.nome}
+                <Text style={styles.descricao} numberOfLines={2}>
+                  {item.descricao}
                 </Text>
-              )}
 
-              <View style={styles.botoesRow}>
-                <TouchableOpacity
-                  style={styles.verSiteButton}
-                  onPress={() => abrirLinkExterno(item.urlProduto)}
-                  activeOpacity={0.85}
-                >
-                  <Feather name="external-link" size={12} color={BRAND_COLORS.white} />
-                  <Text style={styles.verSiteText}>Site</Text>
-                </TouchableOpacity>
+                <Text style={styles.preco}>{item.preco}</Text>
 
-                {proxima && onVerNoMapa && (
+                <Text style={styles.lojaNome} numberOfLines={1}>
+                  {item.nomeLoja}
+                </Text>
+
+                {proxima && (
+                  <Text style={styles.distanciaTexto} numberOfLines={1}>
+                    ≈ {proxima.distanciaKm.toFixed(1)} km • {proxima.unidade.nome}
+                  </Text>
+                )}
+
+                <View style={styles.botoesRow}>
                   <TouchableOpacity
-                    style={styles.rotaButton}
-                    onPress={() =>
-                      onVerNoMapa({
-                        latitude: proxima.unidade.latitude,
-                        longitude: proxima.unidade.longitude,
-                        nome: `${item.nomeLoja} - ${proxima.unidade.nome}`,
-                      })
-                    }
+                    style={styles.verSiteButton}
+                    onPress={() => abrirLinkExterno(item.urlProduto)}
                     activeOpacity={0.85}
                   >
-                    <Feather name="map-pin" size={12} color={BRAND_COLORS.white} />
-                    <Text style={styles.verSiteText}>Mapa</Text>
+                    <Feather name="external-link" size={12} color={BRAND_COLORS.white} />
+                    <Text style={styles.verSiteText}>Site</Text>
+                  </TouchableOpacity>
+
+                  {proxima && onVerNoMapa && (
+                    <TouchableOpacity
+                      style={styles.rotaButton}
+                      onPress={() =>
+                        onVerNoMapa({
+                          latitude: proxima.unidade.latitude,
+                          longitude: proxima.unidade.longitude,
+                          nome: `${item.nomeLoja} - ${proxima.unidade.nome}`,
+                        })
+                      }
+                      activeOpacity={0.85}
+                    >
+                      <Feather name="map-pin" size={12} color={BRAND_COLORS.white} />
+                      <Text style={styles.verSiteText}>Mapa</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+
+                {onReivindicarLoja && (
+                  <TouchableOpacity
+                    style={styles.reivindicarButton}
+                    onPress={() => onReivindicarLoja(item.nomeLoja)}
+                  >
+                    <Text style={styles.reivindicarText}>É sua loja? Reivindicar</Text>
                   </TouchableOpacity>
                 )}
               </View>
 
-              {onReivindicarLoja && (
-                <TouchableOpacity
-                  style={styles.reivindicarButton}
-                  onPress={() => onReivindicarLoja(item.nomeLoja)}
-                >
-                  <Text style={styles.reivindicarText}>É sua loja? Reivindicar</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+              {(index + 1) % PRODUTOS_POR_ADCARD === 0 && <AdCard />}
+            </React.Fragment>
           );
         }}
       />
@@ -362,7 +369,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   listContent: {
-    gap: 10,
+    paddingHorizontal: 4,
     paddingBottom: 4,
   },
   card: {
@@ -370,6 +377,7 @@ const styles = StyleSheet.create({
     backgroundColor: BRAND_COLORS.surface,
     borderRadius: 12,
     padding: 10,
+    marginRight: 10,
     borderWidth: 1,
     borderColor: BRAND_COLORS.border,
     elevation: 2,
