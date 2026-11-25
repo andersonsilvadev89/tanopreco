@@ -1057,6 +1057,7 @@ export default function HomeScreen() {
 
                   <OfertasWebSection
                     termoBusca={termoBusca}
+                    categoriaSelecionada={categoriaSelecionada}
                     userLocation={userLocation}
                     ordenarPorPreco={ordenarPorPreco}
                     ordenacaoManual={ordenacaoManual}
@@ -1250,6 +1251,7 @@ export default function HomeScreen() {
                 </Text>
                 <OfertasWebSection
                   termoBusca={termoBusca}
+                  categoriaSelecionada={categoriaSelecionada}
                   userLocation={userLocation}
                   ordenarPorPreco={ordenarPorPreco}
                   ordenacaoManual={ordenacaoManual}

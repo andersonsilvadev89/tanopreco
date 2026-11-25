@@ -32,12 +32,14 @@ export interface OfertaWeb {
   imagemUrl?: string;
   nomeLoja: string;
   cidade?: string;
+  categoria?: string;
   urlProduto: string;
   atualizadoEm?: string;
 }
 
 interface OfertasWebSectionProps {
   termoBusca: string;
+  categoriaSelecionada?: string | null;
   userLocation: { latitude: number; longitude: number } | null;
   ordenarPorPreco: boolean;
   ordenacaoManual: boolean;
@@ -50,6 +52,79 @@ function normalizarTexto(texto: string) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase();
+}
+
+const LOJAS_POR_CATEGORIA: Record<string, string[]> = {
+  mercado: ["diniz", "saoluiz", "atacadao"],
+  saude: ["paguemenos", "feitosa"],
+  utilidades: ["freitas", "corba"],
+  construcao: ["casadoeletricista"],
+};
+
+const PALAVRAS_POR_CATEGORIA: Record<string, string[]> = {
+  alimentacao: [
+    "arroz", "feijao", "acucar", "oleo", "macarrao", "carne", "frango", "queijo",
+    "biscoito", "pao", "chocolate", "cereal", "fruta", "pitaia", "panetone", "bolo",
+    "molho", "tempero", "farinha", "manteiga", "margarina", "iogurte", "presunto",
+    "salsicha", "ovo", "azeite", "bolacha", "sorvete", "pizza", "hamburguer", "leite condensado",
+  ],
+  bebidas: [
+    "cerveja", "suco", "refrigerante", "agua", "vinho", "whisky", "vodka", "energetico",
+    "cha ", "achocolatado", "guarana", "coca", "pepsi", "heineken", "budweiser", "brahma",
+    "skol", "itaipava", "sprite", "fanta", "leite", "cafe", "espumante", "gin", "isotonic",
+  ],
+  saude: [
+    "dipirona", "paracetamol", "vitamina", "xarope", "comprimido", "capsula", "pomada",
+    "nasal", "neosoro", "suplemento", "termometro", "curativo", "alcool", "dorflex",
+    "advil", "benegrip", "medicamento", "remedio", "solucao", "gotas", "mg",
+  ],
+  beleza: [
+    "shampoo", "condicionador", "sabonete", "hidratante", "creme", "protetor solar",
+    "desodorante", "perfume", "maquiagem", "batom", "esmalte", "tintura", "cabelo",
+    "facial", "serum", "colonia", "escova", "secador", "barbear", "depil",
+  ],
+  kids: [
+    "fralda", "lenco umedecido", "mamadeira", "chupeta", "infantil", "bebe", "brinquedo",
+    "assadura", "aptamil", "ninho", "nan ", "kids",
+  ],
+  utilidades: [
+    "panela", "copo", "prato", "jarra", "talher", "garrafa", "pote", "balde", "vassoura",
+    "rodo", "lixeira", "tapete", "toalha", "lencol", "travesseiro", "organizador", "forma",
+    "frigideira", "chaleira", "batedeira", "liquidificador", "air fryer", "fritadeira",
+    "cafeteira", "ventilador", "ferro", "aspirador", "lampada", "extensao", "lanterna",
+  ],
+  tecnologia: [
+    "celular", "fone", "carregador", "cabo", "usb", "caixa de som", "mouse", "teclado",
+    "smart", "notebook", "tablet", "pilha", "bateria", "eletronico",
+  ],
+  moveis: [
+    "cadeira", "mesa", "sofa", "estante", "armario", "cama", "colchao", "banqueta",
+    "rack", "prateleira",
+  ],
+};
+
+function pertenceACategoria(item: OfertaWeb, categoriaSelecionada: string): boolean {
+  const catNorm = normalizarTexto(categoriaSelecionada);
+
+  // 1. Se o item já vier com categoria do scraper
+  if (item.categoria && normalizarTexto(item.categoria).includes(catNorm)) {
+    return true;
+  }
+
+  // 2. Verifica se a loja pertence diretamente à categoria (ex: Mercado, Saúde, Utilidades)
+  const lojasDaCategoria = LOJAS_POR_CATEGORIA[catNorm];
+  if (lojasDaCategoria?.includes(item.lojaId)) {
+    return true;
+  }
+
+  // 3. Verifica palavras-chave na descrição do produto
+  const palavras = PALAVRAS_POR_CATEGORIA[catNorm];
+  if (palavras) {
+    const descNorm = normalizarTexto(item.descricao);
+    return palavras.some((palavra) => descNorm.includes(palavra));
+  }
+
+  return false;
 }
 
 function embaralhar<T>(array: T[]): T[] {
@@ -121,6 +196,7 @@ function parsePreco(preco: string) {
 
 export function OfertasWebSection({
   termoBusca,
+  categoriaSelecionada,
   userLocation,
   ordenarPorPreco,
   ordenacaoManual,
@@ -179,16 +255,22 @@ export function OfertasWebSection({
   const ofertasFiltradas = useMemo(() => {
     const busca = normalizarTexto(termoBusca.trim());
 
-    const filtradas = !busca
-      ? ofertas
-      : ofertas.filter((item) => {
-          const termos = busca.split(/\s+/).filter(Boolean);
-          const alvo = normalizarTexto(`${item.descricao} ${item.nomeLoja} ${item.cidade || ""}`);
-          return termos.every((t) => alvo.includes(t));
-        });
+    let filtradas = ofertas;
 
-    // Mantém intercalado apenas na abertura inicial (sem busca e sem mexer no switch)
-    if (!busca && !ordenacaoManual) {
+    if (categoriaSelecionada) {
+      filtradas = filtradas.filter((item) => pertenceACategoria(item, categoriaSelecionada));
+    }
+
+    if (busca) {
+      const termos = busca.split(/\s+/).filter(Boolean);
+      filtradas = filtradas.filter((item) => {
+        const alvo = normalizarTexto(`${item.descricao} ${item.nomeLoja} ${item.cidade || ""}`);
+        return termos.every((t) => alvo.includes(t));
+      });
+    }
+
+    // Mantém intercalado apenas na abertura inicial (sem busca, sem categoria e sem mexer no switch)
+    if (!busca && !categoriaSelecionada && !ordenacaoManual) {
       return filtradas;
     }
 
@@ -209,7 +291,15 @@ export function OfertasWebSection({
         return precoA - precoB;
       }
     });
-  }, [ofertas, termoBusca, unidadesPorLoja, userLocation, ordenarPorPreco, ordenacaoManual]);
+  }, [
+    ofertas,
+    termoBusca,
+    categoriaSelecionada,
+    unidadesPorLoja,
+    userLocation,
+    ordenarPorPreco,
+    ordenacaoManual,
+  ]);
 
   const abrirLinkExterno = async (url: string) => {
     try {
@@ -231,14 +321,18 @@ export function OfertasWebSection({
     return null;
   }
 
+  const tituloSecao = termoBusca.trim()
+    ? "Encontrado em sites locais"
+    : categoriaSelecionada
+      ? `Na Web (${categoriaSelecionada})`
+      : "Monitorado na Web (Região)";
+
   return (
     <View style={styles.container}>
       <View style={styles.headerRow}>
         <View style={styles.titleWrapper}>
           <Feather name="globe" size={16} color={BRAND_COLORS.primaryDark} />
-          <Text style={styles.sectionTitle}>
-            {termoBusca.trim() ? "Encontrado em sites locais" : "Monitorado na Web (Região)"}
-          </Text>
+          <Text style={styles.sectionTitle}>{tituloSecao}</Text>
         </View>
         <Text style={styles.countBadge}>{ofertasFiltradas.length} itens</Text>
       </View>
