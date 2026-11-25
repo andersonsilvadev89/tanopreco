@@ -15,8 +15,15 @@ import { ref, onValue } from "firebase/database";
 import { database } from "../../firebaseConfig";
 import { BRAND_COLORS } from "@/constants/BrandColors";
 
+export interface UnidadeLoja {
+  nome: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface OfertaWeb {
   id: string;
+  lojaId: string;
   descricao: string;
   preco: string;
   imagemUrl?: string;
@@ -28,6 +35,10 @@ export interface OfertaWeb {
 
 interface OfertasWebSectionProps {
   termoBusca: string;
+  userLocation: { latitude: number; longitude: number } | null;
+  ordenarPorPreco: boolean;
+  ordenacaoManual: boolean;
+  onVerNoMapa?: (local: { latitude: number; longitude: number; nome: string }) => void;
   onReivindicarLoja?: (nomeLoja: string) => void;
 }
 
@@ -38,7 +49,6 @@ function normalizarTexto(texto: string) {
     .toLowerCase();
 }
 
-// Embaralha um array (Fisher-Yates) para variar os produtos exibidos primeiro
 function embaralhar<T>(array: T[]): T[] {
   const copia = [...array];
   for (let i = copia.length - 1; i > 0; i--) {
@@ -48,7 +58,6 @@ function embaralhar<T>(array: T[]): T[] {
   return copia;
 }
 
-// Intercala produtos de todas as lojas (1 de cada loja por vez)
 function intercalarPorLoja(gruposPorLoja: OfertaWeb[][]): OfertaWeb[] {
   const gruposEmbaralhados = gruposPorLoja.map((grupo) => embaralhar(grupo));
   const resultado: OfertaWeb[] = [];
@@ -65,29 +74,80 @@ function intercalarPorLoja(gruposPorLoja: OfertaWeb[][]): OfertaWeb[] {
   return resultado;
 }
 
+function calcularDistanciaKm(
+  origem: { latitude: number; longitude: number },
+  destino: { latitude: number; longitude: number }
+) {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const R = 6371;
+  const dLat = toRad(destino.latitude - origem.latitude);
+  const dLon = toRad(destino.longitude - origem.longitude);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(origem.latitude)) *
+      Math.cos(toRad(destino.latitude)) *
+      Math.sin(dLon / 2) ** 2;
+  return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function getUnidadeMaisProxima(
+  unidades: UnidadeLoja[] | undefined,
+  userLocation: { latitude: number; longitude: number } | null
+) {
+  if (!unidades?.length || !userLocation) return null;
+
+  let maisProxima = unidades[0];
+  let menorDistancia = calcularDistanciaKm(userLocation, unidades[0]);
+
+  for (let i = 1; i < unidades.length; i++) {
+    const dist = calcularDistanciaKm(userLocation, unidades[i]);
+    if (dist < menorDistancia) {
+      menorDistancia = dist;
+      maisProxima = unidades[i];
+    }
+  }
+
+  return { unidade: maisProxima, distanciaKm: menorDistancia };
+}
+
+function parsePreco(preco: string) {
+  const limpo = preco.replace("R$", "").replace(/\./g, "").replace(",", ".").trim();
+  const num = parseFloat(limpo);
+  return Number.isNaN(num) ? Infinity : num;
+}
+
 export function OfertasWebSection({
   termoBusca,
+  userLocation,
+  ordenarPorPreco,
+  ordenacaoManual,
+  onVerNoMapa,
   onReivindicarLoja,
 }: OfertasWebSectionProps) {
   const [ofertas, setOfertas] = useState<OfertaWeb[]>([]);
+  const [unidadesPorLoja, setUnidadesPorLoja] = useState<Record<string, UnidadeLoja[]>>({});
   const [carregando, setCarregando] = useState(true);
 
   useEffect(() => {
     const ofertasRef = ref(database, "ofertasMonitoradas");
-    const unsubscribe = onValue(
+    const unsubscribeOfertas = onValue(
       ofertasRef,
       (snapshot) => {
         const gruposPorLoja: OfertaWeb[][] = [];
 
         if (snapshot.exists()) {
           snapshot.forEach((lojaSnapshot) => {
+            const lojaId = lojaSnapshot.key!;
             const itensDaLoja: OfertaWeb[] = [];
+
             lojaSnapshot.forEach((produtoSnapshot) => {
               itensDaLoja.push({
                 id: produtoSnapshot.key!,
+                lojaId,
                 ...produtoSnapshot.val(),
               });
             });
+
             if (itensDaLoja.length > 0) {
               gruposPorLoja.push(itensDaLoja);
             }
@@ -100,19 +160,53 @@ export function OfertasWebSection({
       () => setCarregando(false)
     );
 
-    return () => unsubscribe();
+    const unidadesRef = ref(database, "unidadesMonitoradas");
+    const unsubscribeUnidades = onValue(unidadesRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setUnidadesPorLoja(snapshot.val());
+      }
+    });
+
+    return () => {
+      unsubscribeOfertas();
+      unsubscribeUnidades();
+    };
   }, []);
 
   const ofertasFiltradas = useMemo(() => {
     const busca = normalizarTexto(termoBusca.trim());
-    if (!busca) return ofertas;
 
-    const termos = busca.split(/\s+/).filter(Boolean);
-    return ofertas.filter((item) => {
-      const alvo = normalizarTexto(`${item.descricao} ${item.nomeLoja} ${item.cidade || ""}`);
-      return termos.every((t) => alvo.includes(t));
+    const filtradas = !busca
+      ? ofertas
+      : ofertas.filter((item) => {
+          const termos = busca.split(/\s+/).filter(Boolean);
+          const alvo = normalizarTexto(`${item.descricao} ${item.nomeLoja} ${item.cidade || ""}`);
+          return termos.every((t) => alvo.includes(t));
+        });
+
+    // Mantém intercalado apenas na abertura inicial (sem busca e sem mexer no switch)
+    if (!busca && !ordenacaoManual) {
+      return filtradas;
+    }
+
+    return [...filtradas].sort((a, b) => {
+      const precoA = parsePreco(a.preco);
+      const precoB = parsePreco(b.preco);
+      const distA =
+        getUnidadeMaisProxima(unidadesPorLoja[a.lojaId], userLocation)?.distanciaKm ?? Infinity;
+      const distB =
+        getUnidadeMaisProxima(unidadesPorLoja[b.lojaId], userLocation)?.distanciaKm ?? Infinity;
+
+      if (ordenarPorPreco) {
+        if (precoA !== precoB) return precoA - precoB;
+        return distA - distB;
+      } else {
+        const diffDist = distA - distB;
+        if (Math.abs(diffDist) > 0.005) return diffDist;
+        return precoA - precoB;
+      }
     });
-  }, [ofertas, termoBusca]);
+  }, [ofertas, termoBusca, unidadesPorLoja, userLocation, ordenarPorPreco, ordenacaoManual]);
 
   const abrirLinkExterno = async (url: string) => {
     try {
@@ -155,49 +249,78 @@ export function OfertasWebSection({
         initialNumToRender={8}
         maxToRenderPerBatch={10}
         windowSize={5}
-        renderItem={({ item }) => (
-          <View style={styles.card}>
-            <View style={styles.webTag}>
-              <Text style={styles.webTagText}>Preço na Web</Text>
-            </View>
+        renderItem={({ item }) => {
+          const proxima = getUnidadeMaisProxima(unidadesPorLoja[item.lojaId], userLocation);
 
-            {item.imagemUrl ? (
-              <Image source={{ uri: item.imagemUrl }} style={styles.image} resizeMode="contain" />
-            ) : (
-              <View style={[styles.image, styles.imagePlaceholder]}>
-                <Feather name="shopping-bag" size={24} color={BRAND_COLORS.textMuted} />
+          return (
+            <View style={styles.card}>
+              <View style={styles.webTag}>
+                <Text style={styles.webTagText}>Preço na Web</Text>
               </View>
-            )}
 
-            <Text style={styles.descricao} numberOfLines={2}>
-              {item.descricao}
-            </Text>
+              {item.imagemUrl ? (
+                <Image source={{ uri: item.imagemUrl }} style={styles.image} resizeMode="contain" />
+              ) : (
+                <View style={[styles.image, styles.imagePlaceholder]}>
+                  <Feather name="shopping-bag" size={24} color={BRAND_COLORS.textMuted} />
+                </View>
+              )}
 
-            <Text style={styles.preco}>{item.preco}</Text>
+              <Text style={styles.descricao} numberOfLines={2}>
+                {item.descricao}
+              </Text>
 
-            <Text style={styles.lojaNome} numberOfLines={1}>
-              {item.nomeLoja} {item.cidade ? `• ${item.cidade}` : ""}
-            </Text>
+              <Text style={styles.preco}>{item.preco}</Text>
 
-            <TouchableOpacity
-              style={styles.verSiteButton}
-              onPress={() => abrirLinkExterno(item.urlProduto)}
-              activeOpacity={0.85}
-            >
-              <Feather name="external-link" size={13} color={BRAND_COLORS.white} />
-              <Text style={styles.verSiteText}>Ver no site</Text>
-            </TouchableOpacity>
+              <Text style={styles.lojaNome} numberOfLines={1}>
+                {item.nomeLoja}
+              </Text>
 
-            {onReivindicarLoja && (
-              <TouchableOpacity
-                style={styles.reivindicarButton}
-                onPress={() => onReivindicarLoja(item.nomeLoja)}
-              >
-                <Text style={styles.reivindicarText}>É sua loja? Reivindicar</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+              {proxima && (
+                <Text style={styles.distanciaTexto} numberOfLines={1}>
+                  ≈ {proxima.distanciaKm.toFixed(1)} km • {proxima.unidade.nome}
+                </Text>
+              )}
+
+              <View style={styles.botoesRow}>
+                <TouchableOpacity
+                  style={styles.verSiteButton}
+                  onPress={() => abrirLinkExterno(item.urlProduto)}
+                  activeOpacity={0.85}
+                >
+                  <Feather name="external-link" size={12} color={BRAND_COLORS.white} />
+                  <Text style={styles.verSiteText}>Site</Text>
+                </TouchableOpacity>
+
+                {proxima && onVerNoMapa && (
+                  <TouchableOpacity
+                    style={styles.rotaButton}
+                    onPress={() =>
+                      onVerNoMapa({
+                        latitude: proxima.unidade.latitude,
+                        longitude: proxima.unidade.longitude,
+                        nome: `${item.nomeLoja} - ${proxima.unidade.nome}`,
+                      })
+                    }
+                    activeOpacity={0.85}
+                  >
+                    <Feather name="map-pin" size={12} color={BRAND_COLORS.white} />
+                    <Text style={styles.verSiteText}>Mapa</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {onReivindicarLoja && (
+                <TouchableOpacity
+                  style={styles.reivindicarButton}
+                  onPress={() => onReivindicarLoja(item.nomeLoja)}
+                >
+                  <Text style={styles.reivindicarText}>É sua loja? Reivindicar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          );
+        }}
       />
     </View>
   );
@@ -243,7 +366,7 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   card: {
-    width: 170,
+    width: 175,
     backgroundColor: BRAND_COLORS.surface,
     borderRadius: 12,
     padding: 10,
@@ -290,22 +413,45 @@ const styles = StyleSheet.create({
   },
   lojaNome: {
     fontSize: 11,
-    color: BRAND_COLORS.textMuted,
+    fontWeight: "700",
+    color: BRAND_COLORS.text,
+    marginTop: 2,
+  },
+  distanciaTexto: {
+    fontSize: 10,
+    color: BRAND_COLORS.primary,
+    fontWeight: "700",
     marginTop: 2,
     marginBottom: 8,
   },
+  botoesRow: {
+    flexDirection: "row",
+    gap: 6,
+    marginTop: 4,
+  },
   verSiteButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: 5,
+    gap: 4,
     backgroundColor: BRAND_COLORS.primary,
+    paddingVertical: 7,
+    borderRadius: 8,
+  },
+  rotaButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    backgroundColor: BRAND_COLORS.success,
     paddingVertical: 7,
     borderRadius: 8,
   },
   verSiteText: {
     color: BRAND_COLORS.white,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
   },
   reivindicarButton: {

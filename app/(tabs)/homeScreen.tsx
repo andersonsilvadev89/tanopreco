@@ -308,6 +308,24 @@ export default function HomeScreen() {
     []
   );
 
+  const handleVerNoMapaWeb = useCallback(
+    (local: { latitude: number; longitude: number; nome: string }) => {
+      setSelectedLocation({
+        latitude: local.latitude,
+        longitude: local.longitude,
+        nome: local.nome,
+      });
+      setMapRegion({
+        latitude: local.latitude,
+        longitude: local.longitude,
+        latitudeDelta: 0.0922,
+        longitudeDelta: 0.0421,
+      });
+      setMostrarMapa(true);
+    },
+    []
+  );
+
   const handleImagePress = useCallback((produto: ProdutoComEmpresa) => {
     setProdutoModal(produto);
     setImagemModalUrl(produto.imagemUrl ?? null);
@@ -630,11 +648,11 @@ export default function HomeScreen() {
 
   const tituloDaLista =
     (termoBusca.length >= 3 && categoriaSelecionada) ||
-    (!(termoBusca.length >= 3) && categoriaSelecionada)
+      (!(termoBusca.length >= 3) && categoriaSelecionada)
       ? `Resultados da busca (${categoriaSelecionada})`
       : termoBusca.length >= 3 && categoriaSelecionada === null
-      ? `Resultados da busca`
-      : "Veja todos os nossos produtos!";
+        ? `Resultados da busca`
+        : "Veja todos os nossos produtos!";
 
   const produtosOrdenados = useMemo(() => {
     return [...produtosValidos].sort((a, b) => {
@@ -964,12 +982,22 @@ export default function HomeScreen() {
                   style={styles.searchIcon}
                 />
                 <TextInput
-                  style={styles.inputBuscaOverlay}
+                  style={[styles.inputBuscaOverlay, termoBusca.length > 0 && styles.inputBuscaComLimpar]}
                   placeholder="Busque produtos ou serviços..."
                   value={termoBusca}
                   onChangeText={setTermoBusca}
                   placeholderTextColor={BRAND_COLORS.textMuted}
                 />
+                {termoBusca.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.clearButton}
+                    onPress={() => setTermoBusca("")}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                    accessibilityLabel="Limpar busca"
+                  >
+                    <Feather name="x-circle" size={18} color={BRAND_COLORS.textMuted} />
+                  </TouchableOpacity>
+                )}
               </View>
 
               <TouchableOpacity
@@ -1029,6 +1057,10 @@ export default function HomeScreen() {
 
                   <OfertasWebSection
                     termoBusca={termoBusca}
+                    userLocation={userLocation}
+                    ordenarPorPreco={ordenarPorPreco}
+                    ordenacaoManual={ordenacaoManual}
+                    onVerNoMapa={handleVerNoMapaWeb}
                     onReivindicarLoja={handleReivindicarLoja}
                   />
 
@@ -1124,7 +1156,7 @@ export default function HomeScreen() {
                                 style={[
                                   styles.categoriaBotaoRedondo,
                                   categoriaSelecionada === cat.nome &&
-                                    styles.categoriaBotaoSelecionado,
+                                  styles.categoriaBotaoSelecionado,
                                 ]}
                                 onPress={() =>
                                   setCategoriaSelecionada(
@@ -1142,7 +1174,7 @@ export default function HomeScreen() {
                                 style={[
                                   styles.categoriaLegenda,
                                   categoriaSelecionada === cat.nome &&
-                                    styles.categoriaLegendaSelecionada,
+                                  styles.categoriaLegendaSelecionada,
                                 ]}
                               >
                                 {cat.nome}
@@ -1218,6 +1250,10 @@ export default function HomeScreen() {
                 </Text>
                 <OfertasWebSection
                   termoBusca={termoBusca}
+                  userLocation={userLocation}
+                  ordenarPorPreco={ordenarPorPreco}
+                  ordenacaoManual={ordenacaoManual}
+                  onVerNoMapa={handleVerNoMapaWeb}
                   onReivindicarLoja={handleReivindicarLoja}
                 />
               </View>
@@ -1391,9 +1427,9 @@ export default function HomeScreen() {
               const distanciaModal =
                 userLocation && location
                   ? calcularDistancia(userLocation, {
-                      latitude: location.latitude,
-                      longitude: location.longitude,
-                    })
+                    latitude: location.latitude,
+                    longitude: location.longitude,
+                  })
                   : null;
               if (!location) return null;
               return (
@@ -1446,6 +1482,16 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
     elevation: 0,
     zIndex: 10,
+  },
+  inputBuscaComLimpar: {
+    paddingRight: 38,
+  },
+  clearButton: {
+    position: "absolute",
+    right: 12,
+    zIndex: 2,
+    justifyContent: "center",
+    alignItems: "center",
   },
   buscaOverlayContainer: {
     justifyContent: "center",
