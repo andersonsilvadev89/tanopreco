@@ -106,18 +106,15 @@ const PALAVRAS_POR_CATEGORIA: Record<string, string[]> = {
 function pertenceACategoria(item: OfertaWeb, categoriaSelecionada: string): boolean {
   const catNorm = normalizarTexto(categoriaSelecionada);
 
-  // 1. Se o item já vier com categoria do scraper
   if (item.categoria && normalizarTexto(item.categoria).includes(catNorm)) {
     return true;
   }
 
-  // 2. Verifica se a loja pertence diretamente à categoria (ex: Mercado, Saúde, Utilidades)
   const lojasDaCategoria = LOJAS_POR_CATEGORIA[catNorm];
   if (lojasDaCategoria?.includes(item.lojaId)) {
     return true;
   }
 
-  // 3. Verifica palavras-chave na descrição do produto
   const palavras = PALAVRAS_POR_CATEGORIA[catNorm];
   if (palavras) {
     const descNorm = normalizarTexto(item.descricao);
@@ -192,6 +189,28 @@ function parsePreco(preco: string) {
   const limpo = preco.replace("R$", "").replace(/\./g, "").replace(",", ".").trim();
   const num = parseFloat(limpo);
   return Number.isNaN(num) ? Infinity : num;
+}
+
+function formatarUltimaAtualizacao(ofertas: OfertaWeb[]): string | null {
+  let maisRecente = 0;
+
+  for (const item of ofertas) {
+    if (!item.atualizadoEm) continue;
+    const timestamp = Date.parse(item.atualizadoEm);
+    if (!Number.isNaN(timestamp) && timestamp > maisRecente) {
+      maisRecente = timestamp;
+    }
+  }
+
+  if (!maisRecente) return null;
+
+  const data = new Date(maisRecente);
+  const dia = String(data.getDate()).padStart(2, "0");
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const hora = String(data.getHours()).padStart(2, "0");
+  const minuto = String(data.getMinutes()).padStart(2, "0");
+
+  return `${dia}/${mes} às ${hora}:${minuto}`;
 }
 
 export function OfertasWebSection({
@@ -269,7 +288,6 @@ export function OfertasWebSection({
       });
     }
 
-    // Mantém intercalado apenas na abertura inicial (sem busca, sem categoria e sem mexer no switch)
     if (!busca && !categoriaSelecionada && !ordenacaoManual) {
       return filtradas;
     }
@@ -300,6 +318,11 @@ export function OfertasWebSection({
     ordenarPorPreco,
     ordenacaoManual,
   ]);
+
+  const ultimaAtualizacao = useMemo(
+    () => formatarUltimaAtualizacao(ofertasFiltradas),
+    [ofertasFiltradas]
+  );
 
   const abrirLinkExterno = async (url: string) => {
     try {
@@ -423,6 +446,14 @@ export function OfertasWebSection({
           );
         }}
       />
+
+      <View style={styles.disclaimerBox}>
+        <Feather name="info" size={12} color={BRAND_COLORS.textMuted} style={styles.disclaimerIcon} />
+        <Text style={styles.disclaimerText}>
+          Preços coletados de sites públicos, sujeitos a alteração sem aviso prévio pela loja.
+          {ultimaAtualizacao ? ` Última atualização: ${ultimaAtualizacao}.` : ""}
+        </Text>
+      </View>
     </View>
   );
 }
@@ -564,5 +595,21 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: BRAND_COLORS.primaryDark,
     textDecorationLine: "underline",
+  },
+  disclaimerBox: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginTop: 8,
+    paddingHorizontal: 6,
+    gap: 5,
+  },
+  disclaimerIcon: {
+    marginTop: 1,
+  },
+  disclaimerText: {
+    flex: 1,
+    fontSize: 10,
+    lineHeight: 14,
+    color: BRAND_COLORS.textMuted,
   },
 });
